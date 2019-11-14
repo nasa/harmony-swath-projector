@@ -1,0 +1,15 @@
+Data Services Reprojection Service for SWOT Swatch Data
+
+To download source code:
+
+> git clone https://git.earthdata.nasa.gov/scm/sitc/swotrepr.git swotrepr
+
+To build the Docker image:
+
+> cd swotrepr
+> ./bin/build-image
+
+The image build process needs Earthdata Login credentials to access the Harmony utility library. The
+script will attempt to retrieve credentials from a '.netrc' file, but will prompt you for credentials
+if it cannot find any. These credentials are used ONLY during the build process, and will not be
+propagated or otherwise stored in the docker image.
