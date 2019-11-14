@@ -132,7 +132,6 @@ parser.add_argument('--harmony-action',
 parser.add_argument('--harmony-input',
                     help='The input data for the action provided by Harmony')
 
-print("Starting")
 args = parser.parse_args()
 harmony.run_cli(parser, args, HarmonyAdapter)
 
