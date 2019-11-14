@@ -7,6 +7,7 @@ To download source code:
 To build the Docker image:
 
 > cd swotrepr
+
 > ./bin/build-image
 
 The image build process needs Earthdata Login credentials to access the Harmony utility library. The
