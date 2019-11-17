@@ -6,6 +6,7 @@ import argparse
 import gdal
 import json
 import logging
+import mimetypes
 import os
 import re
 import shutil
@@ -64,10 +65,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             # gdal.Warp(output_file, input_file, options=['geoloc', 't_srs', '+proj=longlat +ellps=WGS84 +units=m'], tps=False)
             # gdalwarp -geoloc -tps -t_srs '+proj=longlat +ellps=WGS84' NETCDF:<input_file>:sea_surface_temperature output_file
 
-            info = subprocess.check_output(['gdalinfo', input_file], stderr=subprocess.STDOUT).decode("utf-8")
             try:
+                info = subprocess.check_output(['gdalinfo', input_file], stderr=subprocess.STDOUT).decode("utf-8")
                 input_format = re.search("Driver:\s*([^/]+)", info).group(1)
-            except AttributeError:
+            except Exception as e:
+                logger.error("Unable to determine input file format: " + str(e))
                 raise Exception("Cannot determine input file format")
 
             logger.info("Input file format: " + input_format)
@@ -112,10 +114,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             # Return the output file back to Harmony
 
             logger.info("Reprojection complete")
-            self.completed_with_local_file(output_file)
+            mimetype = mimetypes.guess_type(input_file, False) or ('application/octet-stream', None)
+            self.completed_with_local_file(output_file, os.path.basename(input_file), mimetype[0])
 
         except Exception as e:
-            logger.exception("Reprojection failed", e)
+            logger.error("Reprojection failed:" + str(e))
             self.completed_with_error("Reprojection failed with error: " + str(e))
 
         finally:
