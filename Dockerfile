@@ -11,6 +11,6 @@ RUN pip3 install -vvv requests==2.18.4 --user --trusted-host=pypi.python.org --t
     && pip3 install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git"
 
 # Bundle app source
-COPY . .
+COPY ./reproject reproject
 
 ENTRYPOINT ["python3", "reproject/reproject.py"]
