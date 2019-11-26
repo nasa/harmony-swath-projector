@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 
 from tempfile import mkdtemp
 
@@ -31,12 +32,19 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         logger.info("Starting Data Services Reprojection Service")
 
         try:
-            # Make a local copy of the granule file we need to reproject
+            if not hasattr(self, 'message'):
+                raise Exception("No message request")
 
-            if not self.message.granules:
+
+            # Verify a granule URL has been provided andmake a local copy of the granule file
+
+            msg = self.message
+            if not hasattr(msg, 'granules') or not msg.granules :
                 raise Exception("No granules specified for reprojection")
-            if len(self.message.granules) > 1:
-                raise Exception("Only one granule may be reprojected at a time")
+            if not isinstance(msg.granules, list):
+                raise Exception("Invalid granule list")
+            if len(msg.granules) > 1:
+                raise Exception("Too many granules")
 
             self.download_granules()
             logger.info("Granule data copied")
@@ -44,14 +52,18 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             # Get the reprojection crs
 
-            crs = self.message.format.crs or '+proj=longlat +ellps=WGS84 +units=m'
+            crs = None
+            if hasattr(msg, 'format') and hasattr(msg.format, 'crs'):
+                crs = msg.format.crs
+            crs = crs or '+proj=longlat +ellps=WGS84 +units=m'
 
 
             # Set up source and destination files
 
-            granule = self.message.granules[0]
+            granule = msg.granules[0]
             input_file = granule.local_filename
-
+            if not os.path.isfile(input_file):
+                raise Exception("Input file does not exist")
             temp_dir = mkdtemp()
             output_file = temp_dir + os.sep + os.path.basename(input_file)
             extension = os.path.splitext(output_file)[-1][1:]
@@ -118,7 +130,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             self.completed_with_local_file(output_file, os.path.basename(input_file), mimetype[0])
 
         except Exception as e:
-            logger.error("Reprojection failed:" + str(e))
+            logger.error("Reprojection failed: " + str(e))
             self.completed_with_error("Reprojection failed with error: " + str(e))
 
         finally:
@@ -128,13 +140,14 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
 # Main program start
 #
-parser = argparse.ArgumentParser(prog='Reproject', description='Run the Data Services Reprojection Tool')
-parser.add_argument('--harmony-action',
-                    choices=['invoke'],
-                    help='The action Harmony needs to perform (currently only "invoke")')
-parser.add_argument('--harmony-input',
-                    help='The input data for the action provided by Harmony')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog='Reproject', description='Run the Data Services Reprojection Tool')
+    parser.add_argument('--harmony-action',
+                        choices=['invoke'],
+                        help='The action Harmony needs to perform (currently only "invoke")')
+    parser.add_argument('--harmony-input',
+                        help='The input data for the action provided by Harmony')
 
-args = parser.parse_args()
-harmony.run_cli(parser, args, HarmonyAdapter)
+    args = parser.parse_args()
+    harmony.run_cli(parser, args, HarmonyAdapter)
 
