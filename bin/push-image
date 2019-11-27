@@ -9,15 +9,14 @@ tag=${1:-latest}
 region=${AWS_DEFAULT_REGION-"us-west-2"}
 
 account=$(aws sts get-caller-identity --output text --query 'Account')
+# Need to remove \r returned on all aws commands run from Bamboo
+account=${account//$'\r'/}
 
-# Need to create a temporary file with the docker login command.
-# Call dos2unix to ensure no issues on login.
 temp_docker_login_file=$(mktemp tmp.docker.login.file.XXXXXXXXXXXXXXXXXXX)
-aws ecr get-login --no-include-email --region ${region} > $temp_docker_login_file
-chmod 755 $temp_docker_login_file
-dos2unix $temp_docker_login_file
-sh $temp_docker_login_file
-rm $temp_docker_login_file
+login_command=$(aws ecr get-login --no-include-email --region ${region})
+# Need to remove \r returned on all aws commands run from Bamboo
+login_command=${login_command//$'\r'/}
+$login_command
 
 docker tag ${image}:${tag} ${account}.dkr.ecr.${region}.amazonaws.com/${image}:${tag}
 
