@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -ex
+
+find . | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
+
+docker run --rm -v $(pwd):/home sds/swot-reproject-test "$@"
+
+
