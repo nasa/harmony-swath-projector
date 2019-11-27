@@ -1,7 +1,7 @@
 #!/bin/bash
 # Pushes the docker image to an ECR repo. Requires AWS credentials to be set.
 
-set -e
+set -ex
 
 image="sds/swot-reproject"
 tag=${1:-latest}
