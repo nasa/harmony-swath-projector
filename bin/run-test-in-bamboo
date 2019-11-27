@@ -1,4 +1,5 @@
 #!/bin/bash
+# Runs tests in Bamboo
 
 set -ex
 
