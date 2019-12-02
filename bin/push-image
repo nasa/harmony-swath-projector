@@ -12,7 +12,6 @@ account=$(aws sts get-caller-identity --output text --query 'Account')
 # Need to remove \r returned on all aws commands run from Bamboo
 account=${account//$'\r'/}
 
-temp_docker_login_file=$(mktemp tmp.docker.login.file.XXXXXXXXXXXXXXXXXXX)
 login_command=$(aws ecr get-login --no-include-email --region ${region})
 # Need to remove \r returned on all aws commands run from Bamboo
 login_command=${login_command//$'\r'/}
