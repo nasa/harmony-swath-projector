@@ -17,6 +17,8 @@ from tempfile import mkdtemp
 
 import harmony
 
+from NetCDF4Merger import NetCDF4Merger
+
 
 # Data Services Reprojection service for Harmony
 #
@@ -39,7 +41,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             # Verify a granule URL has been provided andmake a local copy of the granule file
 
             msg = self.message
-            if not hasattr(msg, 'granules') or not msg.granules :
+            if not hasattr(msg, 'granules') or not msg.granules:
                 raise Exception("No granules specified for reprojection")
             if not isinstance(msg.granules, list):
                 raise Exception("Invalid granule list")
@@ -76,7 +78,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             #
             # gdal.Warp(output_file, input_file, options=['geoloc', 't_srs', '+proj=longlat +ellps=WGS84 +units=m'], tps=False)
             # gdalwarp -geoloc -tps -t_srs '+proj=longlat +ellps=WGS84' NETCDF:<input_file>:sea_surface_temperature output_file
-
             try:
                 info = subprocess.check_output(['gdalinfo', input_file], stderr=subprocess.STDOUT).decode("utf-8")
                 input_format = re.search("Driver:\s*([^/]+)", info).group(1)
