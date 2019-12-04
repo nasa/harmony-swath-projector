@@ -17,8 +17,6 @@ from tempfile import mkdtemp
 
 import harmony
 
-from NetCDF4Merger import NetCDF4Merger
-
 
 # Data Services Reprojection service for Harmony
 #
