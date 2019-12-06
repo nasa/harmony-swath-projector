@@ -17,6 +17,9 @@ from tempfile import mkdtemp
 
 import harmony
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from NetCDF4Merger import NetCDF4Merger
 
 # Data Services Reprojection service for Harmony
 #
@@ -99,6 +102,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                     name = dataset.split(':')[-1]
                     output = temp_dir + os.sep + name + '.' + extension
                     logger.info("Reprojecting subdataset '%s'" % name)
+                    logger.info("reprojected output '%s'" % output)
                     result_str = subprocess.check_output(['gdalwarp', '-geoloc', '-t_srs', crs, dataset, output], stderr=subprocess.STDOUT).decode("utf-8")
                     outputs.append(name)
                 except Exception as e:
@@ -109,18 +113,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             if not outputs:
                 raise Exception("No subdatasets could be reprojected")
 
-            elif len(outputs) == 1:
-                # Just rename a single band output
-
-                shutil.move(temp_dir + os.sep + outputs[0] + '.' + extension, output_file)
             else:
-                # Merge multiple bands back into one file
-                args = ['gdal_merge.py', '-o', output_file, '-separate', '-of', input_format]
-                args.extend([temp_dir + os.sep + name + '.' + extension for name in outputs])
-                logger.info("Merging output files")
-
-                subprocess.check_output(args, stderr=subprocess.STDOUT)
-
+                NetCDF4Merger.create_output(input_file, output_file, temp_dir, logger)
 
             # Return the output file back to Harmony
 
