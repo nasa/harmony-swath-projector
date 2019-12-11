@@ -20,7 +20,6 @@ from tempfile import mkdtemp
 
 import harmony
 
-print(sys.path)
 from Mergers import NetCDF4Merger
 
 # Data Services Reprojection service for Harmony

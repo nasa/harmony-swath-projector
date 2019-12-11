@@ -16,5 +16,6 @@ RUN pip3 install -vvv requests==2.18.4 --user --trusted-host=pypi.python.org --t
 
 # Bundle app source
 COPY ./reproject reproject
+COPY ./Mergers Mergers
 
 ENTRYPOINT ["python3", "reproject/reproject.py"]

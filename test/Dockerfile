@@ -17,5 +17,6 @@ RUN pip3 install -vvv requests==2.18.4 --user --trusted-host=pypi.python.org --t
 
 COPY ./test test
 COPY ./reproject reproject
+COPY ./Mergers Mergers
 
 ENTRYPOINT ["python", "-m", "unittest", "discover", "-q", "test"]
