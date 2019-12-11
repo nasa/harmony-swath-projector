@@ -2,24 +2,26 @@
 # Data Services Reprojection service for Harmony
 #
 
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import argparse
 import gdal
 import json
 import logging
 import mimetypes
-import os
 import re
 import shutil
 import subprocess
-import sys
+
 
 from tempfile import mkdtemp
 
 import harmony
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from NetCDF4Merger import NetCDF4Merger
+print(sys.path)
+from Mergers import NetCDF4Merger
 
 # Data Services Reprojection service for Harmony
 #
@@ -68,7 +70,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             if not os.path.isfile(input_file):
                 raise Exception("Input file does not exist")
             temp_dir = mkdtemp()
-            output_file = temp_dir + os.sep + os.path.basename(input_file)
+            root_ext = os.path.splitext(os.path.basename(input_file))
+            output_file = temp_dir + os.sep + root_ext[0] + '_repr' + root_ext[1]
             extension = os.path.splitext(output_file)[-1][1:]
 
             logger.info("Reprojecting file " + input_file + " as " + output_file)
@@ -114,7 +117,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception("No subdatasets could be reprojected")
 
             else:
-                NetCDF4Merger.create_output(input_file, output_file, temp_dir, logger)
+                NetCDF4Merger.create_output(input_file, output_file, temp_dir)
 
             # Return the output file back to Harmony
 
