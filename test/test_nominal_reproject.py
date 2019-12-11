@@ -16,7 +16,7 @@ from test_utils import contains, matches, TestBase
 
 class TestNominalReproject(TestBase):
 
-    # TEST CASE: No granules attribute
+    # TEST CASE: Nominal reprojection on a single band file
     #
     @patch.object(BaseHarmonyAdapter, 'completed_with_local_file')
     @patch.object(BaseHarmonyAdapter, 'cleanup')
