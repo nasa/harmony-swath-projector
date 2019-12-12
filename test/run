@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Exit status used to report back to caller
+#
+STATUS=0
+
+
+
+# Run the standard set of unittests
+#
+python -m unittest discover -q test
+RESULT=$?
+if [ "$RESULT" -ne "0" ]; then
+    STATUS=1
+    echo "ERROR: unittest generated errors"
+fi
+
+
+
+# Run pylint
+#
+pylint reproject --disable=E0401
+RESULT=$?
+RESULT=$((3 & $RESULT))
+if [ "$RESULT" -ne "0" ]; then
+    STATUS=1
+    echo "ERROR: pylint generated errors"
+fi
+
+
+
+# Run the python safety check
+#
+safety check
+RESULT=$?
+if [ "$RESULT" -ne "0" ]; then
+    STATUS=1
+    echo "ERROR: safety check generated errors"
+fi
+
+
+
+exit $STATUS

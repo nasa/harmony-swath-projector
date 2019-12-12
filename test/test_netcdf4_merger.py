@@ -1,12 +1,12 @@
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import unittest
-import subprocess
+import logging
 import netCDF4
+import os
 import re
+import subprocess
+import sys
+import unittest
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Mergers import NetCDF4Merger
 from test_utils import TestBase
 
