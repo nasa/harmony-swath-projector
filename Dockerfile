@@ -6,7 +6,8 @@ ARG EDL_PASSWORD
 # Note GIT credentials could have issue if password contains certain characters.
 # URL encoding additional characters besides '@' may be required
 WORKDIR "/home"
-RUN pip3 install -vvv requests==2.18.4 --user --trusted-host=pypi.python.org --trusted-host=pypi.org --trusted-host=files.pythonhosted.org boto3 \
+RUN pip3 install --upgrade pip \
+    && pip3 install requests==2.18.4 --user --trusted-host=pypi.python.org --trusted-host=pypi.org --trusted-host=files.pythonhosted.org boto3 \
     && apk add git \
     && EDL_PASSWORD=$(echo $EDL_PASSWORD | sed -e 's/@/%40/g') \
     && pip3 install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git" \
@@ -17,5 +18,6 @@ RUN pip3 install -vvv requests==2.18.4 --user --trusted-host=pypi.python.org --t
 
 # Bundle app source
 COPY ./reproject reproject
+COPY ./Mergers Mergers
 
 ENTRYPOINT ["python3", "reproject/reproject.py"]

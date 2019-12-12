@@ -7,16 +7,20 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Note GIT credentials could have issue if password contains certain characters.
 # Escaping may be required
 WORKDIR "/home"
+
 RUN pip3 install --upgrade pip \
     && pip3 install requests --user --trusted-host=pypi.python.org --trusted-host=pypi.org --trusted-host=files.pythonhosted.org boto3 \
     && pip3 install coverage \
-    && apk add build-base python3-dev \
-    && pip3 install pylint safety \
-    && apk del build-base python3-dev
+    && apk add build-base python3-dev py-numpy-dev \
+    && apk add --no-cache --allow-untrusted --repository http://dl-3.alpinelinux.org/alpine/edge/testing hdf5-dev netcdf-dev \
+    && pip3 install netCDF4 pylint safety \
+    && apk del py-numpy-dev python3-dev build-base
+
 
 # Bundle app source
 
 COPY ./test test
 COPY ./reproject reproject
+COPY ./Mergers Mergers
 
 ENTRYPOINT ["/home/test/run"]

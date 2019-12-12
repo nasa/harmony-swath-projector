@@ -59,7 +59,7 @@ class TestBase(unittest.TestCase):
 # Extension class that allows a 'string contains' check in a unit test
 # assertion. e.g.
 #
-# x.assert_called_once_with(containing(str))
+# x.assert_called_once_with(contains(str))
 #
 class contains(str):
     def __eq__(self, other):
@@ -69,7 +69,7 @@ class contains(str):
 # Extension class that allows a regex type check in a unit test
 # assertion. e.g.
 #
-# x.assert_called_once_with(matching(regex))
+# x.assert_called_once_with(matches(regex))
 #
 class matches(str):
     def __eq__(self, other):

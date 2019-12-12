@@ -26,7 +26,7 @@ class TestNominalReproject(TestBase):
         reprojector = HarmonyAdapter(test_data)
         reprojector.invoke()
 
-        completed_with_local_file.assert_called_once_with(contains('VNL2_oneBand.nc'), 'VNL2_oneBand.nc', 'application/x-netcdf')
+        completed_with_local_file.assert_called_once_with(contains('VNL2_oneBand_repr.nc'), 'VNL2_oneBand.nc', 'application/x-netcdf')
         cleanup.assert_called_once()
 
 if __name__ == '__main__':
