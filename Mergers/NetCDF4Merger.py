@@ -5,12 +5,14 @@
 import argparse
 import logging
 import os
+import re
 import netCDF4
 import warnings
 
 GDAL_DATASET_NAME = 'Band1'
 
-
+coor_info_attrs = {'x': {'long_name': 'x coordinate of projection', 'units': 'm', 'standard_name': 'projection_x_coordinate'},
+                   'y': {'long_name': 'y coordinate of projection', 'units': 'm', 'standard_name': 'projection_y_coordinate'}}
 
 def create_output(inputfile, outputfile, temp_dir, logger=None):
     """
@@ -47,6 +49,16 @@ def create_output(inputfile, outputfile, temp_dir, logger=None):
 def read_attrs(inf):
     return inf.__dict__
 
+# check if coordinates attributes is still valid after reprojection
+def check_coor_valid(attrs, rep):
+
+    coors = re.split(' |,', attrs['coordinates'])
+    for coor in coors:
+        if coor not in rep.variables.keys():
+            return False
+
+    return True
+
 # check if time dimension exists
 def has_time_dimension(inf):
     return 'time' in list(inf.dimensions.keys())
@@ -70,10 +82,19 @@ def get_dataset_meta(inf, rep, dataset_name):
         data_type = get_data_type(rep, dataset_name)
         dims = get_dimensions(rep, dataset_name)
         attrs = read_attrs(inf[dataset_name]) if dataset_name in inf.variables.keys() else read_attrs(rep[dataset_name])
+        if dataset_name in coor_info_attrs:
+            attrs.update(coor_info_attrs[dataset_name])
     else:
         data_type = get_data_type(inf, dataset_name)
         dims = get_dimensions(rep, dataset_name, inf)
         attrs = read_attrs(inf[dataset_name])
+        if rep[GDAL_DATASET_NAME].grid_mapping:
+            attrs['grid_mapping'] = rep[GDAL_DATASET_NAME].grid_mapping
+
+    # remove coordinates attribute if it is no longer valid
+    if 'coordinates' in attrs and not check_coor_valid(attrs, rep):
+        del attrs['coordinates']
+
     return dims, data_type, attrs
 
 # get dimensions from input
@@ -116,7 +137,7 @@ def copy_variable(inf, out, rep, dataset_name, logger):
         warnings.simplefilter("ignore", category=UserWarning)
         if rep[ori_dataset_name][:].shape != out[dataset_name].shape:
             reshaped = rep[ori_dataset_name][:].reshape(out[dataset_name].shape)
-            if data_type == 'int16' and 'add_offset' in attrs and 'scale_factor' in attrs:
+            if 'add_offset' in attrs and 'scale_factor' in attrs:
                 reshaped = reshaped * out[dataset_name].scale_factor + out[dataset_name].add_offset
             out[dataset_name][:] = reshaped
         else:

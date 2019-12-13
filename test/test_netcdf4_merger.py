@@ -40,17 +40,31 @@ class TestNetCDF4Merger(TestBase):
         output_dim = NetCDF4Merger.get_dimensions(test_file, os.path.splitext(test_dataset)[0], out)
         self.assertEqual(len(input_dim), len(output_dim), "Should be equal")
 
-    # TEST CASE: datasets in the output file should have same number of attributes as the ones in the input
+    # TEST CASE: datasets in the output file should have same number of global
+    # attributes as the ones in the input
     #
-    def test_same_attributes(self):
-        """Datasets in input and output should have same number of attributes"""
-        test_dataset = 'sea_surface_temperature.nc'
-        test_file = netCDF4.Dataset(self.tmp_dir+test_dataset)
+    def test_same_num_of_global_attributes(self):
+        """Datasets in input and output should have same number of global attributes"""
         inf = netCDF4.Dataset(self.input_file)
         out = netCDF4.Dataset(self.output_file)
-        input_dim = NetCDF4Merger.read_attrs(inf)
-        output_dim = NetCDF4Merger.read_attrs(out)
-        self.assertEqual(len(input_dim), len(output_dim), "Should be equal")
+        input_attrs = NetCDF4Merger.read_attrs(inf)
+        output_attrs = NetCDF4Merger.read_attrs(out)
+        self.assertEqual(len(input_attrs), len(output_attrs), "Should be equal")
+
+    # TEST CASE: datasets in the output file should have one attribute more than the input file
+    #              - the crs attribute
+    #
+    def test_same_num_of_dataset_attributes(self):
+        """Datasets in input should have one attribute more than the datasets in the input file
+            - crs"""
+        test_dataset = 'sea_surface_temperature'
+        inf = netCDF4.Dataset(self.input_file)
+        out = netCDF4.Dataset(self.output_file)
+        inf_data = inf[test_dataset]
+        out_data = out[test_dataset]
+        input_attrs = NetCDF4Merger.read_attrs(inf_data)
+        output_attrs = NetCDF4Merger.read_attrs(out_data)
+        self.assertEqual(len(input_attrs)+1, len(output_attrs), "Should be equal")
 
     # TEST CASE: datasets in the output file should have same data type as the ones in the input
     #
