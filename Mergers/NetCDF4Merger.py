@@ -45,19 +45,41 @@ def create_output(inputfile, outputfile, temp_dir, logger=None):
                     else:
                         copy_variable(inf, out, data, dataset_name, logger)
 
+        # if 'crs' exists in output, rename it to the grid_mapping_name and update grid_mapping attributes
+        if 'crs' in out.variables.keys():
+            new_crs_name = out['crs'].grid_mapping_name
+            out.renameVariable('crs', new_crs_name)
+            for name, var in out.variables.items():
+                if hasattr(var, 'grid_mapping'):
+                    var.grid_mapping = new_crs_name
+
 # read attribute from a file/dataset
 def read_attrs(inf):
     return inf.__dict__
 
 # check if coordinates attributes is still valid after reprojection
-def check_coor_valid(attrs, rep):
+# Invalud coordinate reference cases:
+#    1) coordinate reference no longer exists
+#    2) coordinate size does not match after reprojection
+def check_coor_valid(attrs, inf, rep):
 
     coors = re.split(' |,', attrs['coordinates'])
+    valid = True
+
     for coor in coors:
         if coor not in rep.variables.keys():
-            return False
+            valid = False
+            break
+        elif coor in rep.variables.keys() and coor in inf.variables.keys():
+            if rep[coor].shape != inf[coor].shape:
+                valid = False
+                break
 
-    return True
+    return valid
+
+# rename 'crs' dataset
+def rename_crs(crs):
+    return crs.grid_mapping_name
 
 # check if time dimension exists
 def has_time_dimension(inf):
@@ -92,7 +114,7 @@ def get_dataset_meta(inf, rep, dataset_name):
             attrs['grid_mapping'] = rep[GDAL_DATASET_NAME].grid_mapping
 
     # remove coordinates attribute if it is no longer valid
-    if 'coordinates' in attrs and not check_coor_valid(attrs, rep):
+    if 'coordinates' in attrs and not check_coor_valid(attrs, inf, rep):
         del attrs['coordinates']
 
     return dims, data_type, attrs
@@ -119,17 +141,17 @@ def copy_variable(inf, out, rep, dataset_name, logger):
     # set data type, dimensions, and attributes
     dims, data_type, attrs = get_dataset_meta(inf, rep, dataset_name)
 
+    if dataset_name not in rep.variables.keys():
+        ori_dataset_name = GDAL_DATASET_NAME
+    else:
+        ori_dataset_name = dataset_name
+
     if dims:
         out.createVariable(dataset_name, data_type, dims, zlib=True, complevel=6)
     else:
         out.createVariable(dataset_name, data_type, zlib=True, complevel=6)
 
     out[dataset_name].setncatts(attrs)
-
-    if dataset_name not in rep.variables.keys():
-        ori_dataset_name = GDAL_DATASET_NAME
-    else:
-        ori_dataset_name = dataset_name
 
     # manually compute the data value if offset and scale_factor exist for integers
 
