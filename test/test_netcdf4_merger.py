@@ -51,8 +51,7 @@ class TestNetCDF4Merger(TestBase):
         output_attrs = NetCDF4Merger.read_attrs(out)
         self.assertEqual(len(input_attrs), len(output_attrs), "Should be equal")
 
-    # TEST CASE: datasets in the output file should have one attribute more than the input file
-    #              - the crs attribute
+    # TEST CASE: datasets in the output file should have same number of attributes as the input file
     #
     def test_same_num_of_dataset_attributes(self):
         """Datasets in input should have one attribute more than the datasets in the input file
@@ -64,7 +63,7 @@ class TestNetCDF4Merger(TestBase):
         out_data = out[test_dataset]
         input_attrs = NetCDF4Merger.read_attrs(inf_data)
         output_attrs = NetCDF4Merger.read_attrs(out_data)
-        self.assertEqual(len(input_attrs)+1, len(output_attrs), "Should be equal")
+        self.assertEqual(len(input_attrs), len(output_attrs), "Should be equal")
 
     # TEST CASE: datasets in the output file should have same data type as the ones in the input
     #
@@ -77,7 +76,6 @@ class TestNetCDF4Merger(TestBase):
         input_data_type = NetCDF4Merger.get_data_type(inf, os.path.splitext(test_dataset)[0])
         output_data_type = NetCDF4Merger.get_data_type(out, os.path.splitext(test_dataset)[0])
         self.assertEqual(input_data_type, output_data_type, "Should be equal")
-
 
 if __name__ == '__main__':
     unittest.main()

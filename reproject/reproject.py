@@ -9,7 +9,6 @@ import re
 import sys
 import subprocess
 
-
 from tempfile import mkdtemp
 
 import harmony
@@ -34,6 +33,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         """
         logger = self.logger
         logger.info("Starting Data Services Reprojection Service")
+        os.environ['HDF5_DISABLE_VERSION_CHECK'] = '1'
 
         try:
             if not hasattr(self, 'message'):
