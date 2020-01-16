@@ -53,16 +53,17 @@ def create_output(inputfile, outputfile, temp_dir, logger=None):
                 if hasattr(var, 'grid_mapping'):
                     var.grid_mapping = new_crs_name
 
-# read attribute from a file/dataset
 def read_attrs(inf):
+    """read attribute from a file/dataset"""
     return inf.__dict__
 
-# check if coordinates attributes is still valid after reprojection
-# Invalud coordinate reference cases:
-#    1) coordinate reference no longer exists
-#    2) coordinate size does not match after reprojection
 def check_coor_valid(attrs, inf, rep):
-
+    """
+        Check if coordinates attributes is still valid after reprojection
+        Invalid coordinate reference cases:
+          1) coordinate reference no longer exists
+          2) coordinate size does not match after reprojection
+    """
     coors = re.split(' |,', attrs['coordinates'])
     valid = True
 
@@ -77,29 +78,22 @@ def check_coor_valid(attrs, inf, rep):
 
     return valid
 
-# rename 'crs' dataset
-def rename_crs(crs):
-    return crs.grid_mapping_name
-
-# check if time dimension exists
 def has_time_dimension(inf):
+    """check if time dimension exists"""
     return 'time' in list(inf.dimensions.keys())
 
-# add time dimension to the output file
 def copy_time_dimension(inf, out):
-
+    """add time dimension to the output file"""
     out.createDimension('time', len(inf.dimensions['time']))
 
-# set dimension in the output
 def set_dimension(inf, out):
-
+    """set dimension in the output"""
     for name, dimension in inf.dimensions.items():
         if not (dimension.isunlimited() or name in list(out.dimensions.keys())):
             out.createDimension(name, len(dimension))
 
-# get dataset data type, dimensions, and attributes from input
 def get_dataset_meta(inf, rep, dataset_name):
-
+    """get dataset data type, dimensions, and attributes from input"""
     if dataset_name in rep.variables.keys():
         data_type = get_data_type(rep, dataset_name)
         dims = get_dimensions(rep, dataset_name)
@@ -119,9 +113,8 @@ def get_dataset_meta(inf, rep, dataset_name):
 
     return dims, data_type, attrs
 
-# get dimensions from input
 def get_dimensions(rep, dataset_name, inf=None):
-
+    """get dimensions from input"""
     if inf:
         if 'time' in list(inf.dimensions.keys()):
             return ('time',) + rep[GDAL_DATASET_NAME].dimensions
@@ -131,12 +124,12 @@ def get_dimensions(rep, dataset_name, inf=None):
         return (dataset_name,)
     return None
 
-# get data type
 def get_data_type(inf, dataset_name):
+    """get data type"""
     return inf[dataset_name].datatype
 
-# write dataset value to the output
 def copy_variable(inf, out, rep, dataset_name, logger):
+    """write dataset value to the output"""
 
     # set data type, dimensions, and attributes
     dims, data_type, attrs = get_dataset_meta(inf, rep, dataset_name)
