@@ -4,7 +4,7 @@
 #
 STATUS=0
 
-
+export HDF5_DISABLE_VERSION_CHECK=1
 
 # Run the standard set of unittests
 #

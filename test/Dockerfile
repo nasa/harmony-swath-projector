@@ -1,4 +1,4 @@
-FROM osgeo/gdal:alpine-normal-latest
+FROM osgeo/gdal:alpine-normal-3.0.2
 
 ARG EDL_USERNAME
 ARG EDL_PASSWORD

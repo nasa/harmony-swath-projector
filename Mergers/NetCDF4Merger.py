@@ -45,39 +45,55 @@ def create_output(inputfile, outputfile, temp_dir, logger=None):
                     else:
                         copy_variable(inf, out, data, dataset_name, logger)
 
-# read attribute from a file/dataset
+        # if 'crs' exists in output, rename it to the grid_mapping_name and update grid_mapping attributes
+        if 'crs' in out.variables.keys():
+            new_crs_name = out['crs'].grid_mapping_name
+            out.renameVariable('crs', new_crs_name)
+            for name, var in out.variables.items():
+                if hasattr(var, 'grid_mapping'):
+                    var.grid_mapping = new_crs_name
+
 def read_attrs(inf):
+    """read attribute from a file/dataset"""
     return inf.__dict__
 
-# check if coordinates attributes is still valid after reprojection
-def check_coor_valid(attrs, rep):
-
+def check_coor_valid(attrs, inf, rep):
+    """
+        Check if coordinates attributes is still valid after reprojection
+        Invalid coordinate reference cases:
+          1) coordinate reference no longer exists
+          2) coordinate size does not match after reprojection
+    """
     coors = re.split(' |,', attrs['coordinates'])
+    valid = True
+
     for coor in coors:
         if coor not in rep.variables.keys():
-            return False
+            valid = False
+            break
+        elif coor in rep.variables.keys() and coor in inf.variables.keys():
+            if rep[coor].shape != inf[coor].shape:
+                valid = False
+                break
 
-    return True
+    return valid
 
-# check if time dimension exists
 def has_time_dimension(inf):
+    """check if time dimension exists"""
     return 'time' in list(inf.dimensions.keys())
 
-# add time dimension to the output file
 def copy_time_dimension(inf, out):
-
+    """add time dimension to the output file"""
     out.createDimension('time', len(inf.dimensions['time']))
 
-# set dimension in the output
 def set_dimension(inf, out):
-
+    """set dimension in the output"""
     for name, dimension in inf.dimensions.items():
         if not (dimension.isunlimited() or name in list(out.dimensions.keys())):
             out.createDimension(name, len(dimension))
 
-# get dataset data type, dimensions, and attributes from input
 def get_dataset_meta(inf, rep, dataset_name):
-
+    """get dataset data type, dimensions, and attributes from input"""
     if dataset_name in rep.variables.keys():
         data_type = get_data_type(rep, dataset_name)
         dims = get_dimensions(rep, dataset_name)
@@ -92,14 +108,13 @@ def get_dataset_meta(inf, rep, dataset_name):
             attrs['grid_mapping'] = rep[GDAL_DATASET_NAME].grid_mapping
 
     # remove coordinates attribute if it is no longer valid
-    if 'coordinates' in attrs and not check_coor_valid(attrs, rep):
+    if 'coordinates' in attrs and not check_coor_valid(attrs, inf, rep):
         del attrs['coordinates']
 
     return dims, data_type, attrs
 
-# get dimensions from input
 def get_dimensions(rep, dataset_name, inf=None):
-
+    """get dimensions from input"""
     if inf:
         if 'time' in list(inf.dimensions.keys()):
             return ('time',) + rep[GDAL_DATASET_NAME].dimensions
@@ -109,15 +124,20 @@ def get_dimensions(rep, dataset_name, inf=None):
         return (dataset_name,)
     return None
 
-# get data type
 def get_data_type(inf, dataset_name):
+    """get data type"""
     return inf[dataset_name].datatype
 
-# write dataset value to the output
 def copy_variable(inf, out, rep, dataset_name, logger):
+    """write dataset value to the output"""
 
     # set data type, dimensions, and attributes
     dims, data_type, attrs = get_dataset_meta(inf, rep, dataset_name)
+
+    if dataset_name not in rep.variables.keys():
+        ori_dataset_name = GDAL_DATASET_NAME
+    else:
+        ori_dataset_name = dataset_name
 
     if dims:
         out.createVariable(dataset_name, data_type, dims, zlib=True, complevel=6)
@@ -125,11 +145,6 @@ def copy_variable(inf, out, rep, dataset_name, logger):
         out.createVariable(dataset_name, data_type, zlib=True, complevel=6)
 
     out[dataset_name].setncatts(attrs)
-
-    if dataset_name not in rep.variables.keys():
-        ori_dataset_name = GDAL_DATASET_NAME
-    else:
-        ori_dataset_name = dataset_name
 
     # manually compute the data value if offset and scale_factor exist for integers
 
