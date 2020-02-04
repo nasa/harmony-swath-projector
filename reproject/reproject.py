@@ -54,13 +54,43 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             logger.info("Granule data copied")
 
 
-            # Get the reprojection crs
+            # Get reprojection options
 
             crs = None
-            if hasattr(msg, 'format') and hasattr(msg.format, 'crs'):
-                crs = msg.format.crs
+            interpolation = None
+            x_extent = []
+            y_extent = []
+            width, height = 0, 0
+            x_min, x_max, y_min, y_max = 0.0, 0.0, 0.0, 0.0
+
+            if hasattr(msg, 'format'):
+                if hasattr(msg.format, 'crs'):
+                    crs = msg.format.crs
+                if hasattr(msg.format, 'interpolation'):
+                    interpolation = msg.format.interpolation
+                if hasattr(msg.format, 'XExtent'):
+                    x_extent = msg.format.XExtent
+                if hasattr(msg.format, 'YExtent'):
+                    y_extent = msg.format.YExtent
+                if hasattr(msg.format, 'width'):
+                    width = msg.format.width
+                if hasattr(msg.format, 'height'):
+                    height = msg.format.height
+
             crs = crs or '+proj=longlat +ellps=WGS84 +units=m'
 
+            if not x_extent and y_extent:
+                raise Exception("Missing x extent")
+            if x_extent and not y_extent:
+                raise Exception("Missing y extent")
+            if x_extent and y_extent:
+                x_min, x_max = x_extent[0], x_extent[1]
+                y_min, y_max = y_extent[0], y_extent[1]
+
+            if width and not height:
+                raise Exception("Missing cell height")
+            if height and not width:
+                raise Exception("Missing cell width")
 
             # Set up source and destination files
 
