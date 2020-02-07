@@ -83,7 +83,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception("Missing x extent")
             if x_extent and not y_extent:
                 raise Exception("Missing y extent")
-            if len(x_extent) < 2 or len(y_extent) < 2:
+            if len(x_extent) != 2 or len(y_extent) != 2:
                 raise Exception("Invalid XExtent or YExtent")
             if x_extent and y_extent:
                 x_min, x_max = x_extent[0], x_extent[1]
