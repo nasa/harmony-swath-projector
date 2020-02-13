@@ -138,7 +138,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                     gdal_cmd = ['gdalwarp', '-geoloc', '-t_srs', crs]
                     if interpolation:
                         gdal_cmd.extend(['-r', interpolation])
-                        logger.info('interpolation')
+                        logger.info('Selected interpolation: ' + interpolation)
                     gdal_cmd.extend([dataset, output])
                     result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
                     outputs.append(name)
