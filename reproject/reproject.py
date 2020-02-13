@@ -135,9 +135,12 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                     output = temp_dir + os.sep + name + '.' + extension
                     logger.info("Reprojecting subdataset '%s'" % name)
                     logger.info("reprojected output '%s'" % output)
-                    result_str = subprocess.check_output( \
-                        ['gdalwarp', '-geoloc', '-t_srs', crs, dataset, output], \
-                        stderr=subprocess.STDOUT).decode("utf-8")
+                    gdal_cmd = ['gdalwarp', '-geoloc', '-t_srs', crs]
+                    if interpolation:
+                        gdal_cmd.extend(['-r', interpolation])
+                        logger.info('Selected interpolation: ' + interpolation)
+                    gdal_cmd.extend([dataset, output])
+                    result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
                     outputs.append(name)
                 except Exception as err:
                     # Assume for now dataset cannot be reprojected. TBD add checks for other error
