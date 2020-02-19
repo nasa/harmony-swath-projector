@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import subprocess
+import functools
 
 from tempfile import mkdtemp
 
@@ -16,6 +17,11 @@ import harmony
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Mergers import NetCDF4Merger
 
+def rgetattr(obj, attr, *args):
+    def _getattr(obj, attr):
+        return getattr(obj, attr, *args)
+
+    return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
     """
@@ -55,29 +61,14 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             # Get reprojection options
 
-            crs = None
-            interpolation = None
-            x_extent = []
-            y_extent = []
-            rows, cols = 0, 0
-            width, height = 0.0, 0.0
-            x_min, x_max, y_min, y_max = 0.0, 0.0, 0.0, 0.0
-
-            if hasattr(msg, 'format'):
-                if hasattr(msg.format, 'crs'):
-                    crs = msg.format.crs
-                if hasattr(msg.format, 'interpolation'):
-                    interpolation = msg.format.interpolation
-                if hasattr(msg.format, 'width'):
-                    width = msg.format.width
-                if hasattr(msg.format, 'height'):
-                    height = msg.format.height
-                if hasattr(msg.format, 'scaleSize'):
-                    rows = msg.format.scaleSize.x
-                    cols = msg.format.scaleSize.y
-                if hasattr(msg.format, 'scaleExtent'):
-                    x_extent = msg.format.scaleExtent.x
-                    y_extent = msg.format.scaleExtent.y
+            crs = rgetattr(msg, 'format.crs', None)
+            interpolation = rgetattr(msg, 'format.interpolation', None)
+            x_extent = rgetattr(msg, 'format.scaleExtent.x', [])
+            y_extent = rgetattr(msg, 'format.scaleExtent.y', [])
+            width = rgetattr(msg, 'format.width', 0)
+            height = rgetattr(msg, 'format.height', 0)
+            rows = rgetattr(msg, 'format.scaleSize.x', 0)
+            cols = rgetattr(msg, 'format.scaleSize.y', 0)
 
             crs = crs or '+proj=longlat +ellps=WGS84 +units=m'
 
