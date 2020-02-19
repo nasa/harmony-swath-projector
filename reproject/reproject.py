@@ -17,7 +17,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Mergers import NetCDF4Merger
 
 
-
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
     """
         Data Services Reprojection service for Harmony
@@ -60,7 +59,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             interpolation = None
             x_extent = []
             y_extent = []
-            width, height = 0, 0
+            rows, cols = 0, 0
+            width, height = 0.0, 0.0
             x_min, x_max, y_min, y_max = 0.0, 0.0, 0.0, 0.0
 
             if hasattr(msg, 'format'):
@@ -68,14 +68,16 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                     crs = msg.format.crs
                 if hasattr(msg.format, 'interpolation'):
                     interpolation = msg.format.interpolation
-                if hasattr(msg.format, 'XExtent'):
-                    x_extent = msg.format.XExtent
-                if hasattr(msg.format, 'YExtent'):
-                    y_extent = msg.format.YExtent
                 if hasattr(msg.format, 'width'):
                     width = msg.format.width
                 if hasattr(msg.format, 'height'):
                     height = msg.format.height
+                if hasattr(msg.format, 'scaleSize'):
+                    rows = msg.format.scaleSize.x
+                    cols = msg.format.scaleSize.y
+                if hasattr(msg.format, 'scaleExtent'):
+                    x_extent = msg.format.scaleExtent.x
+                    y_extent = msg.format.scaleExtent.y
 
             crs = crs or '+proj=longlat +ellps=WGS84 +units=m'
 
@@ -138,7 +140,17 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                     gdal_cmd = ['gdalwarp', '-geoloc', '-t_srs', crs]
                     if interpolation:
                         gdal_cmd.extend(['-r', interpolation])
-                        logger.info('Selected interpolation: ' + interpolation)
+                        logger.info('Selected interpolation: %s' % interpolation)
+                    if x_extent and y_extent:
+                        gdal_cmd.extend(['-te', str(x_min), str(x_max), str(y_min), str(y_max)])
+                        logger.info('Selected scale extent: %f %f %f %f' % (x_min, x_max, y_min, y_max))
+                    if rows and cols:
+                        gdal_cmd.extend(['-tr', str(rows), str(cols)])
+                        logger.info('Selected scale size: %d %d' % (rows, cols))
+                    if width and height:
+                        gdal_cmd.extend(['-ts', str(width), str(height)])
+                        logger.info('Selected width: %d' % width)
+                        logger.info('Selected height: %d' % height)
                     gdal_cmd.extend([dataset, output])
                     result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
                     outputs.append(name)
