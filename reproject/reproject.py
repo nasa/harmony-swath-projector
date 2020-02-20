@@ -18,9 +18,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Mergers import NetCDF4Merger
 
 def rgetattr(obj, attr, *args):
+    """
+        return attribute if it exists
+    """
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
 
+    # accepts a function and a sequence and returns a single value calculated
+    # function is applied cumulatively to arguments in the sequence from left to right until the list is exhausted
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
@@ -47,6 +52,13 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             # Verify a granule URL has been provided andmake a local copy of the granule file
 
+            # message schema
+            # {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
+            # 'format': {'crs': 'CRS:84',  'interpolation': 'bilinear',
+            #            # 'width': 1000, 'height': 500,
+            #            'scaleExtent': {'x': [-160, -30], 'y': [10, 25]},
+            #            'scaleSize': {'x': 1, 'y': 1}
+            #            }}
             msg = self.message
             if not hasattr(msg, 'granules') or not msg.granules:
                 raise Exception("No granules specified for reprojection")
@@ -67,8 +79,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             y_extent = rgetattr(msg, 'format.scaleExtent.y', [])
             width = rgetattr(msg, 'format.width', 0)
             height = rgetattr(msg, 'format.height', 0)
-            rows = rgetattr(msg, 'format.scaleSize.x', 0)
-            cols = rgetattr(msg, 'format.scaleSize.y', 0)
+            xres = rgetattr(msg, 'format.scaleSize.x', 0)
+            yres = rgetattr(msg, 'format.scaleSize.y', 0)
 
             crs = crs or '+proj=longlat +ellps=WGS84 +units=m'
 
@@ -133,11 +145,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                         gdal_cmd.extend(['-r', interpolation])
                         logger.info('Selected interpolation: %s' % interpolation)
                     if x_extent and y_extent:
-                        gdal_cmd.extend(['-te', str(x_min), str(x_max), str(y_min), str(y_max)])
-                        logger.info('Selected scale extent: %f %f %f %f' % (x_min, x_max, y_min, y_max))
-                    if rows and cols:
-                        gdal_cmd.extend(['-tr', str(rows), str(cols)])
-                        logger.info('Selected scale size: %d %d' % (rows, cols))
+                        gdal_cmd.extend(['-te', str(x_min), str(y_min), str(x_max), str(y_max)])
+                        logger.info('Selected scale extent: %f %f %f %f' % (x_min, y_min, x_max, y_max))
+                    if xres and yres:
+                        gdal_cmd.extend(['-tr', str(xres), str(yres)])
+                        logger.info('Selected scale size: %d %d' % (xres, yres))
                     if width and height:
                         gdal_cmd.extend(['-ts', str(width), str(height)])
                         logger.info('Selected width: %d' % width)
