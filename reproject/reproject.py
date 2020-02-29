@@ -12,9 +12,8 @@ import sys
 from tempfile import mkdtemp
 
 import numpy as np
-import pyproj
 import rasterio
-from affine import Affine
+# from affine import Affine
 from rasterio.transform import Affine
 import xarray
 from pyproj import Proj
@@ -22,9 +21,11 @@ from pyresample import geometry, kd_tree, bilinear
 from pyresample.ewa import ll2cr, fornav
 
 import harmony
+from Mergers import NetCDF4Merger
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from Mergers import NetCDF4Merger
+RADIUS_EARTH_METRES = 6.378137e6  # nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+crs_default = '+proj=longlat +ellps=WGS84 +units=m'
 
 RADIUS_EARTH_METRES = 6.378137e6  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 crs_default = '+proj=longlat +ellps=WGS84'
@@ -70,6 +71,21 @@ def write_netcdf(file_name, data, crs, transform):
                        crs=crs,
                        transform=transform) as netcdf_container:
         netcdf_container.write(data, 1)  # first (and only) band
+
+
+def convert_resolution_degrees_to_metres(degrees):
+    """Take an input value of latitude of longitude resolution in decimal
+    degrees and convert that to a value in metres. This formula relies on the
+    average radius of the Earth at the equator.
+
+    :param degrees: Decimal degrees input (either latitude or longitude)
+    :type degrees: float
+    :return: Resolution in metres.
+    :rtype: float
+
+    """
+    return degrees * 2.0 * pi * RADIUS_EARTH_METRES / 360.0
+
 
 def get_input_file_data(file_name):
     """Get the input dataset (sea surface temperature) and coordinate
@@ -284,6 +300,15 @@ def get_params_from_msg(message) :
     return locals()
 
 
+def convert_to_meters(x_min, y_min, x_max, y_max):
+    #https://stackoverflow.com/questions/23875030/python-get-the-ratios-between-degrees-and-meters-depending-on-coordinates-on
+    y_mn = 110540 * y_min # meters
+    y_mx = 110540 * y_max
+    x_mn = 111320 * np.cos(y_min) * x_min
+    x_mx = 111320 * np.cos(y_max) * x_max
+    return x_mn, y_mn, x_mx, y_mx
+
+
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
     """
         Data Services Reprojection service for Harmony
@@ -331,8 +356,20 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception(
                     "'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
 
+            granule = msg.granules[0]
             self.download_granules()
             logger.info("Granule data copied")
+
+            # Get reprojection options
+
+            crs = rgetattr(msg, 'format.crs', None)
+            interpolation = rgetattr(msg, 'format.interpolation', None)
+            x_extent = rgetattr(msg, 'format.scaleExtent.x', [])
+            y_extent = rgetattr(msg, 'format.scaleExtent.y', [])
+            width = rgetattr(msg, 'format.width', 0)
+            height = rgetattr(msg, 'format.height', 0)
+            xres = rgetattr(msg, 'format.scaleSize.x', 0)
+            yres = rgetattr(msg, 'format.scaleSize.y', 0)
 
             # Set up source and destination files
             param_list = get_params_from_msg(msg)
@@ -342,9 +379,46 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             root_ext = os.path.splitext(os.path.basename(param_list.get('input_file')))
             output_file = temp_dir + os.sep + root_ext[0] + '_repr' + root_ext[1]
             extension = os.path.splitext(output_file)[-1][1:]
+            file_data = get_input_file_data(param_list.get('input_file'))
+            latitudes = file_data.get("latitudes")
+            longitudes = file_data.get("longitudes")
+
+            # Verify message
+
+            crs = crs or crs_default
+
+            if not x_extent and y_extent:
+                raise Exception("Missing x extent")
+            if x_extent and not y_extent:
+                raise Exception("Missing y extent")
+            if width and not height:
+                raise Exception("Missing cell height")
+            if height and not width:
+                raise Exception("Missing cell width")
+
+            if x_extent and y_extent:
+                if len(x_extent) != 2 or len(y_extent) != 2:
+                    raise Exception("Invalid XExtent or YExtent")
+                x_min, x_max = x_extent[0], x_extent[1]
+                y_min, y_max = y_extent[0], y_extent[1]
+            else :
+                projection_eqc = Proj(crs)
+                x_min, y_min = projection_eqc(longitudes.min(), latitudes.min())
+                x_max, y_max = projection_eqc(longitudes.max(), latitudes.max())
+                x_min, y_min, x_max, y_max = convert_to_meters(x_min, y_min, x_max, y_max)
 
             logger.info("Reprojecting file " + param_list.get('input_file') + " as " + output_file)
             logger.info("Selected CRS: " + param_list.get('crs') + "\tInterpolation: " + param_list.get('interpolation'))
+
+            # Get parameters for pyresample
+
+            x_res = get_resolution_from_minimum_difference(latitudes, longitudes)
+            y_res = -1.0 * get_resolution_from_minimum_difference(latitudes, longitudes)
+            if not width and not height:
+                width, height = abs(round((x_min - x_max) / x_res)), abs(round((y_min - y_max) / y_res))
+            grid_extent = (x_min, y_min, x_max, y_max)
+            target_area = geometry.AreaDefinition('grid_area', 'target_grid', 'proj', crs, width, height, grid_extent)
+            swath_area = file_data.get("swath_definition")
 
             # Use gdalinfo to get the sub-datasets in the input file as well as the file type.
 
@@ -362,21 +436,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             if not datasets:
                 raise Exception("No subdatasets found in input file")
             logger.info("Input file has " + str(len(datasets)) + " datasets")
-
-            # Get parameters for pyresample
-            data_set = xarray.open_dataset(param_list.get('input_file'))
-            grid_extent = param_list.get('x_min'), param_list.get('y_min'), param_list.get('x_max'), param_list.get('y_max')
-            target_area = geometry.AreaDefinition('grid_area', 'target_grid', 'proj', param_list.get('crs'),
-                                                  param_list.get('width'), param_list.get('height'), grid_extent)
-            swath_area = param_list.get('file_data').get("swath_definition")
-            # ll2cr converts swath longitudes and latitudes to grid columns and rows
-            swath_points_in_grid, cols, rows = ll2cr(swath_area, target_area)
-            # Calculate interpolation coefficients, input data reduction matrix and mapping matrix for 2 step bilinear
-            radius_of_influence = 50000
-            t_params = s_params = input_idxs = idx_ref = None
-            if param_list.get('interpolation')=='bilinear':
-                t_params, s_params, input_idxs, idx_ref = bilinear.get_bil_info(swath_area, target_area,
-                                                                            radius_of_influence)
 
             # Loop through each dataset and reproject
             outputs = []

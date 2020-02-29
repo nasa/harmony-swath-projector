@@ -23,7 +23,7 @@ class TestNominalReproject(TestBase):
     def test_single_band_input(self, cleanup, completed_with_local_file):
         """Nominal (successful) reprojection"""
         test_data = {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-            'format': {'crs': 'EPSG:32603', 'interpolation': 'ewa', 'width': 1000, 'height': 500,
+            'format': {'crs': 'EPSG:32603', 'interpolation': 'near', 'width': 1000, 'height': 500,
                 'scaleExtent': {'x': [0, 1500000], 'y': [2500000, 3300000]}}}
         reprojector = HarmonyAdapter(test_data)
         reprojector.invoke()
