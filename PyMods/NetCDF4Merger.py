@@ -93,7 +93,7 @@ def read_attrs(inf):
     return inf.__dict__
 
 
-def check_coor_valid(attrs, inf, rep):
+def check_coor_valid(attrs, inf, repr):
     """
         Check if coordinates attributes is still valid after reprojection
         Invalid coordinate reference cases:
@@ -104,11 +104,11 @@ def check_coor_valid(attrs, inf, rep):
     valid = True
 
     for coor in coors:
-        if coor not in rep.variables.keys():
+        if coor not in repr.variables.keys():
             valid = False
             break
-        elif coor in rep.variables.keys() and coor in inf.variables.keys():
-            if rep[coor].shape != inf[coor].shape:
+        elif coor in repr.variables.keys() and coor in inf.variables.keys():
+            if repr[coor].shape != inf[coor].shape:
                 valid = False
                 break
 
@@ -131,39 +131,42 @@ def set_dimension(inf, out):
         if not (dimension.isunlimited() or name in list(out.dimensions.keys())):
             out.createDimension(name, len(dimension))
 
-
-def get_dataset_meta(inf, rep, dataset_name):
-    """get dataset data type, dimensions, and attributes from input"""
-    if dataset_name in rep.variables.keys():
-        data_type = get_data_type(rep, dataset_name)
-        dims = get_dimensions(rep, dataset_name)
+def get_dataset_meta(inf, repr, dataset_name):
+    """get dataset data type, dimensions, and attributes from reprojection or input"""
+    # TODO: refactor to properly address merging dimensions and reprojected dimensions ?
+    # TODO: at least add commentary
+    if dataset_name in repr.variables.keys():  # when is this true?
+        data_type = get_data_type(repr, dataset_name)
+        dims = get_dimensions(repr, dataset_name)
         attrs = read_attrs(inf[dataset_name]) \
             if dataset_name in inf.variables.keys() \
-            else read_attrs(rep[dataset_name])
+            else read_attrs(repr[dataset_name])
         if dataset_name in coor_info_attrs:
             attrs.update(coor_info_attrs[dataset_name])
     else:
         data_type = get_data_type(inf, dataset_name)
-        dims = get_dimensions(rep, dataset_name, inf)
+        dims = get_dimensions(repr, dataset_name, inf)
         attrs = read_attrs(inf[dataset_name])
-        if rep[GDAL_DATASET_NAME].grid_mapping:
-            attrs['grid_mapping'] = rep[GDAL_DATASET_NAME].grid_mapping
+        if repr[GDAL_DATASET_NAME].grid_mapping:
+            attrs['grid_mapping'] = repr[GDAL_DATASET_NAME].grid_mapping
 
     # remove coordinates attribute if it is no longer valid
-    if 'coordinates' in attrs and not check_coor_valid(attrs, inf, rep):
+    if 'coordinates' in attrs and not check_coor_valid(attrs, inf, repr):
         del attrs['coordinates']
 
     return dims, data_type, attrs
 
-
-def get_dimensions(rep, dataset_name, inf=None):
+def get_dimensions(repr, dataset_name, inf=None):
     """get dimensions from input"""
+    # TODO: refactor to properly address merging dimensions and reprojected dimensions ?
     if inf:
         if 'time' in list(inf.dimensions.keys()):
-            return ('time',) + rep[GDAL_DATASET_NAME].dimensions
-        return rep[dataset_name].dimensions
+            return ('time',) + repr[GDAL_DATASET_NAME].dimensions
+        else:
+            return repr[GDAL_DATASET_NAME].dimensions
+#       return inf[dataset_name].dimensions  # when is this the right answer?
 
-    if rep[dataset_name].size > 1:
+    if repr[dataset_name].size > 1:
         return (dataset_name,)
     return None
 
@@ -207,8 +210,9 @@ def copy_variable(inf, out, repr, dataset_name, logger):
         if repr[ori_dataset_name][:].shape != out[new_dataset_name].shape:
             reshaped = repr[ori_dataset_name][:].reshape(out[new_dataset_name].shape)
             if 'add_offset' in attrs and 'scale_factor' in attrs:
-                reshaped = reshaped * out[new_dataset_name].scale_factor + out[
-                    new_dataset_name].add_offset
+                reshaped = (reshaped * out[new_dataset_name].scale_factor)
+                    + out[new_dataset_name].add_offset
+
             out[new_dataset_name][:] = reshaped
         else:
             out[new_dataset_name][:] = repr[ori_dataset_name][:]

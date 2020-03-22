@@ -4,12 +4,13 @@
 
 import argparse
 import functools
-import mimetypes
 import os
 import re
 import subprocess
 import sys
 from tempfile import mkdtemp
+import logging
+import json
 
 import numpy as np
 import rasterio
@@ -20,34 +21,29 @@ from pyproj import Proj
 from pyresample import geometry, kd_tree, bilinear
 from pyresample.ewa import ll2cr, fornav
 
-import harmony
-from Mergers import NetCDF4Merger
+from PyMods import NetCDF4Merger
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-RADIUS_EARTH_METRES = 6.378137e6  # nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
-crs_default = '+proj=longlat +ellps=WGS84 +units=m'
-
-RADIUS_EARTH_METRES = 6.378137e6  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
-crs_default = '+proj=longlat +ellps=WGS84'
-#crs_default ='EPSG:4327'
-#crs_default = '+proj=eqc'
+RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
+#CRS_DEFAULT ='EPSG:4979' # WGS84 Datum + Elipsoid for coordinate reference (CRS), similar to 4326
+#CRS_DEFAULT = '+proj=eqc'
 
 # https://pyresample.readthedocs.io/en/latest/swath.html
-rows_per_scan = 8  # the number of rows in the entire swath (need for EWA)
-repr_mode = 'pyresampl'
+ROWS_PER_SCAN = 8  # the number of overlapping rows in the swath (need for EWA)
+REPR_MODE = 'pyresampl'
 
 
 def rgetattr(obj, attr, *args):
-    """
-        return attribute if it exists
+    """ Recursive get attribute
+        Returns attribute from an attribute hierarchy, e.g. a.b.c, if it exists
     """
 
+    # functools.reduce will apply _getattr with previous result (obj)
+    #   and item from sequence (attr)
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
 
-    # accepts a function and a sequence and returns a single value calculated
-    # function is applied cumulatively to arguments in the sequence
-    # from left to right until the list is exhausted
+    # First call takes first two items, thus need [obj] as first item in sequence
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 
@@ -73,21 +69,8 @@ def write_netcdf(file_name, data, crs, transform):
         netcdf_container.write(data, 1)  # first (and only) band
 
 
-def convert_resolution_degrees_to_metres(degrees):
-    """Take an input value of latitude of longitude resolution in decimal
-    degrees and convert that to a value in metres. This formula relies on the
-    average radius of the Earth at the equator.
-
-    :param degrees: Decimal degrees input (either latitude or longitude)
-    :type degrees: float
-    :return: Resolution in metres.
-    :rtype: float
-
-    """
-    return degrees * 2.0 * pi * RADIUS_EARTH_METRES / 360.0
-
-
-def get_input_file_data(file_name):
+# TODO: rework to receive science-variable and get coordinates for that
+def get_input_file_data(file_name, group):
     """Get the input dataset (sea surface temperature) and coordinate
     information. Using the coordinate information derive a swath
     definition.
@@ -95,14 +78,21 @@ def get_input_file_data(file_name):
     :rtype: dictionary
 
     """
-    with xarray.open_dataset(file_name, decode_cf=True) as dataset:
-        latitudes = dataset.coords.variables.get('lat').values
-        longitudes = dataset.coords.variables.get('lon').values
+    with xarray.open_dataset(file_name, decode_cf=True, group=group) as dataset:
+        try:
+            latitudes = dataset.coords.variables.get('lat').values
+            longitudes = dataset.coords.variables.get('lon').values
+        except:
+            variables = dataset.variables
+            for variable in dataset.variables:
+                if "lat" in variable:
+                    latitudes = variables[variable].values
+                elif "lon" in variable:
+                    longitudes = variables[variable].values
+
         metadata = dataset.attrs
-        if dataset.attrs.get('geospatial_lat_resolution') != None:
-            lat_res = dataset.attrs.get('geospatial_lat_resolution')
-        if dataset.attrs.get('geospatial_lon_resolution') != None:
-            lon_res = dataset.attrs.get('geospatial_lon_resolution')
+        lat_res = dataset.attrs.get('geospatial_lat_resolution')
+        lon_res = dataset.attrs.get('geospatial_lon_resolution')
 
     swath_definition = geometry.SwathDefinition(lons=longitudes,
                                                 lats=latitudes)
@@ -115,13 +105,13 @@ def get_input_file_data(file_name):
             }
 
 
-def get_resolution_from_minimum_difference(latitudes, longitudes):
+def get_resolution_from_minimum_difference(latitudes, longitudes, projection):
     """Take the differences in latitude and longitudes between adjacent pixels
     (in both the i and j directions), and find the minimum combined difference:
 
     Minimum(((lat_2 - lat_1)^2 + (lon_2 - lon_1)^2)^0.5)
 
-    Then return the resolution in metres.
+    Then return the resolution in metres or degrees depending on projection.
 
     NOTE: Is the median value more appropriate than the minimum? If so:
 
@@ -130,8 +120,10 @@ def get_resolution_from_minimum_difference(latitudes, longitudes):
     :param latitudes: Input array of latitudes
     :param longitudes: Input array of longitudes, where the points at indices:
         longitudes[i, j] and latitudes[i, j] are the same data point.
+    :param projection: target projection of output grid
     :type: numpy.ndarray
     :type: numpy.ndarray
+    :type: PyProj.proj.Proj projection object, converting degrees to meters, forward projection
     :return: The minimum of the differences, cast as a float for compatibility
         with later functions (internally one of the pyresample functions can't
         handle a numpy.float64.
@@ -145,10 +137,17 @@ def get_resolution_from_minimum_difference(latitudes, longitudes):
 
     diffs_i = np.sqrt(np.add(np.square(lats_diff_i), np.square(lons_diff_i)))
     diffs_j = np.sqrt(np.add(np.square(lats_diff_j), np.square(lons_diff_j)))
-    min_diff = min(diffs_i.min(), diffs_j.min())
+    # min_diff = min(diffs_i.min(), diffs_j.min()) # * 2 ?
+    # TODO: Resolve issues, use min? median? meta-data? total-cell-count?
     # Alternative if using the median:
-    # min_diff = min(np.median(diffs_i), np.median(diffs_j))
-    return min_diff
+    min_diff = min(np.median(diffs_i), np.median(diffs_j))
+
+    if not projection.crs.is_geographic: # convert resolution to meters
+        # generic conversion based upon distance of degrees at equator
+        min_diff = min_diff * (2 * pi * RADIUS_EARTH_METRES / 360)
+        # should we use center of grid?  determine point of true-scale?
+    return float(min_diff)
+
 
 def get_extents_from_walking_perimeter(projection, latitudes, longitudes):
     """Find the extents of the projected coordinates in the x and y directions
@@ -184,9 +183,11 @@ def get_extents_from_walking_perimeter(projection, latitudes, longitudes):
 
     return min(x_values), max(x_values), min(y_values), max(y_values)
 
+
 def gdal_resample(message, dataset, output_file, logger):
     prms = get_params_from_msg(message)
 
+    #TODO: rework to accomodate new parameter handling re. undefined or None
     gdal_cmd = ['gdalwarp', '-geoloc', '-t_srs', prms.get('crs')]
     if prms.get('interpolation') and prms.get('interpolation') is not 'ewa':
         gdal_cmd.extend(['-r', prms.get('interpolation')])
@@ -204,20 +205,25 @@ def gdal_resample(message, dataset, output_file, logger):
     gdal_cmd.extend([dataset, output_file])
     result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
 
+
 def py_resample(message, name, output_file, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref):
     prms = get_params_from_msg(message)
     # Suppress known pyresamle warnings
     if not sys.warnoptions:
         warnings.simplefilter("ignore")
     # Get parameters for pyresample
-    data_set = xarray.open_dataset(prms.get('input_file'))
+    data_set = xarray.open_dataset(prms.get('input_file'), decode_cf=True, group=prms.get('data_group'))
     swath_area = prms.get('file_data').get("swath_definition")
     radius_of_influence = 50000
 
-    # Exclude time
-    if data_set.variables.get('time').size != 0:
+    name = name.split('/')[-1]
+
+    # Get data, exclude time
+    if not data_set.variables:
+        data_arr = data_set.values
+    elif data_set.variables.get('time') != None: # .size != 0:
         data_arr = data_set.variables.get(name)[0].values
-    else :
+    else:
         data_arr = data_set.variables.get(name).values
 
     if prms.get('interpolation') == 'near' :
@@ -240,17 +246,20 @@ def py_resample(message, name, output_file, target_area, cols, rows, t_params, s
 
         # -------------- BILINEAR 2 --------------
         result_data = bilinear.get_sample_from_bil_info(data_arr.ravel(), t_params, s_params,
-                                                        input_idxs,
-                                                        idx_ref, output_shape=target_area.shape)
+                                                        input_idxs, idx_ref,
+                                                        output_shape=target_area.shape)
     if prms.get('interpolation') =='ewa' :
         # fornav resamples the swath data to the gridded area
+        if np.issubdtype(data_arr.dtype, np.integer):
+            data_arr = data_arr.astype(float)
         num_valid_points, result_data = fornav(cols, rows, target_area, data_arr,
-                                               rows_per_scan=rows_per_scan)
+                                               rows_per_scan=ROWS_PER_SCAN)
 
     write_netcdf(output_file, result_data, prms.get('crs'), prms.get('grid_transform'))
 
 def get_params_from_msg(message) :
-    crs = rgetattr(message, 'format.crs', crs_default)
+    # TODO: test for incomplete message, consider defaults as None or undefined
+    crs = rgetattr(message, 'format.crs', CRS_DEFAULT)
     interpolation = rgetattr(message, 'format.interpolation', 'near')  # near, bilinear, ewa
     x_extent = rgetattr(message, 'format.scaleExtent.x', None)
     y_extent = rgetattr(message, 'format.scaleExtent.y', None)
@@ -258,15 +267,18 @@ def get_params_from_msg(message) :
     height = rgetattr(message, 'format.height', 0)
     xres = rgetattr(message, 'format.scaleSize.x', 0)
     yres = rgetattr(message, 'format.scaleSize.y', 0)
-    granule = message.granules[0]
+    granule = rgetattr(message, 'granules', [None])[0]
 
-    input_file = granule.local_filename
-    file_data = get_input_file_data(input_file)
+    input_file = rgetattr(granule, 'local_filename', None)
+    # TODO: test for no local_filename
+    # refactor to get groups and datasets together (first?)
+    latlon_group, data_group = get_group(input_file)
+    file_data = get_input_file_data(input_file, latlon_group)
     latitudes = file_data.get("latitudes")
     longitudes = file_data.get("longitudes")
     lon_res = file_data.get('lon_res')
     lat_res = file_data.get('lat_res')
-    projection = pyproj.proj.Proj(crs)
+    projection = Proj(crs)
 
     # Verify message and assign values
 
@@ -287,9 +299,10 @@ def get_params_from_msg(message) :
 
     if not x_extent and not y_extent:
         x_min, x_max, y_min, y_max = get_extents_from_walking_perimeter(projection, latitudes, longitudes)
-    if not xres and not yres:
-        xres = get_resolution_from_minimum_difference(latitudes, longitudes)
-        yres = -1.0 * get_resolution_from_minimum_difference(latitudes, longitudes)
+    if xres != None and yres != None:
+        xres = get_resolution_from_minimum_difference(latitudes, longitudes, projection)
+#        yres = -1.0 * get_resolution_from_minimum_difference(latitudes, longitudes)
+        yres = -1.0 * xres
 
     if not width and not height:
         width, height = abs(round((x_min - x_max) / xres)), abs(round((y_min - y_max) / yres))
@@ -309,68 +322,7 @@ def convert_to_meters(x_min, y_min, x_max, y_max):
     return x_mn, y_mn, x_mx, y_mx
 
 
-class HarmonyAdapter(harmony.BaseHarmonyAdapter):
-    """
-        Data Services Reprojection service for Harmony
-
-        This class uses the Harmony utility library for processing the
-        service input options.
-    """
-
-    def invoke(self):
-        """
-            Callback used by BaseHarmonyAdapter to invoke the service
-        """
-        logger = self.logger
-        logger.info("Starting Data Services Reprojection Service")
-        os.environ['HDF5_DISABLE_VERSION_CHECK'] = '1'
-
-        try:
-            if not hasattr(self, 'message'):
-                raise Exception("No message request")
-
-            # Verify a granule URL has been provided and make a local copy of the granule file
-
-            # message schema
-            # {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-            #     'format': {
-            #         'crs': 'CRS:84', 'interpolation': 'bilinear',
-            #         'width': 1000, 'height': 500,
-            #         'scaleExtent': {
-            #             'x': {'min': -160, 'max': -30},
-            #             'y': {'min': 10, 'max': 25}
-            #         },
-            #         'scaleSize': {'x': 1, 'y': 1}
-            #     }
-            # }
-            msg = self.message
-            if not hasattr(msg, 'granules') or not msg.granules:
-                raise Exception("No granules specified for reprojection")
-            if not isinstance(msg.granules, list):
-                raise Exception("Invalid granule list")
-            if len(msg.granules) > 1:
-                raise Exception("Too many granules")
-            # ERROR 5: -tr and -ts options cannot be used at the same time.
-            if hasattr(msg, 'format') and hasattr(msg.format, 'scaleSize') and (
-                    hasattr(msg.format, 'width') or hasattr(msg.format, 'height')):
-                raise Exception(
-                    "'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
-
-            granule = msg.granules[0]
-            self.download_granules()
-            logger.info("Granule data copied")
-
-            # Get reprojection options
-
-            crs = rgetattr(msg, 'format.crs', None)
-            interpolation = rgetattr(msg, 'format.interpolation', None)
-            x_extent = rgetattr(msg, 'format.scaleExtent.x', [])
-            y_extent = rgetattr(msg, 'format.scaleExtent.y', [])
-            width = rgetattr(msg, 'format.width', 0)
-            height = rgetattr(msg, 'format.height', 0)
-            xres = rgetattr(msg, 'format.scaleSize.x', 0)
-            yres = rgetattr(msg, 'format.scaleSize.y', 0)
-
+def reproject(msg, logger):
             # Set up source and destination files
             param_list = get_params_from_msg(msg)
             if not os.path.isfile(param_list.get('input_file')):
@@ -442,20 +394,22 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             for dataset in datasets:
                 try:
                     name = dataset.split(':')[-1]
-                    output = temp_dir + os.sep + name + '.' + extension
+                    if "lat" in name or "lon" in name:
+                        continue # skip processing
+                    output = temp_dir + os.sep + name.split('/')[-1] + '.' + extension
                     logger.info("Reprojecting subdataset '%s'" % name)
                     logger.info("Reprojected output '%s'" % output)
-
-                    if repr_mode =='gdal':
+                    if REPR_MODE == 'gdal':
                         gdal_resample(msg, dataset, output, logger)
                     else:
-                        if name == "lat" or name == "lon": continue
+                        # if name == "lat" or name == "lon": continue
                         py_resample(msg, name, output, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref)
                     outputs.append(name)
                 except Exception as err:
                     # Assume for now dataset cannot be reprojected. TBD add checks for other error
                     # conditions.
                     logger.info("Cannot reproject " + name)
+                    logger.info(err)
 
             # Now merge outputs (unless we only have one)
 
@@ -465,32 +419,79 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             NetCDF4Merger.create_output(param_list.get('input_file'), output_file, temp_dir)
 
             # Return the output file back to Harmony
+            return param_list.get('granule'), output_file
 
-            logger.info("Reprojection complete")
-            mimetype = mimetypes.guess_type(param_list.get('input_file'), False) or ('application/octet-stream', None)
-            self.completed_with_local_file(
-                output_file,
-                source_granule=granule,
-                is_regridded=True,
-                mime=mimetype[0])
 
-        except Exception as err:
-            logger.error("Reprojection failed: " + str(err))
-            self.completed_with_error("Reprojection failed with error: " + str(err))
+def get_group(file_name):
+    dataset = rasterio.open(file_name)
+    latlon_group = None
+    data_group = None
 
-        finally:
-            self.cleanup()
+    for subdataset in dataset.subdatasets:
+        dataset_path = re.sub(r'.*\.nc:(.*)', r'\1', subdataset)
+        dataset_path_arr = dataset_path.split('/')
+        dataset_name = dataset_path_arr[-1]
+        prefix = dataset_path_arr[0:-1] # if dataset_path.len > 1 else ""
 
-# Main program start
+        if 'lat' in dataset_path or 'lon' in dataset_path:
+            latlon_group = "/".join(prefix)
+        else:
+            data_group = "/".join(prefix)
+
+        if latlon_group != None and data_group != None:
+            # early exit from loop
+            break
+
+    return latlon_group, data_group
+
+
+'''
+class to_object(data):  # treats data as a dictionary
+    def __init__(self, data):
+        self.__dict__ = data
+'''
+
+def to_object(item):
+    """ Recursively converts item into object with attributes
+        E.g., a dictionary becomes an object with "." access attributes
+        Useful for e.g., converting json objects into "full" objects
+    """
+    if isinstance(item, dict):
+        # return a new object with the dictionary items as attributes
+        return type('obj', (), {k: to_object(v) for k, v in item.items()})
+    if isinstance(item, list):
+        def yield_convert(item):
+            """ Acts as a generator (iterator) returning one item for successive calls """
+            for index, value in enumerate(item):
+                yield to_object(value)
+        # list will iterate on generator (yield_convert) and combine the results into a list
+        return list(yield_convert(item))
+    else:
+        return item
+
+
+# Main program start for testing
 #
 if __name__ == "__main__":
-    PARSER = argparse.ArgumentParser(prog='Reproject',
-                                     description='Run the Data Services Reprojection Tool')
-    PARSER.add_argument('--harmony-action',
-                        choices=['invoke'],
-                        help='The action Harmony needs to perform (currently only "invoke")')
-    PARSER.add_argument('--harmony-input',
+    PARSER = argparse.ArgumentParser(prog='Reproject', description='Run the Data Services Reprojection Tool')
+    PARSER.add_argument('--message',
                         help='The input data for the action provided by Harmony')
 
     ARGS = PARSER.parse_args()
-    harmony.run_cli(PARSER, ARGS, HarmonyAdapter)
+    # Note it is hard to get properly quoted json string through shell invocation,
+    # It is easier if single and double quoting is inverted
+    quoted_msg = re.sub("'", '"', ARGS.message)
+    msg_dictionary = json.loads(quoted_msg)
+    msg = to_object(msg_dictionary)
+
+    logger = logging.getLogger("SwotRepr")
+    syslog = logging.StreamHandler()
+    formatter = logging.Formatter(
+            "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s")
+    #       "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] [%(user)s] %(message)s")
+    syslog.setFormatter(formatter)
+    logger.addHandler(syslog)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    reproject(msg, logger)
