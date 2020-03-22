@@ -8,7 +8,7 @@ import os
 
 import harmony
 
-from PyMods import reproject
+from PyMods.reproject import reproject
 
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
     """
