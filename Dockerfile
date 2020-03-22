@@ -17,7 +17,7 @@ RUN pip3 install --upgrade pip \
     && apk del py-numpy-dev python3-dev build-base
 
 # Bundle app source
-COPY ./reproject reproject
-COPY ./Mergers Mergers
+COPY ./PyMods Pymods
+COPY swotrepr.py .
 
-ENTRYPOINT ["python3", "reproject/reproject.py"]
+ENTRYPOINT ["python3", "swotrepr.py"]
