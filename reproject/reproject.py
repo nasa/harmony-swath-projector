@@ -59,6 +59,18 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             #            'scaleExtent': {'x': [-160, -30], 'y': [10, 25]},
             #            'scaleSize': {'x': 1, 'y': 1}
             #            }}
+            # New message format:
+            # {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
+            #     'format': {
+            #         'crs': 'CRS:84', 'interpolation': 'bilinear',
+            #         'width': 1000, 'height': 500,
+            #         'scaleExtent': {
+            #             'x': {'min': -160, 'max': -30},
+            #             'y': {'min': 10, 'max': 25}
+            #         },
+            #         'scaleSize': {'x': 1, 'y': 1}
+            #     }
+            # }
             msg = self.message
             if not hasattr(msg, 'granules') or not msg.granules:
                 raise Exception("No granules specified for reprojection")
@@ -66,6 +78,9 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception("Invalid granule list")
             if len(msg.granules) > 1:
                 raise Exception("Too many granules")
+            # ERROR 5: -tr and -ts options cannot be used at the same time.
+            if hasattr(msg.format, 'scaleSize') and (hasattr(msg.format, 'width') or  hasattr(msg.format, 'height')) :
+                raise Exception("'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
 
             self.download_granules()
             logger.info("Granule data copied")
@@ -75,8 +90,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             crs = rgetattr(msg, 'format.crs', None)
             interpolation = rgetattr(msg, 'format.interpolation', None)
-            x_extent = rgetattr(msg, 'format.scaleExtent.x', [])
-            y_extent = rgetattr(msg, 'format.scaleExtent.y', [])
+            x_extent = rgetattr(msg, 'format.scaleExtent.x', None)
+            y_extent = rgetattr(msg, 'format.scaleExtent.y', None)
             width = rgetattr(msg, 'format.width', 0)
             height = rgetattr(msg, 'format.height', 0)
             xres = rgetattr(msg, 'format.scaleSize.x', 0)
@@ -88,16 +103,16 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception("Missing x extent")
             if x_extent and not y_extent:
                 raise Exception("Missing y extent")
-            if x_extent and y_extent:
-                if len(x_extent) != 2 or len(y_extent) != 2:
-                    raise Exception("Invalid XExtent or YExtent")
-                x_min, x_max = x_extent[0], x_extent[1]
-                y_min, y_max = y_extent[0], y_extent[1]
-
             if width and not height:
                 raise Exception("Missing cell height")
             if height and not width:
                 raise Exception("Missing cell width")
+            if x_extent:
+                x_min = x_extent.min
+                x_max = x_extent.max
+            if y_extent:
+                y_min = y_extent.min
+                y_max = y_extent.max
 
             # Set up source and destination files
 
@@ -155,6 +170,9 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                         logger.info('Selected width: %d' % width)
                         logger.info('Selected height: %d' % height)
                     gdal_cmd.extend([dataset, output])
+
+                    logger.info("GDAL command: " + " ".join(gdal_cmd))
+
                     result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
                     outputs.append(name)
                 except Exception as err:
