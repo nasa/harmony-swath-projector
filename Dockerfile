@@ -13,7 +13,7 @@ RUN pip3 install --upgrade pip \
     && pip3 install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git" \
     && apk add --no-cache --allow-untrusted --repository http://dl-3.alpinelinux.org/alpine/edge/testing hdf5-dev netcdf-dev \
     && apk add build-base python3-dev py-numpy-dev \
-    && pip3 install netCDF4 \
+    && pip3 install netCDF4 pyresample==1.13.1 \
     && apk del py-numpy-dev python3-dev build-base
 
 # Bundle app source
