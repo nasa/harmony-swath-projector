@@ -66,7 +66,7 @@ class TestReprojectInput(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_completed_with_error_when_local_file_not_exists(self, cleanup, completed_with_error):
         """Handle a harmony message that references a granule local file that does not exist"""
-        test_data = test_data = {'granules' : [{'local_filename' : '/home/test/data/no_such_file'}]}
+        test_data = {'granules' : [{'local_filename' : '/home/test/data/no_such_file'}]}
         reprojector = HarmonyAdapter(test_data)
         reprojector.invoke()
 
@@ -81,7 +81,7 @@ class TestReprojectInput(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_completed_with_error_when_local_file_not_valid(self, cleanup, completed_with_error):
         """Handle a harmony message that references a granule local file that is not valid data"""
-        test_data = test_data = {'granules' : [{'local_filename' : '/home/test/data/InvalidDataFile.nc'}]}
+        test_data = {'granules' : [{'local_filename' : '/home/test/data/InvalidDataFile.nc'}]}
         reprojector = HarmonyAdapter(test_data)
         reprojector.invoke()
 

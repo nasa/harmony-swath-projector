@@ -17,16 +17,19 @@ import harmony
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Mergers import NetCDF4Merger
 
+
 def rgetattr(obj, attr, *args):
     """
         return attribute if it exists
     """
+
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
 
     # accepts a function and a sequence and returns a single value calculated
     # function is applied cumulatively to arguments in the sequence from left to right until the list is exhausted
     return functools.reduce(_getattr, [obj] + attr.split('.'))
+
 
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
     """
@@ -35,7 +38,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         This class uses the Harmony utility library for processing the
         service input options.
     """
-
 
     def invoke(self):
         """
@@ -49,16 +51,20 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             if not hasattr(self, 'message'):
                 raise Exception("No message request")
 
-
-            # Verify a granule URL has been provided andmake a local copy of the granule file
+            # Verify a granule URL has been provided and make a local copy of the granule file
 
             # message schema
             # {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-            # 'format': {'crs': 'CRS:84',  'interpolation': 'bilinear',
-            #            # 'width': 1000, 'height': 500,
-            #            'scaleExtent': {'x': [-160, -30], 'y': [10, 25]},
-            #            'scaleSize': {'x': 1, 'y': 1}
-            #            }}
+            #     'format': {
+            #         'crs': 'CRS:84', 'interpolation': 'bilinear',
+            #         'width': 1000, 'height': 500,
+            #         'scaleExtent': {
+            #             'x': {'min': -160, 'max': -30},
+            #             'y': {'min': 10, 'max': 25}
+            #         },
+            #         'scaleSize': {'x': 1, 'y': 1}
+            #     }
+            # }
             msg = self.message
             if not hasattr(msg, 'granules') or not msg.granules:
                 raise Exception("No granules specified for reprojection")
@@ -66,17 +72,22 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception("Invalid granule list")
             if len(msg.granules) > 1:
                 raise Exception("Too many granules")
+            # ERROR 5: -tr and -ts options cannot be used at the same time.
+            if hasattr(msg, 'format') and hasattr(msg.format, 'scaleSize') and (
+                    hasattr(msg.format, 'width') or hasattr(msg.format, 'height')):
+                raise Exception(
+                    "'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
 
             self.download_granules()
             logger.info("Granule data copied")
-
+            logger.info(f'Received message "{msg}"')
 
             # Get reprojection options
 
             crs = rgetattr(msg, 'format.crs', None)
             interpolation = rgetattr(msg, 'format.interpolation', None)
-            x_extent = rgetattr(msg, 'format.scaleExtent.x', [])
-            y_extent = rgetattr(msg, 'format.scaleExtent.y', [])
+            x_extent = rgetattr(msg, 'format.scaleExtent.x', None)
+            y_extent = rgetattr(msg, 'format.scaleExtent.y', None)
             width = rgetattr(msg, 'format.width', 0)
             height = rgetattr(msg, 'format.height', 0)
             xres = rgetattr(msg, 'format.scaleSize.x', 0)
@@ -88,16 +99,16 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception("Missing x extent")
             if x_extent and not y_extent:
                 raise Exception("Missing y extent")
-            if x_extent and y_extent:
-                if len(x_extent) != 2 or len(y_extent) != 2:
-                    raise Exception("Invalid XExtent or YExtent")
-                x_min, x_max = x_extent[0], x_extent[1]
-                y_min, y_max = y_extent[0], y_extent[1]
-
             if width and not height:
                 raise Exception("Missing cell height")
             if height and not width:
                 raise Exception("Missing cell width")
+            if x_extent:
+                x_min = x_extent.min
+                x_max = x_extent.max
+            if y_extent:
+                y_min = y_extent.min
+                y_max = y_extent.max
 
             # Set up source and destination files
 
@@ -113,23 +124,23 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             logger.info("Reprojecting file " + input_file + " as " + output_file)
             logger.info("Selected CRS: " + crs)
 
-
             # Use gdalinfo to get the sub-datasets in the input file as well as the file type.
 
             try:
-                info = subprocess.check_output(['gdalinfo', input_file], stderr=subprocess.STDOUT).decode("utf-8")
+                info = subprocess.check_output(['gdalinfo', input_file],
+                                               stderr=subprocess.STDOUT).decode("utf-8")
                 input_format = re.search(r"Driver:\s*([^/]+)", info).group(1)
             except Exception as err:
                 logger.error("Unable to determine input file format: " + str(err))
                 raise Exception("Cannot determine input file format")
 
             logger.info("Input file format: " + input_format)
-            datasets = [line.split('=')[-1] for line in info.split("\n") if re.match(r"^\s*SUBDATASET_\d+_NAME=", line)]
+            datasets = [line.split('=')[-1] for line in info.split("\n") if
+                        re.match(r"^\s*SUBDATASET_\d+_NAME=", line)]
 
             if not datasets:
                 raise Exception("No subdatasets found in input file")
             logger.info("Input file has " + str(len(datasets)) + " datasets")
-
 
             # Loop through each dataset and reproject
 
@@ -146,7 +157,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                         logger.info('Selected interpolation: %s' % interpolation)
                     if x_extent and y_extent:
                         gdal_cmd.extend(['-te', str(x_min), str(y_min), str(x_max), str(y_max)])
-                        logger.info('Selected scale extent: %f %f %f %f' % (x_min, y_min, x_max, y_max))
+                        logger.info(
+                            'Selected scale extent: %f %f %f %f' % (x_min, y_min, x_max, y_max))
                     if xres and yres:
                         gdal_cmd.extend(['-tr', str(xres), str(yres)])
                         logger.info('Selected scale size: %d %d' % (xres, yres))
@@ -155,7 +167,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                         logger.info('Selected width: %d' % width)
                         logger.info('Selected height: %d' % height)
                     gdal_cmd.extend([dataset, output])
-                    result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
+
+                    logger.info("GDAL command: " + " ".join(gdal_cmd))
+
+                    result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode(
+                        "utf-8")
                     outputs.append(name)
                 except Exception as err:
                     # Assume for now dataset cannot be reprojected. TBD add checks for other error
@@ -183,11 +199,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             self.cleanup()
 
 
-
 # Main program start
 #
 if __name__ == "__main__":
-    PARSER = argparse.ArgumentParser(prog='Reproject', description='Run the Data Services Reprojection Tool')
+    PARSER = argparse.ArgumentParser(prog='Reproject',
+                                     description='Run the Data Services Reprojection Tool')
     PARSER.add_argument('--harmony-action',
                         choices=['invoke'],
                         help='The action Harmony needs to perform (currently only "invoke")')
