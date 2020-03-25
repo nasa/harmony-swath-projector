@@ -51,16 +51,9 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             if not hasattr(self, 'message'):
                 raise Exception("No message request")
 
-            # Verify a granule URL has been provided andmake a local copy of the granule file
+            # Verify a granule URL has been provided and make a local copy of the granule file
 
             # message schema
-            # {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-            # 'format': {'crs': 'CRS:84',  'interpolation': 'bilinear',
-            #            # 'width': 1000, 'height': 500,
-            #            'scaleExtent': {'x': [-160, -30], 'y': [10, 25]},
-            #            'scaleSize': {'x': 1, 'y': 1}
-            #            }}
-            # New message format:
             # {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
             #     'format': {
             #         'crs': 'CRS:84', 'interpolation': 'bilinear',
@@ -82,10 +75,12 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             # ERROR 5: -tr and -ts options cannot be used at the same time.
             if hasattr(msg, 'format') and hasattr(msg.format, 'scaleSize') and (
                     hasattr(msg.format, 'width') or hasattr(msg.format, 'height')):
-                raise Exception("'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
+                raise Exception(
+                    "'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
 
             self.download_granules()
             logger.info("Granule data copied")
+            logger.info(f'Received message "{msg}"')
 
             # Get reprojection options
 
@@ -132,14 +127,16 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             # Use gdalinfo to get the sub-datasets in the input file as well as the file type.
 
             try:
-                info = subprocess.check_output(['gdalinfo', input_file], stderr=subprocess.STDOUT).decode("utf-8")
+                info = subprocess.check_output(['gdalinfo', input_file],
+                                               stderr=subprocess.STDOUT).decode("utf-8")
                 input_format = re.search(r"Driver:\s*([^/]+)", info).group(1)
             except Exception as err:
                 logger.error("Unable to determine input file format: " + str(err))
                 raise Exception("Cannot determine input file format")
 
             logger.info("Input file format: " + input_format)
-            datasets = [line.split('=')[-1] for line in info.split("\n") if re.match(r"^\s*SUBDATASET_\d+_NAME=", line)]
+            datasets = [line.split('=')[-1] for line in info.split("\n") if
+                        re.match(r"^\s*SUBDATASET_\d+_NAME=", line)]
 
             if not datasets:
                 raise Exception("No subdatasets found in input file")
@@ -160,7 +157,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                         logger.info('Selected interpolation: %s' % interpolation)
                     if x_extent and y_extent:
                         gdal_cmd.extend(['-te', str(x_min), str(y_min), str(x_max), str(y_max)])
-                        logger.info('Selected scale extent: %f %f %f %f' % (x_min, y_min, x_max, y_max))
+                        logger.info(
+                            'Selected scale extent: %f %f %f %f' % (x_min, y_min, x_max, y_max))
                     if xres and yres:
                         gdal_cmd.extend(['-tr', str(xres), str(yres)])
                         logger.info('Selected scale size: %d %d' % (xres, yres))
@@ -172,7 +170,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
                     logger.info("GDAL command: " + " ".join(gdal_cmd))
 
-                    result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
+                    result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode(
+                        "utf-8")
                     outputs.append(name)
                 except Exception as err:
                     # Assume for now dataset cannot be reprojected. TBD add checks for other error
@@ -203,7 +202,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 # Main program start
 #
 if __name__ == "__main__":
-    PARSER = argparse.ArgumentParser(prog='Reproject', description='Run the Data Services Reprojection Tool')
+    PARSER = argparse.ArgumentParser(prog='Reproject',
+                                     description='Run the Data Services Reprojection Tool')
     PARSER.add_argument('--harmony-action',
                         choices=['invoke'],
                         help='The action Harmony needs to perform (currently only "invoke")')
