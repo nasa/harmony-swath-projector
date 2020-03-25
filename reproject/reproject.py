@@ -17,16 +17,19 @@ import harmony
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Mergers import NetCDF4Merger
 
+
 def rgetattr(obj, attr, *args):
     """
         return attribute if it exists
     """
+
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
 
     # accepts a function and a sequence and returns a single value calculated
     # function is applied cumulatively to arguments in the sequence from left to right until the list is exhausted
     return functools.reduce(_getattr, [obj] + attr.split('.'))
+
 
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
     """
@@ -35,7 +38,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         This class uses the Harmony utility library for processing the
         service input options.
     """
-
 
     def invoke(self):
         """
@@ -48,7 +50,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         try:
             if not hasattr(self, 'message'):
                 raise Exception("No message request")
-
 
             # Verify a granule URL has been provided andmake a local copy of the granule file
 
@@ -79,12 +80,12 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             if len(msg.granules) > 1:
                 raise Exception("Too many granules")
             # ERROR 5: -tr and -ts options cannot be used at the same time.
-            if hasattr(msg.format, 'scaleSize') and (hasattr(msg.format, 'width') or  hasattr(msg.format, 'height')) :
+            if hasattr(msg, 'format') and hasattr(msg.format, 'scaleSize') and (
+                    hasattr(msg.format, 'width') or hasattr(msg.format, 'height')):
                 raise Exception("'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
 
             self.download_granules()
             logger.info("Granule data copied")
-
 
             # Get reprojection options
 
@@ -128,7 +129,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             logger.info("Reprojecting file " + input_file + " as " + output_file)
             logger.info("Selected CRS: " + crs)
 
-
             # Use gdalinfo to get the sub-datasets in the input file as well as the file type.
 
             try:
@@ -144,7 +144,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             if not datasets:
                 raise Exception("No subdatasets found in input file")
             logger.info("Input file has " + str(len(datasets)) + " datasets")
-
 
             # Loop through each dataset and reproject
 
@@ -199,7 +198,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
         finally:
             self.cleanup()
-
 
 
 # Main program start
