@@ -189,7 +189,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             logger.info("Reprojection complete")
             mimetype = mimetypes.guess_type(input_file, False) or ('application/octet-stream', None)
-            self.completed_with_local_file(output_file, os.path.basename(input_file), mimetype[0])
+            self.completed_with_local_file(
+                output_file,
+                source_granule=granule,
+                is_regridded=True,
+                mime=mimetype[0])
 
         except Exception as err:
             logger.error("Reprojection failed: " + str(err))
