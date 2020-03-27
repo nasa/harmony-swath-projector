@@ -33,10 +33,12 @@ class TestNominalReproject(TestBase):
             }
         }
         reprojector = HarmonyAdapter(test_data)
+        granule = reprojector.message.granules[0]
         reprojector.invoke()
 
-        completed_with_local_file.assert_called_once_with(contains('africa_repr.nc'), 'africa.nc',
-                                                          'application/x-netcdf')
+        completed_with_local_file.assert_called_once_with(contains('africa.nc'),
+                        source_granule=granule, is_regridded=True, mime='application/x-netcdf')
+
         cleanup.assert_called_once()
 
 
