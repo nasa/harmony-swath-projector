@@ -30,7 +30,6 @@ class TestNominalReproject(TestBase):
                     'x': {'min': -20, 'max': 60},
                     'y': {'min': 10, 'max': 35}
                 },
-                # 'scaleSize': {'x': 1, 'y': 1}
             }
         }
         reprojector = HarmonyAdapter(test_data)

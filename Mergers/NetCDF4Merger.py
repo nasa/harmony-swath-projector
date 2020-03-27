@@ -137,9 +137,9 @@ def get_dataset_meta(inf, rep, dataset_name):
     if dataset_name in rep.variables.keys():
         data_type = get_data_type(rep, dataset_name)
         dims = get_dimensions(rep, dataset_name)
-        attrs = read_attrs(
-            inf[dataset_name]) if dataset_name in inf.variables.keys() else read_attrs(
-            rep[dataset_name])
+        attrs = read_attrs(inf[dataset_name]) \
+            if dataset_name in inf.variables.keys() \
+            else read_attrs(rep[dataset_name])
         if dataset_name in coor_info_attrs:
             attrs.update(coor_info_attrs[dataset_name])
     else:
@@ -184,12 +184,6 @@ def copy_variable(inf, out, repr, dataset_name, logger):
     else:
         ori_dataset_name = dataset_name
 
-    #    new_dataset_name = f'/{dataset_name}' \
-    #        if '/' in dataset_name \
-    #        else dataset_name
-
-    #    group = "/".join(dataset_name.split('/')[0:-1])
-    #    out.createGroup(group)
     new_dataset_name = dataset_name.split('/')[-1]  # just basename at end of path
 
     fill_value = None
