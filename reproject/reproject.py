@@ -3,13 +3,12 @@
 """
 
 import argparse
+import functools
 import mimetypes
 import os
 import re
-import sys
 import subprocess
-import functools
-
+import sys
 from tempfile import mkdtemp
 
 import harmony
@@ -27,7 +26,8 @@ def rgetattr(obj, attr, *args):
         return getattr(obj, attr, *args)
 
     # accepts a function and a sequence and returns a single value calculated
-    # function is applied cumulatively to arguments in the sequence from left to right until the list is exhausted
+    # function is applied cumulatively to arguments in the sequence
+    # from left to right until the list is exhausted
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 
@@ -80,7 +80,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             self.download_granules()
             logger.info("Granule data copied")
-            logger.info(f'Received message "{msg}"')
 
             # Get reprojection options
 

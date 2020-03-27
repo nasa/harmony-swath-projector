@@ -20,13 +20,8 @@ class TestNominalReproject(TestBase):
     @patch.object(BaseHarmonyAdapter, 'completed_with_local_file')
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_single_band_input(self, cleanup, completed_with_local_file):
-        """Nominal (successful) reprojection"""
-        test_data = {'granules': [
-            {'local_filename': '/home/test/data/africa.nc'}],
-            # 'format': {'interpolation': 'near',
-            #            'crs': '+proj=longlat',
-            #            'scaleExtent': {'x': [-20, 60], 'y': [0, 40]}
-            #            }
+        """Nominal (successful) reprojection for africa.nc"""
+        test_data = {'granules': [{'local_filename': '/home/test/data/africa.nc'}],
             'format': {
                 'crs': 'CRS:84',
                 'interpolation': 'bilinear',
