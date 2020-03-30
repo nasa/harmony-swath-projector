@@ -7,10 +7,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import unittest
 from unittest.mock import patch
 
-from reproject import HarmonyAdapter
-from harmony import BaseHarmonyAdapter
-
-from test_utils import contains, matches, TestBase
+from test.harmony import BaseHarmonyAdapter
+from test.test_utils import contains, matches, TestBase
 
 
 class TestNominalReproject(TestBase):

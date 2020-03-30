@@ -9,9 +9,9 @@ import unittest
 from unittest.mock import patch
 
 from swotrepr import HarmonyAdapter
-from harmony import BaseHarmonyAdapter
+from test.harmony import BaseHarmonyAdapter
 
-from test_utils import contains, TestBase
+from test.test_utils import contains, TestBase
 
 
 class TestGDALReproject(TestBase):
@@ -22,8 +22,15 @@ class TestGDALReproject(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_multi_band_input(self, cleanup, completed_with_local_file):
         """GDAL reprojection"""
-        test_data = {'granules': [{'local_filename': '/home/test/data/VOL2PSST_2017.nc'}],
-            'format': {'crs': 'EPSG:32603', 'interpolation': 'near', 'width': 1000, 'height': 500,}}
+        test_data = {
+            'granules': [{'local_filename': '/home/test/data/VOL2PSST_2017.nc'}],
+            'format': {
+                'crs': 'EPSG:32603',
+                'interpolation': 'near',
+                'width': 1000,
+                'height': 500
+            }
+        }
         start = time.time()
         reprojector = HarmonyAdapter(test_data)
         reprojector.invoke()

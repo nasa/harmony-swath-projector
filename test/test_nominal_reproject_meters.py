@@ -8,11 +8,8 @@ import unittest
 from unittest.mock import patch
 
 from swotrepr import HarmonyAdapter
-from harmony import BaseHarmonyAdapter
-
-from test_utils import contains, matches, TestBase
-
-
+from test.harmony import BaseHarmonyAdapter
+from test.test_utils import contains, matches, TestBase
 
 class TestNominalReproject(TestBase):
 
@@ -22,9 +19,17 @@ class TestNominalReproject(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_single_band_input(self, cleanup, completed_with_local_file):
         """Nominal (successful) reprojection"""
-        test_data = {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-            'format': {'crs': 'EPSG:32603', 'interpolation': 'near', 'width': 1000, 'height': 500,
-                'scaleExtent': {'x': [0, 1500000], 'y': [2500000, 3300000]}}}
+        test_data = {
+            'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
+            'format': {'crs': 'EPSG:32603',
+                'interpolation': 'near',
+                'width': 1000, 'height': 500,
+                'scaleExtent': {
+                    'x': { 'min':0, 'max':1500000},
+                    'y': { 'min':2500000, 'max':3300000}
+                }
+            }
+        }
         reprojector = HarmonyAdapter(test_data)
         reprojector.invoke()
 
