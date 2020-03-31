@@ -1,23 +1,33 @@
-FROM osgeo/gdal:alpine-normal-3.0.2
+#
+# Using Conda within ENTRYPOINT was taken from:
+# https://pythonspeed.com/articles/activate-conda-dockerfile/
+#
+
+FROM continuumio/miniconda3
 
 ARG EDL_USERNAME
 ARG EDL_PASSWORD
 
-# Note GIT credentials could have issue if password contains certain characters.
-# URL encoding additional characters besides '@' may be required
 WORKDIR "/home"
-RUN pip3 install --upgrade pip \
-    && pip3 install requests==2.18.4 --user --trusted-host=pypi.python.org --trusted-host=pypi.org --trusted-host=files.pythonhosted.org boto3 \
-    && apk add git \
-    && EDL_PASSWORD=$(echo $EDL_PASSWORD | sed -e 's/@/%40/g') \
-    && pip3 install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git" \
-    && apk add --no-cache --allow-untrusted --repository http://dl-3.alpinelinux.org/alpine/edge/testing hdf5-dev netcdf-dev \
-    && apk add build-base python3-dev py-numpy-dev \
-    && pip3 install netCDF4 pyresample==1.13.1 \
-    && apk del py-numpy-dev python3-dev build-base
 
 # Bundle app source
 COPY ./PyMods Pymods
 COPY swotrepr.py .
+COPY conda_requirements.txt .
+COPY pip_requirements.txt .
 
-ENTRYPOINT ["python3", "swotrepr.py"]
+# Create Conda environment
+RUN conda create --name swotrepr --file conda_requirements.txt --channel conda-forge python=3.6
+
+# Make RUN commands use the Conda environment
+SHELL ["conda", "run", "--name", "swotrepr", "/bin/bash", "-c"]
+
+# Install additional Pip dependencies
+RUN pip install -r pip_requirements.txt
+
+# Install Harmony
+# Note GIT credentials could have issue if password contains certain characters.
+# URL encoding additional characters besides '@' may be required
+RUN pip install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git"
+
+ENTRYPOINT ["conda", "run", "--name", "swotrepr", "python", "swotrepr.py"]

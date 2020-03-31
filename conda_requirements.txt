@@ -1,0 +1,3 @@
+gdal
+pyresample==1.13.1
+xarray==0.15.1

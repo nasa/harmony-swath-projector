@@ -1,7 +1,6 @@
 """
  Data Services Reprojection service for Harmony
 """
-
 import argparse
 import functools
 import os
@@ -11,6 +10,7 @@ import sys
 from tempfile import mkdtemp
 import logging
 import json
+import warnings
 
 import numpy as np
 import rasterio
@@ -143,18 +143,18 @@ def py_resample(message, name, output_file, target_area, cols, rows, t_params, s
     # Get data, exclude time
     if not data_set.variables:
         data_arr = data_set.values
-    elif data_set.variables.get('time') != None: # .size != 0:
+    elif data_set.variables.get('time') is not None: # .size != 0:
         data_arr = data_set.variables.get(name)[0].values
     else:
         data_arr = data_set.variables.get(name).values
 
-    if prms.get('interpolation') == 'near' :
+    if prms.get('interpolation') == 'near':
         fill_value = 9999
         epsilon = 0.5
         result_data = kd_tree.resample_nearest(swath_area, data_arr, target_area,
                                                radius_of_influence,
                                                fill_value, epsilon)
-    if prms.get('interpolation') =='bilinear':
+    if prms.get('interpolation') == 'bilinear':
         # # -------------- BILINEAR 1 --------------
         # fill_value = 9999
         # epsilon = 0.5
@@ -170,7 +170,7 @@ def py_resample(message, name, output_file, target_area, cols, rows, t_params, s
         result_data = bilinear.get_sample_from_bil_info(data_arr.ravel(), t_params, s_params,
                                                         input_idxs, idx_ref,
                                                         output_shape=target_area.shape)
-    if prms.get('interpolation') =='ewa' :
+    if prms.get('interpolation') == 'ewa':
         # fornav resamples the swath data to the gridded area
         if np.issubdtype(data_arr.dtype, np.integer):
             data_arr = data_arr.astype(float)
@@ -199,7 +199,7 @@ def get_pyresample_params(param_list):
     return target_area, cols, rows, t_params, s_params, input_idxs, idx_ref
 
 
-def get_params_from_msg(message) :
+def get_params_from_msg(message):
     # TODO: test for incomplete message, consider defaults as None or undefined
     crs = rgetattr(message, 'format.crs', CRS_DEFAULT)
     interpolation = rgetattr(message, 'format.interpolation', 'near')  # near, bilinear, ewa
@@ -232,17 +232,18 @@ def get_params_from_msg(message) :
         raise Exception("Missing cell height")
     if height and not width:
         raise Exception("Missing cell width")
+
     if x_extent:
-        x_min = x_extent.min
-        x_max = x_extent.max
+        x_min = rgetattr(x_extent, 'min', None)
+        x_max = rgetattr(x_extent, 'max', None)
     if y_extent:
-        y_min = y_extent.min
-        y_max = y_extent.max
+        y_min = rgetattr(y_extent, 'min', None)
+        y_max = rgetattr(y_extent, 'max', None)
 
     if REPR_MODE == 'pyresample':
-        if not x_extent and not y_extent:
+        if x_extent is None and y_extent is None:
             x_min, x_max, y_min, y_max = get_extents_from_walking_perimeter(projection, latitudes, longitudes)
-        if xres != None and yres != None:
+        if xres is not None and yres is not None:
             xres = get_resolution_from_minimum_difference(latitudes, longitudes, projection)
     #        yres = -1.0 * get_resolution_from_minimum_difference(latitudes, longitudes)
             yres = -1.0 * xres
@@ -353,7 +354,7 @@ def get_resolution_from_minimum_difference(latitudes, longitudes, projection):
 
     if not projection.crs.is_geographic: # convert resolution to meters
         # generic conversion based upon distance of degrees at equator
-        min_diff = min_diff * (2 * pi * RADIUS_EARTH_METRES / 360)
+        min_diff = min_diff * (2 * np.pi * RADIUS_EARTH_METRES / 360)
         # should we use center of grid?  determine point of true-scale?
     return float(min_diff)
 
