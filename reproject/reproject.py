@@ -72,11 +72,6 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
                 raise Exception("Invalid granule list")
             if len(msg.granules) > 1:
                 raise Exception("Too many granules")
-            # ERROR 5: -tr and -ts options cannot be used at the same time.
-            if hasattr(msg, 'format') and hasattr(msg.format, 'scaleSize') and (
-                    hasattr(msg.format, 'width') or hasattr(msg.format, 'height')):
-                raise Exception(
-                    "'scaleSize', 'width' or/and 'height' cannot be used at the same time in the message.")
 
             self.download_granules()
             logger.info("Granule data copied")
@@ -87,10 +82,19 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             interpolation = rgetattr(msg, 'format.interpolation', None)
             x_extent = rgetattr(msg, 'format.scaleExtent.x', None)
             y_extent = rgetattr(msg, 'format.scaleExtent.y', None)
-            width = rgetattr(msg, 'format.width', 0)
-            height = rgetattr(msg, 'format.height', 0)
+            width = rgetattr(msg, 'format.width', None)
+            height = rgetattr(msg, 'format.height', None)
             xres = rgetattr(msg, 'format.scaleSize.x', 0)
             yres = rgetattr(msg, 'format.scaleSize.y', 0)
+
+            # ERROR 5: -tr and -ts options cannot be used at the same time.
+            if (
+                    (x_extent is not None or y_extent is not None) and
+                    (height is not None or width is not None)
+            ):
+                raise Exception("'scaleSize', 'width' or/and 'height' cannot "
+                                "be used at the same time in the message.")
+
 
             crs = crs or '+proj=longlat +ellps=WGS84 +units=m'
 
