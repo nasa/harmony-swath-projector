@@ -25,7 +25,6 @@ class TestNominalReproject(TestBase):
             'format': {
                 'crs': 'CRS:84',
                 'interpolation': 'bilinear',
-                'width': 1000, 'height': 500,
                 'scaleExtent': {
                     'x': {'min': -20, 'max': 60},
                     'y': {'min': 10, 'max': 35}
