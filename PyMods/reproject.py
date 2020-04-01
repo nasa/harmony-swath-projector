@@ -30,7 +30,9 @@ CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 
 # https://pyresample.readthedocs.io/en/latest/swath.html
 ROWS_PER_SCAN = 8  # the number of overlapping rows in the swath (need for EWA)
-REPR_MODE = 'pyresample' # 'gdal'
+# The REPR_MODE should probably become a parameter in the call to reproject,
+# with a default value to fall back on.
+REPR_MODE = 'gdal'
 
 ''' TODO: Refactor so that we either first determine groups, or we cache PyResample
     setup results to avoid recomputing.
@@ -42,9 +44,7 @@ REPR_MODE = 'pyresample' # 'gdal'
 
 def reproject(msg, logger):
     # Set up source and destination files
-    param_list = get_params_from_msg(msg)
-    if not os.path.isfile(param_list.get('input_file')):
-        raise Exception("Input file does not exist")
+    param_list = get_params_from_msg(msg, logger)
     temp_dir = mkdtemp()
     root_ext = os.path.splitext(os.path.basename(param_list.get('input_file')))
     output_file = temp_dir + os.sep + root_ext[0] + '_repr' + root_ext[1]
@@ -84,10 +84,15 @@ def reproject(msg, logger):
             logger.info("Reprojecting subdataset '%s'" % name)
             logger.info("Reprojected output '%s'" % output)
             if REPR_MODE == 'gdal':
-                gdal_resample(msg, dataset, output, logger)
+                try:
+                    gdal_resample(msg, dataset, output, logger)
+                except Exception as err:
+                    logger.error('Unable to determine input file format: '
+                                 f'{str(err)}')
+                    raise Exception('Cannot determine input file format')
             else:
                 # if name == "lat" or name == "lon": continue
-                py_resample(msg, name, output, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref)
+                py_resample(msg, name, output, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref, logger)
             outputs.append(name)
         except Exception as err:
             # Assume for now dataset cannot be reprojected. TBD add checks for other error
@@ -107,7 +112,7 @@ def reproject(msg, logger):
 
 
 def gdal_resample(message, dataset, output_file, logger):
-    prms = get_params_from_msg(message)
+    prms = get_params_from_msg(message, logger)
 
     #TODO: rework to accomodate new parameter handling re. undefined or None
     gdal_cmd = ['gdalwarp', '-geoloc', '-t_srs', prms.get('crs')]
@@ -128,8 +133,8 @@ def gdal_resample(message, dataset, output_file, logger):
     result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
 
 
-def py_resample(message, name, output_file, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref):
-    prms = get_params_from_msg(message)
+def py_resample(message, name, output_file, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref, logger):
+    prms = get_params_from_msg(message, logger)
     # Suppress known pyresamle warnings
     if not sys.warnoptions:
         warnings.simplefilter("ignore")
@@ -199,7 +204,7 @@ def get_pyresample_params(param_list):
     return target_area, cols, rows, t_params, s_params, input_idxs, idx_ref
 
 
-def get_params_from_msg(message):
+def get_params_from_msg(message, logger):
     # TODO: test for incomplete message, consider defaults as None or undefined
     crs = rgetattr(message, 'format.crs', CRS_DEFAULT)
     interpolation = rgetattr(message, 'format.interpolation', 'near')  # near, bilinear, ewa
@@ -220,14 +225,23 @@ def get_params_from_msg(message):
                         "be used at the same time in the message.")
 
     input_file = rgetattr(granule, 'local_filename', None)
-    # TODO: test for no local_filename
+    if input_file is None:
+        raise Exception('Invalid local_filename attribute for granule.')
+    elif not os.path.isfile(input_file):
+        raise Exception("Input file does not exist")
+
     # refactor to get groups and datasets together (first?)
-    latlon_group, data_group = get_group(input_file)
-    file_data = get_input_file_data(input_file, latlon_group)
-    latitudes = file_data.get("latitudes")
-    longitudes = file_data.get("longitudes")
-    lon_res = file_data.get('lon_res')
-    lat_res = file_data.get('lat_res')
+    try:
+        latlon_group, data_group = get_group(input_file)
+        file_data = get_input_file_data(input_file, latlon_group)
+        latitudes = file_data.get("latitudes")
+        longitudes = file_data.get("longitudes")
+        lon_res = file_data.get('lon_res')
+        lat_res = file_data.get('lat_res')
+    except Exception as err:
+        logger.error(f'Unable to determine input file format: {str(err)}')
+        raise Exception('Cannot determine input file format')
+
     projection = Proj(crs)
 
     # Verify message and assign values

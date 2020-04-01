@@ -27,8 +27,6 @@ class TestNominalReproject(TestBase):
             'format': {
                 'crs': 'EPSG:32603',
                 'interpolation': 'near',
-                'width': 1000,
-                'height': 500,
                 'scaleExtent': {'x': {'min': 0, 'max': 1500000},
                                 'y': {'min': 2500000, 'max': 3300000}}
             }
