@@ -205,11 +205,19 @@ def get_params_from_msg(message):
     interpolation = rgetattr(message, 'format.interpolation', 'near')  # near, bilinear, ewa
     x_extent = rgetattr(message, 'format.scaleExtent.x', None)
     y_extent = rgetattr(message, 'format.scaleExtent.y', None)
-    width = rgetattr(message, 'format.width', 0)
-    height = rgetattr(message, 'format.height', 0)
+    width = rgetattr(message, 'format.width', None)
+    height = rgetattr(message, 'format.height', None)
     xres = rgetattr(message, 'format.scaleSize.x', 0)
     yres = rgetattr(message, 'format.scaleSize.y', 0)
     granule = rgetattr(message, 'granules', [None])[0]
+
+    # ERROR 5: -tr and -ts options cannot be used at the same time.
+    if (
+            (x_extent is not None or y_extent is not None) and
+            (height is not None or width is not None)
+    ):
+        raise Exception("'scaleSize', 'width' or/and 'height' cannot "
+                        "be used at the same time in the message.")
 
     input_file = rgetattr(granule, 'local_filename', None)
     # TODO: test for no local_filename
