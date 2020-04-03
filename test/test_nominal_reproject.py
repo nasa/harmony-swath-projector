@@ -8,9 +8,9 @@ import unittest
 from unittest.mock import patch
 
 from swotrepr import HarmonyAdapter
-from test.harmony import BaseHarmonyAdapter
+from harmony import BaseHarmonyAdapter
 
-from test.test_utils import contains, matches, TestBase
+from test_utils import contains, matches, TestBase
 
 
 
@@ -26,6 +26,7 @@ class TestNominalReproject(TestBase):
         reprojector = HarmonyAdapter(test_data)
         granule = reprojector.message.granules[0]
         reprojector.invoke()
+        print(reprojector.completed_with_local_file)
 
         completed_with_local_file.assert_called_once_with(contains('VNL2_oneBand_repr.nc'), source_granule=granule, is_regridded=True, mime='application/x-netcdf')
         cleanup.assert_called_once()

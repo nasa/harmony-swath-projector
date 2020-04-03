@@ -61,7 +61,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             # Return the output file back to Harmony
             logger.info("Reprojection complete")
             # TODO: mimetype should be based on output file(s)?
-            mimetype = mimetypes.guess_type(granule, False) or ('application/octet-stream', None)
+            mimetype = mimetypes.guess_type(granule.local_filename, False) or ('application/octet-stream', None)
             self.completed_with_local_file(
                 output_file,
                 source_granule=granule,

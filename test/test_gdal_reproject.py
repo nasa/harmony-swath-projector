@@ -9,9 +9,9 @@ import unittest
 from unittest.mock import patch
 
 from swotrepr import HarmonyAdapter
-from test.harmony import BaseHarmonyAdapter
+from harmony import BaseHarmonyAdapter
 
-from test.test_utils import contains, TestBase
+from test_utils import contains, TestBase
 
 
 class TestGDALReproject(TestBase):
@@ -22,21 +22,20 @@ class TestGDALReproject(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_multi_band_input(self, cleanup, completed_with_local_file):
         """GDAL reprojection"""
-        test_data = {
-            'granules': [{'local_filename': '/home/test/data/VOL2PSST_2017.nc'}],
-            'format': {
-                'crs': 'EPSG:32603',
-                'interpolation': 'near',
-                'width': 1000,
-                'height': 500
-            }
-        }
+        test_data = {'granules': [{'local_filename': '/home/test/data/VOL2PSST_2017.nc'}],
+            'format': {'crs': 'EPSG:32603', 'interpolation': 'near', 'width': 1000, 'height': 500,}}
         start = time.time()
         reprojector = HarmonyAdapter(test_data)
+        granule = reprojector.message.granules[0]
         reprojector.invoke()
         end = time.time()
         print("Full time = " + str(end - start))
-        completed_with_local_file.assert_called_once_with(contains('VOL2PSST_2017_repr.nc'), 'VOL2PSST_2017.nc', 'application/x-netcdf')
+        completed_with_local_file.assert_called_once_with(
+            contains('VOL2PSST_2017_repr.nc'),
+            source_granule=granule,
+            is_regridded=True,
+            mime='application/x-netcdf'
+        )
         cleanup.assert_called_once()
 
 

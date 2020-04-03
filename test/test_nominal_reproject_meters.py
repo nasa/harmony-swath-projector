@@ -8,8 +8,11 @@ import unittest
 from unittest.mock import patch
 
 from swotrepr import HarmonyAdapter
-from test.harmony import BaseHarmonyAdapter
-from test.test_utils import contains, matches, TestBase
+from harmony import BaseHarmonyAdapter
+
+from test_utils import contains, matches, TestBase
+
+
 
 class TestNominalReproject(TestBase):
 
@@ -21,19 +24,23 @@ class TestNominalReproject(TestBase):
         """Nominal (successful) reprojection"""
         test_data = {
             'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-            'format': {'crs': 'EPSG:32603',
+            'format': {
+                'crs': 'EPSG:32603',
                 'interpolation': 'near',
-                'width': 1000, 'height': 500,
-                'scaleExtent': {
-                    'x': { 'min':0, 'max':1500000},
-                    'y': { 'min':2500000, 'max':3300000}
-                }
+                'scaleExtent': {'x': {'min': 0, 'max': 1500000},
+                                'y': {'min': 2500000, 'max': 3300000}}
             }
         }
         reprojector = HarmonyAdapter(test_data)
+        granule = reprojector.message.granules[0]
         reprojector.invoke()
 
-        completed_with_local_file.assert_called_once_with(contains('VNL2_oneBand_repr.nc'), 'VNL2_oneBand.nc', 'application/x-netcdf')
+        completed_with_local_file.assert_called_once_with(
+            contains('VNL2_oneBand_repr.nc'),
+            source_granule=granule,
+            is_regridded=True,
+            mime='application/x-netcdf')
+
         cleanup.assert_called_once()
 
 if __name__ == '__main__':
