@@ -170,8 +170,8 @@ def copy_variable(inf, out, repr, dataset_name, logger):
         if repr[ori_dataset_name][:].shape != out[new_dataset_name].shape:
             reshaped = repr[ori_dataset_name][:].reshape(out[new_dataset_name].shape)
             if 'add_offset' in attrs and 'scale_factor' in attrs:
-                reshaped = (reshaped * out[new_dataset_name].scale_factor)
-                    + out[new_dataset_name].add_offset
+                reshaped = ((reshaped * out[new_dataset_name].scale_factor)
+                            + out[new_dataset_name].add_offset)
 
             out[new_dataset_name][:] = reshaped
         else:

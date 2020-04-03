@@ -22,14 +22,22 @@ class TestNominalReproject(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_single_band_input(self, cleanup, completed_with_local_file):
         """Nominal (successful) reprojection"""
-        test_data = {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-             'format': {'interpolation': 'ewa',
-                        'scaleExtent': {'x': [-160, -159], 'y': [24, 25]}
-                        }}
+        test_data = {
+            'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
+            'format': {'interpolation': 'ewa',
+                       'scaleExtent': {'x': {'min': -160, 'max': -159},
+                                       'y': {'min': 24, 'max': 25}}}
+        }
         reprojector = HarmonyAdapter(test_data)
+        granule = reprojector.message.granules[0]
         reprojector.invoke()
 
-        completed_with_local_file.assert_called_once_with(contains('VNL2_oneBand_repr.nc'), 'VNL2_oneBand.nc', 'application/x-netcdf')
+        completed_with_local_file.assert_called_once_with(
+            contains('VNL2_oneBand_repr.nc'),
+            source_granule=granule,
+            is_regridded=True,
+            mime='application/x-netcdf'
+        )
         cleanup.assert_called_once()
 
 if __name__ == '__main__':

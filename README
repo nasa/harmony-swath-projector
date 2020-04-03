@@ -1,16 +1,45 @@
-Data Services Reprojection Service for SWOT Swatch Data
+## Data Services Reprojection Service for SWOT Swath Data
 
 To download source code:
 
-> git clone https://git.earthdata.nasa.gov/scm/sitc/swotrepr.git swotrepr
+```bash
+git clone https://git.earthdata.nasa.gov/scm/sitc/swotrepr.git swotrepr
+```
 
 To build the Docker image:
 
-> cd swotrepr
-
-> ./bin/build-image
+```bash
+cd swotrepr
+./bin/build-image
+```
 
 The image build process needs Earthdata Login credentials to access the Harmony utility library. The
 script will attempt to retrieve credentials from a '.netrc' file, but will prompt you for credentials
 if it cannot find any. These credentials are used ONLY during the build process, and will not be
 propagated or otherwise stored in the docker image.
+
+### Development notes:
+
+SwotRepr runs within a Docker container (both the project itself, and the tests
+that are run for CI/CD. If you add a new Python package to be used within
+SwotRepr (or remove a third party package), the change in dependencies will need
+to be recorded in the relevant requirements file:
+
+* `swotrepr/conda_requirements.txt`: Requirements needed for SwotRepr to run,
+	obtained from the `conda-forge` channel.
+* `swotrepr/pip_requirements.txt`: Additional requirements installed within
+	the container's conda environment via Pip. These are also required for the
+	source code of SwotRepr to run.
+* `swotrepr/test/pip_test_requirements.txt`: Requirements only used while running
+	tests, such as `pylint` or `coverage`. These are kept separate to reduce the
+	dependencies in the delivered software.
+
+### Running tests:
+
+SwotRepr has Python tests that use the `unittest` package. These can be run
+within a Docker container using the following two scripts:
+
+```bash
+./bin/build-test
+./bin/run-test
+```
