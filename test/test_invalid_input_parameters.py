@@ -8,9 +8,9 @@ import unittest
 from unittest.mock import patch
 
 from swotrepr import HarmonyAdapter
-from test.harmony import BaseHarmonyAdapter
+from harmony import BaseHarmonyAdapter
 
-from test.test_utils import contains, matches, TestBase
+from test_utils import contains, matches, TestBase
 
 
 class TestReprojectInput(TestBase):

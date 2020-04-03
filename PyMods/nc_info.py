@@ -11,11 +11,10 @@ def walktree(top):
         for children in walktree(value):
             yield children
 
-
 class NC4Info:
-    def __init__(self, ncfile):
+    def __init__(self, ncfile: str):
         self.rootgroup = Dataset(ncfile)
-        self.vars_coord = set()
+        self.vars_with_coords = set()
         self.vars_meta = set()
         self.dims = set()
         self.coords = set()
@@ -25,7 +24,7 @@ class NC4Info:
             if self.rootgroup.variables:
                 for nvar, var in self.rootgroup.variables.items():
                     if 'coordinates' in var.ncattrs():
-                        self.vars_coord.add("/" + nvar)
+                        self.vars_with_coords.add("/" + nvar)
                     else:
                         self.vars_meta.add("/" + nvar)
                 for dim in self.rootgroup.dimensions:
@@ -34,7 +33,7 @@ class NC4Info:
                 if child.variables:
                     for varn, var in child.variables.items():
                         if 'coordinates' in var.ncattrs():
-                            self.vars_coord.add(child.path + "/" + varn)
+                            self.vars_with_coords.add(child.path + "/" + varn)
                             vcoords = getattr(var, 'coordinates')
                             if "," not in vcoords:
                                 self.coords.add(child.path + "/" + getattr(var, 'coordinates'))
@@ -48,7 +47,7 @@ class NC4Info:
                         self.dims.add(child.path + "/" + dim)
 
     def get_science_variables(self):
-        return self.vars_coord - self.vars_meta - self.dims - self.coords
+        return self.vars_with_coords - self.dims - self.coords
 
     def get_metadata_variables(self):
         return self.vars_meta - self.dims - self.coords
