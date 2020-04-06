@@ -37,3 +37,23 @@ class TestNC4Info(TestBase):
         africa = NC4Info('test/data/africa.nc')
         metadata_variables = africa.get_metadata_variables()
         self.assertEqual(metadata_variables, set())
+
+    def test_extract_coordinates(self):
+        """Ensure a string with either space delimited, comma delimited, or
+        comma-space delimited coordinates returns a separated list of these
+        coordinate datasets.
+
+        """
+        africa = NC4Info('test/data/africa.nc')
+
+        expected_output = ['/lon', '/lat']
+        test_args = [['space', 'lon lat'],
+                     ['multiple spaces', 'lon    lat'],
+                     ['comma', 'lon,lat'],
+                     ['comma-space', 'lon, lat'],
+                     ['comma-multiple-space', 'lon,    lat']]
+
+        for description, coordinates in test_args:
+            with self.subTest(description):
+                self.assertEqual(africa._extract_coordinates(coordinates),
+                                 expected_output)

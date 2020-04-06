@@ -1,3 +1,4 @@
+from typing import List, Set
 import argparse
 import logging
 import re
@@ -15,6 +16,7 @@ def walktree(top):
 
 class NC4Info:
     def __init__(self, ncfile: str):
+        self.coordinate_delimiter = '\s+|,(?:\s+)?'
         self.rootgroup = Dataset(ncfile)
         self.vars_with_coords = set()
         self.vars_meta = set()
@@ -27,9 +29,7 @@ class NC4Info:
                 for nvar, var in self.rootgroup.variables.items():
                     if 'coordinates' in var.ncattrs():
                         self.vars_with_coords.add(f'/{nvar}')
-                        split_coords = [f'/{coord}'
-                                        for coord
-                                        in re.split(' |,', var.coordinates)]
+                        split_coords = self._extract_coordinates(var.coordinates)
                         self.coords.update(split_coords)
                     else:
                         self.vars_meta.add(f'/{nvar}')
@@ -42,10 +42,7 @@ class NC4Info:
                     for varn, var in child.variables.items():
                         if 'coordinates' in var.ncattrs():
                             self.vars_with_coords.add(f'{child.path}/{varn}')
-                            split_coords = [f'/{coord}'
-                                            for coord
-                                            in re.split(' |,', var.coordinates)]
-
+                            split_coords = self._extract_coordinates(var.coordinates)
                             self.coords.update(split_coords)
                         else:
                             self.vars_meta.add(f'{child.path}/{varn}')
@@ -53,11 +50,18 @@ class NC4Info:
                     for dim in child.dimensions:
                         self.dims.add(f'{child.path}/{dim}')
 
-    def get_science_variables(self):
+    def get_science_variables(self) -> Set[str]:
         return self.vars_with_coords - self.dims - self.coords
 
-    def get_metadata_variables(self):
+    def get_metadata_variables(self) -> Set[str]:
         return self.vars_meta - self.dims - self.coords
+
+    def _extract_coordinates(self, coordinates: str) -> List[str]:
+        """ Take a string of potentially coordinate datasets and return a list
+        of separate coordinate dataset names.
+
+        """
+        return [f'/{coord}' for coord in re.split('\s+|,(?:\s+)?', coordinates)]
 
 
 # Main program start for testing with any input file
