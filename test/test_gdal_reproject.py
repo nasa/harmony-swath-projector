@@ -1,17 +1,13 @@
 import os
 import sys
 import time
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 import unittest
 from unittest.mock import patch
 
-from swotrepr import HarmonyAdapter
 from harmony import BaseHarmonyAdapter
 
-from test_utils import contains, TestBase
+from swotrepr import HarmonyAdapter
+from test.test_utils import contains, TestBase
 
 
 class TestGDALReproject(TestBase):

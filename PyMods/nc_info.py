@@ -1,5 +1,7 @@
 import argparse
 import logging
+import re
+
 from netCDF4 import Dataset
 
 
@@ -24,27 +26,32 @@ class NC4Info:
             if self.rootgroup.variables:
                 for nvar, var in self.rootgroup.variables.items():
                     if 'coordinates' in var.ncattrs():
-                        self.vars_with_coords.add("/" + nvar)
+                        self.vars_with_coords.add(f'/{nvar}')
+                        split_coords = [f'/{coord}'
+                                        for coord
+                                        in re.split(' |,', var.coordinates)]
+                        self.coords.update(split_coords)
                     else:
-                        self.vars_meta.add("/" + nvar)
+                        self.vars_meta.add(f'/{nvar}')
+
                 for dim in self.rootgroup.dimensions:
-                    self.dims.add("/" + dim)
+                    self.dims.add(f'/{dim}')
+
             for child in children:
                 if child.variables:
                     for varn, var in child.variables.items():
                         if 'coordinates' in var.ncattrs():
-                            self.vars_with_coords.add(child.path + "/" + varn)
-                            vcoords = getattr(var, 'coordinates')
-                            if "," not in vcoords:
-                                self.coords.add(child.path + "/" + getattr(var, 'coordinates'))
-                            else:
-                                nvc = vcoords.split(", ")
-                                for idx, value in enumerate(nvc):
-                                    self.coords.add(child.path + "/" + value)
+                            self.vars_with_coords.add(f'{child.path}/{varn}')
+                            split_coords = [f'/{coord}'
+                                            for coord
+                                            in re.split(' |,', var.coordinates)]
+
+                            self.coords.update(split_coords)
                         else:
-                            self.vars_meta.add(child.path + "/" + varn)
+                            self.vars_meta.add(f'{child.path}/{varn}')
+
                     for dim in child.dimensions:
-                        self.dims.add(child.path + "/" + dim)
+                        self.dims.add(f'{child.path}/{dim}')
 
     def get_science_variables(self):
         return self.vars_with_coords - self.dims - self.coords

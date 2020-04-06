@@ -1,13 +1,13 @@
-import netCDF4
 import os
 import re
 import subprocess
 import sys
 import unittest
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import netCDF4
+
 from PyMods import NetCDF4Merger
-from test_utils import TestBase
+from test.test_utils import TestBase
 
 class TestNetCDF4Merger(TestBase):
 
