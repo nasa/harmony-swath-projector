@@ -53,7 +53,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             self.download_granules()
             logger.info("Granule data copied")
-            logger.info("Received message '%s'", msg)
+            logger.info(f'Received message: {msg}')
 
             # Call Reprojection utility
             granule, output_file = reproject(msg, logger)

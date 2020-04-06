@@ -6,11 +6,9 @@ import functools
 import os
 import re
 import subprocess
-import sys
 from tempfile import mkdtemp
 import logging
 import json
-import warnings
 
 import numpy as np
 import rasterio
@@ -18,27 +16,25 @@ import rasterio
 from rasterio.transform import Affine
 import xarray
 from pyproj import Proj
-from pyresample import geometry, kd_tree, bilinear
-from pyresample.ewa import ll2cr, fornav
+from pyresample import geometry
 
 from PyMods import NetCDF4Merger
+from PyMods.interpolation_gdal import gdal_resample_all_variables
+from PyMods.interpolation_pyresample import resample_all_variables
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
-#CRS_DEFAULT ='EPSG:4979' # WGS84 Datum + Elipsoid for coordinate reference (CRS), similar to 4326
-#CRS_DEFAULT = '+proj=eqc'
 
-# https://pyresample.readthedocs.io/en/latest/swath.html
-ROWS_PER_SCAN = 8  # the number of overlapping rows in the swath (need for EWA)
 # The REPR_MODE should probably become a parameter in the call to reproject,
 # with a default value to fall back on.
-REPR_MODE = 'gdal'
+REPR_MODE = 'pyresample'
+# REPR_MODE = 'gdal'
 
 ''' TODO: Refactor so that we either first determine groups, or we cache PyResample
     setup results to avoid recomputing.
-    
+
     Also: Refactor to not use gdalinfo for list of datasets
-    
+
     Also: Resolve issues re. get_resolution and get_extents and various data architectures
 '''
 
@@ -48,57 +44,37 @@ def reproject(msg, logger):
     temp_dir = mkdtemp()
     root_ext = os.path.splitext(os.path.basename(param_list.get('input_file')))
     output_file = temp_dir + os.sep + root_ext[0] + '_repr' + root_ext[1]
-    extension = os.path.splitext(output_file)[-1][1:]
 
-    logger.info("Reprojecting file " + param_list.get('input_file') + " as " + output_file)
-    logger.info("Selected CRS: " + param_list.get('crs') + "\tInterpolation: " + param_list.get('interpolation'))
-
-    # TODO: refactor to better handle parameters, and to consider e.g. EWA and Nearest setup
-    if REPR_MODE == 'pyresample':
-        target_area, cols, rows, t_params, s_params, input_idxs, idx_ref \
-          = get_pyresample_params(param_list)
+    logger.info(f'Reprojecting file {param_list.get("input_file")} as {output_file}')
+    logger.info(f'Selected CRS: {param_list.get("crs")}\t'
+                f'Interpolation: {param_list.get("interpolation")}')
 
     # Use gdalinfo to get the sub-datasets in the input file as well as the file type.
     try:
-        info = subprocess.check_output(['gdalinfo', param_list.get('input_file')], stderr=subprocess.STDOUT).decode("utf-8")
-        input_format = re.search(r"Driver:\s*([^/]+)", info).group(1)
+        info = subprocess.check_output(['gdalinfo', param_list.get('input_file')],
+                                       stderr=subprocess.STDOUT).decode('utf-8')
+        input_format = re.search(r'Driver:\s*([^/]+)', info).group(1)
     except Exception as err:
-        logger.error("Unable to determine input file format: " + str(err))
-        raise Exception("Cannot determine input file format")
+        logger.error(f'Unable to determine input file format: {str(err)}')
+        raise Exception('Cannot determine input file format')
 
     logger.info("Input file format: " + input_format)
-    datasets = [line.split('=')[-1] for line in info.split("\n") if re.match(r"^\s*SUBDATASET_\d+_NAME=", line)]
+    datasets = [line.split('=')[-1] for line in info.split('\n')
+                if re.match(r'^\s*SUBDATASET_\d+_NAME=', line)]
 
     if not datasets:
-        raise Exception("No subdatasets found in input file")
-    logger.info("Input file has " + str(len(datasets)) + " datasets")
+        raise Exception('No subdatasets found in input file')
+    logger.info(f'Input file has {len(datasets)} datasets')
 
     # Loop through each dataset and reproject
-    outputs = []
-    for dataset in datasets:
-        try:
-            name = dataset.split(':')[-1]
-            if "lat" in name or "lon" in name:
-                continue # skip processing
-            output = temp_dir + os.sep + name.split('/')[-1] + '.' + extension
-            logger.info("Reprojecting subdataset '%s'" % name)
-            logger.info("Reprojected output '%s'" % output)
-            if REPR_MODE == 'gdal':
-                try:
-                    gdal_resample(msg, dataset, output, logger)
-                except Exception as err:
-                    logger.error('Unable to determine input file format: '
-                                 f'{str(err)}')
-                    raise Exception('Cannot determine input file format')
-            else:
-                # if name == "lat" or name == "lon": continue
-                py_resample(msg, name, output, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref, logger)
-            outputs.append(name)
-        except Exception as err:
-            # Assume for now dataset cannot be reprojected. TBD add checks for other error
-            # conditions.
-            logger.info("Cannot reproject " + name)
-            logger.info(err)
+    if REPR_MODE == 'gdal':
+        logger.debug('Using gdal for reprojection.')
+        outputs = gdal_resample_all_variables(param_list, info, temp_dir, logger)
+    elif REPR_MODE == 'pyresample':
+        logger.debug('Using pyresample for reprojection.')
+        outputs = resample_all_variables(param_list, info, temp_dir, logger)
+    else:
+        raise Exception(f'Invalid reprojection mode: {REPR_MODE}')
 
     # Now merge outputs (unless we only have one)
 
@@ -109,99 +85,6 @@ def reproject(msg, logger):
 
     # Return the output file back to Harmony
     return param_list.get('granule'), output_file
-
-
-def gdal_resample(message, dataset, output_file, logger):
-    prms = get_params_from_msg(message, logger)
-
-    #TODO: rework to accomodate new parameter handling re. undefined or None
-    gdal_cmd = ['gdalwarp', '-geoloc', '-t_srs', prms.get('crs')]
-    if prms.get('interpolation') and prms.get('interpolation') is not 'ewa':
-        gdal_cmd.extend(['-r', prms.get('interpolation')])
-        logger.info('Selected interpolation: %s' % prms.get('interpolation'))
-    if prms.get('x_extent') and prms.get('y_extent'):
-        gdal_cmd.extend(['-te', str(prms.get('x_min')), str(prms.get('y_min')), str(prms.get('x_max')), str(prms.get('y_max'))])
-        logger.info('Selected scale extent: %f %f %f %f' % (prms.get('x_min'), prms.get('y_min'), prms.get('x_max'), prms.get('y_max')))
-    if prms.get('xres') and prms.get('yres'):
-        gdal_cmd.extend(['-tr', str(prms.get('xres')), str(prms.get('yres'))])
-        logger.info('Selected scale size: %d %d' % (prms.get('xres'), prms.get('yres')))
-    if prms.get('width') and prms.get('height'):
-        gdal_cmd.extend(['-ts', str(prms.get('width')), str(prms.get('height'))])
-        logger.info('Selected width: %d' % prms.get('width'))
-        logger.info('Selected height: %d' % prms.get('height'))
-    gdal_cmd.extend([dataset, output_file])
-    result_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode("utf-8")
-
-
-def py_resample(message, name, output_file, target_area, cols, rows, t_params, s_params, input_idxs, idx_ref, logger):
-    prms = get_params_from_msg(message, logger)
-    # Suppress known pyresamle warnings
-    if not sys.warnoptions:
-        warnings.simplefilter("ignore")
-    # Get parameters for pyresample
-    data_set = xarray.open_dataset(prms.get('input_file'), decode_cf=True, group=prms.get('data_group'))
-    swath_area = prms.get('file_data').get("swath_definition")
-    radius_of_influence = 50000
-
-    name = name.split('/')[-1]
-
-    # Get data, exclude time
-    if not data_set.variables:
-        data_arr = data_set.values
-    elif data_set.variables.get('time') is not None: # .size != 0:
-        data_arr = data_set.variables.get(name)[0].values
-    else:
-        data_arr = data_set.variables.get(name).values
-
-    if prms.get('interpolation') == 'near':
-        fill_value = 9999
-        epsilon = 0.5
-        result_data = kd_tree.resample_nearest(swath_area, data_arr, target_area,
-                                               radius_of_influence,
-                                               fill_value, epsilon)
-    if prms.get('interpolation') == 'bilinear':
-        # # -------------- BILINEAR 1 --------------
-        # fill_value = 9999
-        # epsilon = 0.5
-        # neighbours = 32
-        # reduce_data = True
-        # segments = None
-        # result_data = bilinear.resample_bilinear(data_arr, swath_area, target_area, radius_of_influence,
-        #                                     neighbours,
-        #                                     fill_value, reduce_data, segments, epsilon)
-        # # -------------- BILINEAR 1 --------------
-
-        # -------------- BILINEAR 2 --------------
-        result_data = bilinear.get_sample_from_bil_info(data_arr.ravel(), t_params, s_params,
-                                                        input_idxs, idx_ref,
-                                                        output_shape=target_area.shape)
-    if prms.get('interpolation') == 'ewa':
-        # fornav resamples the swath data to the gridded area
-        if np.issubdtype(data_arr.dtype, np.integer):
-            data_arr = data_arr.astype(float)
-        num_valid_points, result_data = fornav(cols, rows, target_area, data_arr,
-                                               rows_per_scan=ROWS_PER_SCAN)
-
-    write_netcdf(output_file, result_data, prms.get('crs'), prms.get('grid_transform'))
-
-
-def get_pyresample_params(param_list):
-    # TODO: refactor to better handle parameters, and to consider e.g. EWA and Nearest setup
-    # Get parameters for pyresample
-    # data_set = xarray.open_dataset(param_list.get('input_file'))
-    grid_extent = param_list.get('x_min'), param_list.get('y_min'), param_list.get('x_max'), param_list.get('y_max')
-    target_area = geometry.AreaDefinition('grid_area', 'target_grid', 'proj', param_list.get('crs'),
-                                          param_list.get('width'), param_list.get('height'), grid_extent)
-    swath_area = param_list.get('file_data').get("swath_definition")
-    # ll2cr converts swath longitudes and latitudes to grid columns and rows
-    swath_points_in_grid, cols, rows = ll2cr(swath_area, target_area)
-    # Calculate interpolation coefficients, input data reduction matrix and mapping matrix for 2 step bilinear
-    radius_of_influence = 50000
-    t_params = s_params = input_idxs = idx_ref = None
-    if param_list.get('interpolation') == 'bilinear':
-        t_params, s_params, input_idxs, idx_ref = bilinear.get_bil_info(swath_area, target_area,
-                                                                        radius_of_influence, neighbours=4)
-    return target_area, cols, rows, t_params, s_params, input_idxs, idx_ref
 
 
 def get_params_from_msg(message, logger):
@@ -333,8 +216,7 @@ def get_input_file_data(file_name, group):
             'metadata': metadata,
             'swath_definition': swath_definition,
             'lat_res':lat_res,
-            'lon_res':lon_res
-            }
+            'lon_res':lon_res}
 
 
 def get_resolution_from_minimum_difference(latitudes, longitudes, projection):
@@ -380,6 +262,7 @@ def get_resolution_from_minimum_difference(latitudes, longitudes, projection):
         # should we use center of grid?  determine point of true-scale?
     return float(min_diff)
 
+
 def get_extents_from_walking_perimeter(projection, latitudes, longitudes):
     """Find the extents of the projected coordinates in the x and y directions
     of the output. This is achieved by projecting only the points along the
@@ -413,28 +296,6 @@ def get_extents_from_walking_perimeter(projection, latitudes, longitudes):
     x_values, y_values = zip(*all_points)
 
     return min(x_values), max(x_values), min(y_values), max(y_values)
-
-
-def write_netcdf(file_name, data, crs, transform):
-    """Write the results of the transformation to a new NetCDF file.
-
-    :param file_name: String name of the output file.
-    :param data: The numpy.ndarray containing the transformed data.
-    :param crs: Coordinate Reference System of the transformed data,
-        currently: {'proj': 'eqc'}
-    :param transform: Transformation matrix from Affine.
-
-    """
-    with rasterio.open(file_name,
-                       'w',
-                       driver='NetCDF',
-                       height=data.shape[0],
-                       width=data.shape[1],
-                       count=1,
-                       dtype=data.dtype,
-                       crs=crs,
-                       transform=transform) as netcdf_container:
-        netcdf_container.write(data, 1)  # first (and only) band
 
 
 def rgetattr(obj, attr, *args):

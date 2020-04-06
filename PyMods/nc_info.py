@@ -16,7 +16,6 @@ def walktree(top):
 
 class NC4Info:
     def __init__(self, ncfile: str):
-        self.coordinate_delimiter = '\s+|,(?:\s+)?'
         self.rootgroup = Dataset(ncfile)
         self.vars_with_coords = set()
         self.vars_meta = set()
@@ -61,7 +60,7 @@ class NC4Info:
         of separate coordinate dataset names.
 
         """
-        return [f'/{coord}' for coord in re.split('\s+|,(?:\s+)?', coordinates)]
+        return [f'/{coord}' for coord in re.split('\s+|,\s*', coordinates)]
 
 
 # Main program start for testing with any input file

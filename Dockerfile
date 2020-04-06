@@ -17,7 +17,9 @@ COPY conda_requirements.txt .
 COPY pip_requirements.txt .
 
 # Create Conda environment
-RUN conda create --name swotrepr --file conda_requirements.txt --channel conda-forge python=3.7
+RUN conda create --name swotrepr --file conda_requirements.txt python=3.7 \
+	--channel conda-forge \
+	--channel defaults
 
 # Make RUN commands use the Conda environment
 SHELL ["conda", "run", "--name", "swotrepr", "/bin/bash", "-c"]
