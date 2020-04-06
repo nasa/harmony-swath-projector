@@ -1,16 +1,12 @@
-from unittest.mock import patch
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-
-from swotrepr import HarmonyAdapter
 from harmony import BaseHarmonyAdapter
 
-from test_utils import contains, matches, TestBase
+from swotrepr import HarmonyAdapter
+from test.test_utils import contains, matches, TestBase
 
 
 class TestNominalReproject(TestBase):
