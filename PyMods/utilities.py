@@ -19,6 +19,11 @@ def get_variable_values(input_file: Dataset, variable: Variable) -> ndarray:
         variable is present in the dataset.
 
     """
+    # TODO: Remove in favour of apply2D or process_subdimension.
+    #       The coordinate dimensions should be determined, and a slice of data
+    #       in the longitude-latitude plane should be used to determine 2-D
+    #       reprojection information. This information should then also be
+    #       applied across the other preceding or following dimensions.
     if input_file.variables.get('time') is not None:
         # Assumption: Array = (1, y, x)
         return variable[0].values
