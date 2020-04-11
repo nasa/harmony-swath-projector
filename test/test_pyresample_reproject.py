@@ -10,24 +10,24 @@ from swotrepr import HarmonyAdapter
 from test.test_utils import contains, TestBase
 
 
-class TestGDALReproject(TestBase):
-    """A suite of tests to test SwotRepr, using GDAL and the valid input
-    interpolation options. These tests will enforce REPR_MODE = 'gdal',
+class TestPyResampleReproject(TestBase):
+    """A suite of tests to test SwotRepr, using pyresample and the valid input
+    interpolation options. These tests will enforce REPR_MODE = 'pyresample',
     regardless of the actual value of REPR_MODE set in PyMods.reproject.py
 
     """
-    @patch('PyMods.reproject.REPR_MODE', 'gdal')
+    @patch('PyMods.reproject.REPR_MODE', 'pyresample')
     @patch.object(BaseHarmonyAdapter, 'completed_with_local_file')
     @patch.object(BaseHarmonyAdapter, 'cleanup')
-    def test_gdal_interpolation(self, cleanup, completed_with_local_file):
-        """Ensure SwotRepr will successfully complete when using gdalwarp and
+    def test_pyresample_interpolation(self, cleanup, completed_with_local_file):
+        """Ensure SwotRepr will successfully complete when using pyresample and
         each specified interpolation.
 
         """
-        valid_interpolations = ['bilinear', 'near']
+        valid_interpolations = ['bilinear', 'ewa', 'near']
 
         for interpolation in valid_interpolations:
-            with self.subTest(f'gdalwarp "{interpolation}" interpolation.'):
+            with self.subTest(f'pyresample "{interpolation}" interpolation.'):
                 test_data = {
                     'granules': [{
                         'local_filename': '/home/test/data/VOL2PSST_2017.nc'
