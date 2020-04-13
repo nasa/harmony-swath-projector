@@ -8,7 +8,7 @@ export HDF5_DISABLE_VERSION_CHECK=1
 
 # Run the standard set of unittests
 #
-python -m unittest discover -q test
+python -m unittest discover -q test -f
 RESULT=$?
 if [ "$RESULT" -ne "0" ]; then
     STATUS=1

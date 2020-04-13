@@ -63,7 +63,7 @@ class TestNCMerge(TestBase):
         self.assertEqual(len(input_attrs), len(output_attrs))
 
     def test_same_num_of_dataset_attributes(self):
-        """ Variables in input should have the same number of attribures. """
+        """ Variables in input should have the same number of attributes. """
         test_variable = 'sea_surface_temperature'
         in_dataset = netCDF4.Dataset(self.input_file)
         out_dataset = netCDF4.Dataset(self.output_file)
