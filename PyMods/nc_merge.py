@@ -1,13 +1,15 @@
+""" Reprojection support for merging single-dataset NetCDF-4 files, produced by
+    either gdalwarp or pyresample, back into a single output file with all the
+    necessary attributes.
 """
-    Reprojection support for merging single-dataset NetCDF 4 files produced by gdalwarp back
-    into a single output file with all the necessary attributes.
-"""
+from typing import Dict, Optional, Set
 import argparse
 import logging
 import os
 import re
-import netCDF4
 import warnings
+
+import netCDF4
 
 GDAL_DATASET_NAME = 'Band1'
 
@@ -21,46 +23,59 @@ STD_COOR_ATTRS = {  # only for non-geographic projection case, i.e. not lat/lon
 }
 
 
-def create_output(inputfile, outputfile, temp_dir, logger=None):
-    """
-        Merging the reprojected single-dataset netCDF4 files from GDAL into one, and copy attributes
-        from the original input file
+def create_output(input_file: str, output_file: str, temp_dir: str,
+                  metadata_variables: Set[str] = set(),
+                  logger: Optional[logging.Logger] = None) -> None:
+    """ Merging the reprojected single-dataset netCDF4 files from GDAL into
+        one, and copy attributes from the original input file
+
     """
 
     if not logger:
         logger = logging.getLogger(__name__)
-    logger.info("Creating output file '%s'", outputfile)
 
-    with netCDF4.Dataset(inputfile) as inf, netCDF4.Dataset(outputfile, 'w',
-                                                            format='NETCDF4') as out:
+    logger.info(f'Creating output file "{output_file}"')
 
-        out.setncatts(read_attrs(inf))
+    with netCDF4.Dataset(input_file) as input_dataset, \
+         netCDF4.Dataset(output_file, 'w', format='NETCDF4') as output_dataset:
+
+        logger.info('Copying input file attributes to output file.')
+        output_dataset.setncatts(read_attrs(input_dataset))
+
+        if has_time_dimension(input_dataset):
+            copy_time_dimension(input_dataset, output_dataset, logger)
+
+        for metadata_variable in metadata_variables:
+            copy_metadata_variable(input_dataset, output_dataset,
+                                   metadata_variable, logger)
 
         files = [f for f in os.listdir(temp_dir)
-                 if f != os.path.basename(outputfile)
+                 if f != os.path.basename(output_file)
                  and not f.startswith('.')]  # macos "hidden" files
-        if has_time_dimension(inf):
-            copy_time_dimension(inf, out)
 
-        for file in files:
-            logger.info("Adding '%s' to the output", file)
-            data = netCDF4.Dataset(temp_dir + '/' + file)
-            set_dimension(data, out)
+        for dataset_file in files:
+            logger.info(f'Adding "{dataset_file}" to the output')
+            data = netCDF4.Dataset(os.sep.join([temp_dir, dataset_file]))
+            set_dimension(data, output_dataset)
 
             for name, var in data.variables.items():
-                if name not in list(out.variables.keys()):
+                if name not in list(output_dataset.variables.keys()):
                     if name != GDAL_DATASET_NAME:
-                        copy_variable(inf, out, data, name, logger)
+                        copy_variable(input_dataset, output_dataset, data,
+                                      name, logger)
                     else:
-                        dataset_name = find_dataset_name(inf, os.path.splitext(file)[0])
-                        copy_variable(inf, out, data, dataset_name, logger)
+                        dataset_name = find_dataset_name(
+                            input_dataset, os.path.splitext(dataset_file)[0]
+                        )
+                        copy_variable(input_dataset, output_dataset, data,
+                                      dataset_name, logger)
 
         # if 'crs' exists in output, rename it to the grid_mapping_name
         # and update grid_mapping attributes
-        if 'crs' in out.variables.keys():
-            new_crs_name = out['crs'].grid_mapping_name
-            out.renameVariable('crs', new_crs_name)
-            for name, var in out.variables.items():
+        if 'crs' in output_dataset.variables.keys():
+            new_crs_name = output_dataset['crs'].grid_mapping_name
+            output_dataset.renameVariable('crs', new_crs_name)
+            for name, var in output_dataset.variables.items():
                 # avoid the new crs var itself, replace grid_mapping attribute
                 if name != new_crs_name \
                         and hasattr(var, 'grid_mapping'):
@@ -101,9 +116,16 @@ def has_time_dimension(inf):
     """check if time dimension exists"""
     return 'time' in list(inf.dimensions.keys())
 
-def copy_time_dimension(inf, out):
+
+def copy_time_dimension(input_dataset: netCDF4.Dataset,
+                        output_dataset: netCDF4.Dataset,
+                        logger: logging.Logger) -> None:
     """add time dimension to the output file"""
-    out.createDimension('time', len(inf.dimensions['time']))
+    logger.info('Adding "time" dimension.')
+    time_variable = input_dataset['time']
+    output_dataset.createDimension('time', len(time_variable))
+    copy_metadata_variable(input_dataset, output_dataset, 'time', logger)
+
 
 def set_dimension(inf, out):
     """set dimension in the output"""
@@ -113,27 +135,28 @@ def set_dimension(inf, out):
             out.createDimension(name, len(dimension))
 
 
-def find_dataset_name(inf, name):
-    # TODO: refactor reproject.py and this module to rename intermediate .nc4 files
-    # to include group names, and then decode these file names to establish
-    # dataset name with group path.  Then this method is not needed.
-    dataset_name = None
-    def find_dataset_in_group(inf, group, name):
-        for variable in inf[group].variables:
-            if name == variable:
-                return f"{group}/{variable}"
-            for subgroup in inf[group].groups:
-                dataset_name = find_dataset_in_group(inf, subgroup, name)
-                if dataset_name:
-                    return dataset_name
-    for variable in inf.variables:
-        if name == variable:
-            return variable
-    for group in inf.groups:
-        dataset_name = find_dataset_in_group(inf, group, name)
-        if dataset_name:
-            return dataset_name
-    return dataset_name
+def copy_metadata_variable(input_dataset: netCDF4.Dataset,
+                           output_dataset: netCDF4.Dataset, variable_name: str,
+                           logger: logging.Logger) -> None:
+    """ Write a metadata variable directly from the input dataset. These
+        variables have not been reprojected as they contain no references to
+        dimensions or coordinate datasets.
+
+    """
+    # TODO: Account for dimensions - potential conflicts between original and
+    # reprojected dimension names.
+    logger.info(f'Adding input file variable "{variable_name}" to the output.')
+    variable = input_dataset[variable_name]
+    data_type = get_data_type(input_dataset, variable_name)
+    attributes = read_attrs(variable)
+    fill_value = get_fill_value_from_attributes(attributes)
+
+    output_dataset.createVariable(variable_name, data_type,
+                                  fill_value=fill_value, zlib=True,
+                                  complevel=6)
+
+    output_dataset[variable_name][:] = variable[:]
+    output_dataset[variable_name].setncatts(attributes)
 
 
 def copy_variable(inf, out, repr, dataset_name, logger):
@@ -141,6 +164,7 @@ def copy_variable(inf, out, repr, dataset_name, logger):
 
     # set data type, dimensions, and attributes
     dims, data_type, attrs = get_dataset_meta(inf, repr, dataset_name)
+    fill_value = get_fill_value_from_attributes(attrs)
 
     if dataset_name not in repr.variables.keys():
         ori_dataset_name = GDAL_DATASET_NAME
@@ -148,11 +172,6 @@ def copy_variable(inf, out, repr, dataset_name, logger):
         ori_dataset_name = dataset_name
 
     new_dataset_name = dataset_name.split('/')[-1]  # just basename at end of path
-
-    fill_value = None
-    if '_FillValue' in attrs:
-        fill_value = attrs['_FillValue']
-        del attrs['_FillValue']
 
     if dims:
         out.createVariable(new_dataset_name, data_type, dims,
@@ -244,10 +263,18 @@ def check_coor_valid(attrs, inf, repr):
     return valid
 
 
+def get_fill_value_from_attributes(variable_attributes: Dict) -> Optional:
+    """ Check attributes for _FillValue. If present return this and remove the
+        _FillValue attribute from the input dictionary. Otherwise return None.
+
+    """
+    return variable_attributes.pop('_FillValue', None)
+
+
 # main program
 if __name__ == "__main__":
     print('Main')
-    PARSER = argparse.ArgumentParser(prog='NetCDF4Merger',
+    PARSER = argparse.ArgumentParser(prog='nc_merge',
                                      description='Merged reprojected netcdf4 files into one')
     PARSER.add_argument('--ori-inputfile', dest='ori_inputfile',
                         help='Original input netcdf4 file(before reprojection)')

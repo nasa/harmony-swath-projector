@@ -10,12 +10,12 @@ class TestNCInfo(TestBase):
 
         """
         africa = NCInfo('test/data/africa.nc')
-        self.assertEqual(africa.auxs, set())
-        self.assertEqual(africa.coords, {'/lat', '/lon'})
-        self.assertEqual(africa.dims, {'/ni', '/nj', '/time'})
-        self.assertEqual(africa.vars_meta, {'/lat', '/lon', '/time'})
-        self.assertEqual(africa.vars_with_coords, {'/alpha_var', '/blue_var',
-                                                   '/green_var', '/red_var'})
+        self.assertEqual(africa.ancillary_data, set())
+        self.assertEqual(africa.coords, {'lat', 'lon'})
+        self.assertEqual(africa.dims, {'ni', 'nj', 'time'})
+        self.assertEqual(africa.vars_meta, {'lat', 'lon', 'time'})
+        self.assertEqual(africa.vars_with_coords, {'alpha_var', 'blue_var',
+                                                   'green_var', 'red_var'})
 
     def test_get_science_variables(self):
         """Calling the `get_science_variables` method should return the set
@@ -25,7 +25,7 @@ class TestNCInfo(TestBase):
         """
         africa = NCInfo('test/data/africa.nc')
         science_variables = africa.get_science_variables()
-        expected_output = {'/alpha_var', '/blue_var', '/green_var', '/red_var'}
+        expected_output = {'alpha_var', 'blue_var', 'green_var', 'red_var'}
         self.assertEqual(science_variables, expected_output)
 
     def test_get_metadata_variables(self):
@@ -46,7 +46,7 @@ class TestNCInfo(TestBase):
         """
         africa = NCInfo('test/data/africa.nc')
 
-        expected_output = ['/lon', '/lat']
+        expected_output = ['lon', 'lat']
         test_args = [['space', 'lon lat'],
                      ['multiple spaces', 'lon    lat'],
                      ['comma', 'lon,lat'],

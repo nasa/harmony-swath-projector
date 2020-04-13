@@ -23,14 +23,8 @@ from test.test_utils import TestBase
 class TestInterpolationPyResample(TestBase):
 
     def setUp(self):
-        self.file_information = (
-            'SUBDATASET_1_NAME=NETCDF:"test/data/africa.nc":lat\n'
-            'SUBDATASET_2_NAME=NETCDF:"test/data/africa.nc":lon\n'
-            'SUBDATASET_3_NAME=NETCDF:"test/data/africa.nc":red_var\n'
-            'SUBDATASET_4_NAME=NETCDF:"test/data/africa.nc":green_var\n'
-            'SUBDATASET_5_NAME=NETCDF:"test/data/africa.nc":blue_var\n'
-            'SUBDATASET_6_NAME=NETCDF:"test/data/africa.nc":alpha_var\n'
-        )
+        self.science_variables = ('red_var', 'green_var', 'blue_var',
+                                  'alpha_var')
         self.message_parameters = {'input_file': 'test/data/africa.nc'}
         self.temp_directory = '/tmp/01234'
         self.logger = Logger('test')
@@ -55,7 +49,7 @@ class TestInterpolationPyResample(TestBase):
         parameters.update(self.message_parameters)
 
         output_variables = resample_all_variables(parameters,
-                                                  self.file_information,
+                                                  self.science_variables,
                                                   self.temp_directory,
                                                   self.logger)
 
@@ -66,7 +60,6 @@ class TestInterpolationPyResample(TestBase):
         for variable in expected_output:
             variable_output_path = f'/tmp/01234/{variable}.nc'
             mock_resample_variable.assert_any_call(parameters,
-                                                   fake_dataset,
                                                    variable,
                                                    {},
                                                    fake_target_area,
@@ -94,7 +87,7 @@ class TestInterpolationPyResample(TestBase):
         parameters.update(self.message_parameters)
 
         output_variables = resample_all_variables(parameters,
-                                                  self.file_information,
+                                                  self.science_variables,
                                                   self.temp_directory,
                                                   self.logger)
 
@@ -107,7 +100,6 @@ class TestInterpolationPyResample(TestBase):
         for variable in all_variables:
             variable_output_path = f'/tmp/01234/{variable}.nc'
             mock_resample_variable.assert_any_call(parameters,
-                                                   fake_dataset,
                                                    variable,
                                                    {},
                                                    fake_target_area,
@@ -131,8 +123,8 @@ class TestInterpolationPyResample(TestBase):
                 mock_nearest.reset_mock()
 
                 parameters = {'interpolation': interpolation}
-                resample_variable(parameters, 'fake dataset', 'variable_name',
-                                  {}, 'target area', '/output/path.nc',
+                resample_variable(parameters, 'variable_name', {},
+                                  'target area', '/output/path.nc',
                                   self.logger)
 
                 self.assertEqual(mock_bilinear.call_count, bilinear_calls)
@@ -163,13 +155,14 @@ class TestInterpolationPyResample(TestBase):
         dataset = xarray.open_dataset('test/data/africa.nc', decode_cf=False)
         projection = Proj('+proj=longlat +ellps=WGS84')
 
-        message_parameters = {'projection': projection,
+        message_parameters = {'input_file': 'test/data/africa.nc',
+                              'projection': projection,
                               'grid_transform': 'grid_transform value'}
         target_area = Mock(spec=AreaDefinition, shape='ta_shape')
 
         with self.subTest('No pre-existing bilinear information'):
-            pyresample_bilinear(message_parameters, dataset, 'alpha_var',
-                                {}, target_area, 'path/to/output', self.logger)
+            pyresample_bilinear(message_parameters, 'alpha_var', {},
+                                target_area, 'path/to/output', self.logger)
 
             mock_get_bil_info.assert_called_once_with('swath', target_area,
                                                       radius=50000,
@@ -199,7 +192,7 @@ class TestInterpolationPyResample(TestBase):
                 }
             }
 
-            pyresample_bilinear(message_parameters, dataset, 'alpha_var',
+            pyresample_bilinear(message_parameters, 'alpha_var',
                                 bilinear_information, target_area,
                                 'path/to/output', self.logger)
 
@@ -234,16 +227,16 @@ class TestInterpolationPyResample(TestBase):
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
 
-        dataset = xarray.open_dataset('test/data/africa.nc', decode_cf=False)
         projection = Proj('+proj=longlat +ellps=WGS84')
 
-        message_parameters = {'projection': projection,
+        message_parameters = {'input_file': 'test/data/africa.nc',
+                              'projection': projection,
                               'grid_transform': 'grid_transform value'}
         target_area = Mock(spec=AreaDefinition)
 
         with self.subTest('No pre-existing EWA information'):
-            pyresample_ewa(message_parameters, dataset, 'alpha_var', {},
-                           target_area, 'path/to/output', self.logger)
+            pyresample_ewa(message_parameters, 'alpha_var', {}, target_area,
+                           'path/to/output', self.logger)
 
             mock_ll2cr.assert_called_once_with('swath', target_area)
             mock_fornav.assert_called_once_with('columns', 'rows', target_area,
@@ -261,9 +254,8 @@ class TestInterpolationPyResample(TestBase):
             ewa_information = {('lon', 'lat'): {'columns': 'old_columns',
                                                 'rows': 'old_rows'}}
 
-            pyresample_ewa(message_parameters, dataset, 'alpha_var',
-                           ewa_information, target_area, 'path/to/output',
-                           self.logger)
+            pyresample_ewa(message_parameters, 'alpha_var', ewa_information,
+                           target_area, 'path/to/output', self.logger)
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
@@ -281,30 +273,30 @@ class TestInterpolationPyResample(TestBase):
     def test_resample_nearest(self, mock_get_info, mock_get_sample,
                               mock_get_values, mock_get_swath,
                               mock_write_netcdf):
-        """ EWA interpolation should call both ll2cr and fornav if there are
-            no matching entries for the coordinates in the reprojection
-            information. If there is an entry, then only fornav  should be
-            called.
+        """ Nearest neighbour interpolation should call both get_neighbour_info
+            and get_sample_from_neighbour_info if there are no matching entries
+            for the coordinates in the reprojection information. If there is an
+            entry, then only get_sample_from_neighbour_infor should be called.
 
         """
-        mock_get_info.return_value = ['valid_input_index', 'valid_output_input',
+        mock_get_info.return_value = ['valid_input_index', 'valid_output_index',
                                       'index_array', 'distance_array']
         mock_get_sample.return_value = 'results'
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
 
-        dataset = xarray.open_dataset('test/data/africa.nc', decode_cf=False)
         projection = Proj('+proj=longlat +ellps=WGS84')
 
-        message_parameters = {'projection': projection,
+        message_parameters = {'input_file': 'test/data/africa.nc',
+                              'projection': projection,
                               'grid_transform': 'grid_transform value'}
         target_area = Mock(spec=AreaDefinition, shape='ta_shape')
 
         with self.subTest('No pre-existing nearest neighbour information'):
-            pyresample_nearest_neighbour(message_parameters, dataset,
-                                         'alpha_var', {}, target_area,
-                                         'path/to/output', self.logger)
+            pyresample_nearest_neighbour(message_parameters, 'alpha_var', {},
+                                         target_area, 'path/to/output',
+                                         self.logger)
 
             mock_get_info.assert_called_once_with('swath', target_area,
                                                   RADIUS_OF_INFLUENCE,
@@ -336,10 +328,9 @@ class TestInterpolationPyResample(TestBase):
                 }
             }
 
-            pyresample_nearest_neighbour(message_parameters, dataset,
-                                         'alpha_var', nearest_information,
-                                         target_area, 'path/to/output',
-                                         self.logger)
+            pyresample_nearest_neighbour(message_parameters, 'alpha_var',
+                                         nearest_information, target_area,
+                                         'path/to/output', self.logger)
 
             mock_get_info.assert_not_called()
             mock_get_sample.assert_called_once_with('nn', 'ta_shape',

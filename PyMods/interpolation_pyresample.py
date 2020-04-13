@@ -17,8 +17,7 @@ import rasterio
 import xarray
 
 from PyMods.utilities import (create_coordinates_key, get_coordinate_variable,
-                              get_variable_name, get_variable_values,
-                              get_variables, is_coordinate_variable)
+                              get_variable_group_and_name, get_variable_values)
 
 
 EPSILON = 0.5
@@ -28,10 +27,11 @@ RADIUS_OF_INFLUENCE = 50000
 
 
 def resample_all_variables(message_parameters: Dict,
-                           file_information: str,
+                           science_variables: List[str],
                            temp_directory: str,
                            logger: Logger) -> List[str]:
-    """ NOTE: file_information will likely change to a class from DAS-570.
+    """ Iterate through all science variables and reproject to the target
+        coordinate grid.
 
         Returns:
             output_variables: A list of names of successfully reprojected
@@ -44,30 +44,19 @@ def resample_all_variables(message_parameters: Dict,
     check_for_valid_interpolation(message_parameters, logger)
 
     target_area = get_target_area(message_parameters)
-    dataset = xarray.open_dataset(message_parameters['input_file'], decode_cf=False)
 
-    # TODO: DAS-570 integration: to replace get_variables with class method
-    # on file_information, instead.
-    for variable in get_variables(file_information):
+    for variable in science_variables:
         try:
-            # TODO: DAS-570 integration: file_information will probably return
-            # the name of the variable, so this could end up being a call to
-            # get the variable, rather than the name.
-            variable_name = get_variable_name(variable)
-
-            if is_coordinate_variable(variable_name):
-                logger.info(f'Skipping coordinate variable: "{variable_name}".')
-                continue
+            _, variable_name = get_variable_group_and_name(variable)
 
             variable_output_path = os.sep.join([
-                temp_directory,
-                f'{variable_name.split("/")[-1]}{output_extension}'
+                temp_directory, f'{variable_name}{output_extension}'
             ])
 
-            logger.info(f'Reprojecting subdataset "{variable_name}"')
+            logger.info(f'Reprojecting subdataset "{variable}"')
             logger.info(f'Reprojected output: "{variable_output_path}"')
 
-            resample_variable(message_parameters, dataset, variable_name,
+            resample_variable(message_parameters, variable,
                               reprojection_information, target_area,
                               variable_output_path, logger)
 
@@ -81,8 +70,8 @@ def resample_all_variables(message_parameters: Dict,
     return output_variables
 
 
-def resample_variable(message_parameters: Dict, dataset: Dataset,
-                      variable_name: str, reprojection_information: Dict,
+def resample_variable(message_parameters: Dict, full_variable: str,
+                      reprojection_information: Dict,
                       target_area: AreaDefinition, variable_output_path: str,
                       logger: Logger) -> None:
     """ A wrapper function to redirect the variable being reprojected to a
@@ -91,16 +80,15 @@ def resample_variable(message_parameters: Dict, dataset: Dataset,
     """
     resampling_functions = get_resampling_functions()
     resampling_functions[message_parameters['interpolation']](message_parameters,
-                                                              dataset,
-                                                              variable_name,
+                                                              full_variable,
                                                               reprojection_information,
                                                               target_area,
                                                               variable_output_path,
                                                               logger)
 
 
-def pyresample_bilinear(message_parameters: Dict, dataset: Dataset,
-                        variable_name: str, reprojection_information: Dict,
+def pyresample_bilinear(message_parameters: Dict, full_variable: str,
+                        reprojection_information: Dict,
                         target_area: AreaDefinition, variable_output_path: str,
                         logger: Logger) -> None:
     """ Use bilinear interpolation to produce the target output. If the same
@@ -112,6 +100,11 @@ def pyresample_bilinear(message_parameters: Dict, dataset: Dataset,
         interpolated.
 
     """
+    variable_group, variable_name = get_variable_group_and_name(full_variable)
+    dataset = xarray.open_dataset(message_parameters['input_file'],
+                                  decode_cf=False,
+                                  group=variable_group)
+
     variable = dataset.variables.get(variable_name)
     variable_values = get_variable_values(dataset, variable)
     coordinates = create_coordinates_key(variable.attrs.get('coordinates'))
@@ -150,7 +143,7 @@ def pyresample_bilinear(message_parameters: Dict, dataset: Dataset,
                  f'{variable_output_path}')
 
 
-def pyresample_ewa(message_parameters: Dict, dataset: Dataset, variable_name: str,
+def pyresample_ewa(message_parameters: Dict, full_variable: str,
                    reprojection_information: Dict, target_area: AreaDefinition,
                    variable_output_path: str, logger: Logger) -> None:
     """ Use Elliptical Weighted Average (EWA) interpolation to produce the
@@ -164,6 +157,11 @@ def pyresample_ewa(message_parameters: Dict, dataset: Dataset, variable_name: st
         interpolated.
 
     """
+    variable_group, variable_name = get_variable_group_and_name(full_variable)
+    dataset = xarray.open_dataset(message_parameters['input_file'],
+                                  decode_cf=False,
+                                  group=variable_group)
+
     variable = dataset.variables.get(variable_name)
     variable_values = get_variable_values(dataset, variable)
     coordinates = create_coordinates_key(variable.attrs.get('coordinates'))
@@ -197,8 +195,7 @@ def pyresample_ewa(message_parameters: Dict, dataset: Dataset, variable_name: st
 
 
 def pyresample_nearest_neighbour(message_parameters: Dict,
-                                 dataset: Dataset,
-                                 variable_name: str,
+                                 full_variable: str,
                                  reprojection_information: Dict,
                                  target_area: AreaDefinition,
                                  variable_output_path: str,
@@ -213,6 +210,11 @@ def pyresample_nearest_neighbour(message_parameters: Dict,
         interpolated.
 
     """
+    variable_group, variable_name = get_variable_group_and_name(full_variable)
+    dataset = xarray.open_dataset(message_parameters['input_file'],
+                                  decode_cf=False,
+                                  group=variable_group)
+
     variable = dataset.variables.get(variable_name)
     variable_values = get_variable_values(dataset, variable)
     coordinates = create_coordinates_key(variable.attrs.get('coordinates'))

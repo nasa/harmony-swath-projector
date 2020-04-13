@@ -46,17 +46,13 @@ def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
     return None
 
 
-def get_variables(file_information: str) -> List[str]:
-    """ Extract variables from gdalinfo output"""
-    return [line.split('=')[-1] for line in file_information.split('\n')
-            if re.match(r'^\s*SUBDATASET_\d+_NAME=', line)]
+def get_variable_group_and_name(variable: str) -> Tuple[str, str]:
+    """ Extract variable name and group from its full path.
 
+        Returns:
+            group: String showing location of variable within the NetCDF file.
+            name: String name of the variable.
 
-def get_variable_name(variable: str) -> str:
-    """ Extract variable name from single line of gdalinfo output."""
-    return variable.split(':')[-1]
-
-
-def is_coordinate_variable(variable_name: str) -> bool:
-    """ Check the variable name for indicators it is a coordinate variable."""
-    return 'lat' in variable_name or 'lon' in variable_name
+    """
+    split_variable = variable.split('/')
+    return '/'.join(split_variable[:-1]), split_variable[-1]

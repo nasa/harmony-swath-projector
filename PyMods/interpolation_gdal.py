@@ -1,16 +1,15 @@
 from logging import Logger
-from typing import Dict
+from typing import Dict, List
 import os
 import subprocess
 
 import xarray
 
-from PyMods.utilities import (get_variable_name, get_variables,
-                              is_coordinate_variable)
+from PyMods.utilities import get_variable_group_and_name
 
 
 def gdal_resample_all_variables(message_parameters: Dict,
-                                file_information: str,
+                                science_variables: List[str],
                                 temp_directory: str,
                                 logger: Logger):
     """ This function opens the specified granule, identifies all variables
@@ -25,22 +24,12 @@ def gdal_resample_all_variables(message_parameters: Dict,
     output_extension = os.path.splitext(message_parameters['input_file'])[-1]
     output_variables = []
 
-    # TODO: DAS-570 integration: to replace get_variables with class method
-    # on file_information, instead.
-    for variable in get_variables(file_information):
+    for variable in science_variables:
         try:
-            # TODO: DAS-570 integration: file_information will probably return
-            # the name of the variable, so this could end up being a call to
-            # get the variable, rather than the name.
-            variable_name = get_variable_name(variable)
-
-            if is_coordinate_variable(variable_name):
-                logger.info(f'Skipping coordinate variable: "{variable_name}".')
-                continue
+            _, variable_name = get_variable_group_and_name(variable)
 
             variable_output_path = os.sep.join([
-                temp_directory,
-                f'{variable_name.split("/")[-1]}{output_extension}'
+                temp_directory, f'{variable_name}{output_extension}'
             ])
 
             logger.info(f'Reprojecting subdataset "{variable_name}"')
@@ -102,7 +91,20 @@ def gdal_resample(parameters: Dict, variable: str, output_file: str,
         logger.info(f'Selected width: {parameters.get("width")}')
         logger.info(f'Selected height: {parameters.get("height")}')
 
-    gdal_cmd.extend([variable, output_file])
+    full_variable = create_gdal_variable_name('NETCDF',
+                                              parameters['input_file'],
+                                              variable)
+
+    gdal_cmd.extend([full_variable, output_file])
     logger.info(f'Running GDAL command: {" ".join(gdal_cmd)}')
     results_str = subprocess.check_output(gdal_cmd, stderr=subprocess.STDOUT).decode('utf-8')
     logger.info(f'GDAL output:\n{results_str}')
+
+
+def create_gdal_variable_name(file_format: str, file_name: str,
+                              variable_name: str) -> str:
+    """ Construct the full variable name required for gdalwarp to process the
+    science variable.
+
+    """
+    return f'{file_format}:"{file_name}":{variable_name}'
