@@ -1,15 +1,15 @@
-from PyMods.nc_info import NC4Info
+from PyMods.nc_info import NCInfo
 from test.test_utils import TestBase
 
 
-class TestNC4Info(TestBase):
+class TestNCInfo(TestBase):
 
     def test_instantiate(self):
-        """When given a file name, the `NC4Info` class should successfully
+        """When given a file name, the `NCInfo` class should successfully
          create a new object with the expected values in the attributes.
 
         """
-        africa = NC4Info('test/data/africa.nc')
+        africa = NCInfo('test/data/africa.nc')
         self.assertEqual(africa.auxs, set())
         self.assertEqual(africa.coords, {'/lat', '/lon'})
         self.assertEqual(africa.dims, {'/ni', '/nj', '/time'})
@@ -23,7 +23,7 @@ class TestNC4Info(TestBase):
         variables determined to be coordinates or dimensions.
 
         """
-        africa = NC4Info('test/data/africa.nc')
+        africa = NCInfo('test/data/africa.nc')
         science_variables = africa.get_science_variables()
         expected_output = {'/alpha_var', '/blue_var', '/green_var', '/red_var'}
         self.assertEqual(science_variables, expected_output)
@@ -34,7 +34,7 @@ class TestNC4Info(TestBase):
         those variables deemed to be coordinates or dimensions.
 
         """
-        africa = NC4Info('test/data/africa.nc')
+        africa = NCInfo('test/data/africa.nc')
         metadata_variables = africa.get_metadata_variables()
         self.assertEqual(metadata_variables, set())
 
@@ -44,7 +44,7 @@ class TestNC4Info(TestBase):
         coordinate datasets.
 
         """
-        africa = NC4Info('test/data/africa.nc')
+        africa = NCInfo('test/data/africa.nc')
 
         expected_output = ['/lon', '/lat']
         test_args = [['space', 'lon lat'],
