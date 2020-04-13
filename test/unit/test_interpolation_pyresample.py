@@ -16,8 +16,7 @@ from PyMods.interpolation_pyresample import (check_for_valid_interpolation,
                                              pyresample_nearest_neighbour,
                                              resample_all_variables,
                                              resample_variable,
-                                             RADIUS_OF_INFLUENCE,
-                                             ROWS_PER_SCAN)
+                                             RADIUS_OF_INFLUENCE)
 from test.test_utils import TestBase
 
 
@@ -64,7 +63,6 @@ class TestInterpolationPyResample(TestBase):
         self.assertEqual(output_variables, expected_output)
         self.assertEqual(mock_resample_variable.call_count, 4)
 
-        print(mock_resample_variable.calls)
         for variable in expected_output:
             variable_output_path = f'/tmp/01234/{variable}.nc'
             mock_resample_variable.assert_any_call(parameters,
@@ -243,20 +241,19 @@ class TestInterpolationPyResample(TestBase):
                               'grid_transform': 'grid_transform value'}
         target_area = Mock(spec=AreaDefinition)
 
-        with self.subTest('No pre-existing bilinear information'):
+        with self.subTest('No pre-existing EWA information'):
             pyresample_ewa(message_parameters, dataset, 'alpha_var', {},
                            target_area, 'path/to/output', self.logger)
 
             mock_ll2cr.assert_called_once_with('swath', target_area)
             mock_fornav.assert_called_once_with('columns', 'rows', target_area,
-                                                mock_values,
-                                                rows_per_scan=ROWS_PER_SCAN)
+                                                mock_values)
             mock_write_netcdf.assert_called_once_with('path/to/output',
                                                       'results',
                                                       projection,
                                                       'grid_transform value')
 
-        with self.subTest('Pre-existing bilinear information'):
+        with self.subTest('Pre-existing EWA information'):
             mock_ll2cr.reset_mock()
             mock_fornav.reset_mock()
             mock_write_netcdf.reset_mock()
@@ -270,8 +267,7 @@ class TestInterpolationPyResample(TestBase):
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
-                                                target_area, mock_values,
-                                                rows_per_scan=ROWS_PER_SCAN)
+                                                target_area, mock_values)
             mock_write_netcdf.assert_called_once_with('path/to/output',
                                                       'results',
                                                       projection,
@@ -280,16 +276,20 @@ class TestInterpolationPyResample(TestBase):
     @patch('PyMods.interpolation_pyresample.write_netcdf')
     @patch('PyMods.interpolation_pyresample.get_swath_definition')
     @patch('PyMods.interpolation_pyresample.get_variable_values')
-    @patch('PyMods.interpolation_pyresample.resample_nearest')
-    def test_resample_nearest(self, mock_nearest, mock_get_values,
-                              mock_get_swath, mock_write_netcdf):
+    @patch('PyMods.interpolation_pyresample.get_sample_from_neighbour_info')
+    @patch('PyMods.interpolation_pyresample.get_neighbour_info')
+    def test_resample_nearest(self, mock_get_info, mock_get_sample,
+                              mock_get_values, mock_get_swath,
+                              mock_write_netcdf):
         """ EWA interpolation should call both ll2cr and fornav if there are
             no matching entries for the coordinates in the reprojection
             information. If there is an entry, then only fornav  should be
             called.
 
         """
-        mock_nearest.return_value = 'results'
+        mock_get_info.return_value = ['valid_input_index', 'valid_output_input',
+                                      'index_array', 'distance_array']
+        mock_get_sample.return_value = 'results'
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
@@ -299,21 +299,60 @@ class TestInterpolationPyResample(TestBase):
 
         message_parameters = {'projection': projection,
                               'grid_transform': 'grid_transform value'}
-        target_area = Mock(spec=AreaDefinition)
+        target_area = Mock(spec=AreaDefinition, shape='ta_shape')
 
-        pyresample_nearest_neighbour(message_parameters, dataset, 'alpha_var',
-                                     {}, target_area, 'path/to/output',
-                                     self.logger)
+        with self.subTest('No pre-existing nearest neighbour information'):
+            pyresample_nearest_neighbour(message_parameters, dataset,
+                                         'alpha_var', {}, target_area,
+                                         'path/to/output', self.logger)
 
-        mock_nearest.assert_called_once_with('swath', mock_values, target_area,
-                                             radius_of_influence=RADIUS_OF_INFLUENCE,
-                                             fill_value=FILL_VALUE,
-                                             epsilon=EPSILON)
+            mock_get_info.assert_called_once_with('swath', target_area,
+                                                  RADIUS_OF_INFLUENCE,
+                                                  epsilon=EPSILON,
+                                                  neighbours=1)
+            mock_get_sample.assert_called_once_with('nn', 'ta_shape',
+                                                    mock_values,
+                                                    'valid_input_index',
+                                                    'valid_output_index',
+                                                    'index_array',
+                                                    distance_array='distance_array',
+                                                    fill_value=FILL_VALUE)
+            mock_write_netcdf.assert_called_once_with('path/to/output',
+                                                      'results',
+                                                      projection,
+                                                      'grid_transform value')
 
-        mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                  'results',
-                                                  projection,
-                                                  'grid_transform value')
+        with self.subTest('Pre-existing nearest neighbour information'):
+            mock_get_info.reset_mock()
+            mock_get_sample.reset_mock()
+            mock_write_netcdf.reset_mock()
+
+            nearest_information = {
+                ('lon', 'lat'): {
+                    'valid_input_index': 'old_valid_input',
+                    'valid_output_index': 'old_valid_output',
+                    'index_array': 'old_index_array',
+                    'distance_array': 'old_distance',
+                }
+            }
+
+            pyresample_nearest_neighbour(message_parameters, dataset,
+                                         'alpha_var', nearest_information,
+                                         target_area, 'path/to/output',
+                                         self.logger)
+
+            mock_get_info.assert_not_called()
+            mock_get_sample.assert_called_once_with('nn', 'ta_shape',
+                                                    mock_values,
+                                                    'old_valid_input',
+                                                    'old_valid_output',
+                                                    'old_index_array',
+                                                    distance_array='old_distance',
+                                                    fill_value=FILL_VALUE)
+            mock_write_netcdf.assert_called_once_with('path/to/output',
+                                                      'results',
+                                                      projection,
+                                                      'grid_transform value')
 
     def test_check_for_valid_interpolation(self):
         """ Ensure all valid interpolations don't raise an exception. """

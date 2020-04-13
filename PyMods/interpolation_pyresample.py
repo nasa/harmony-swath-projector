@@ -10,7 +10,7 @@ from pyproj import Proj
 from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
 from pyresample.geometry import AreaDefinition, SwathDefinition
-from pyresample.kd_tree import resample_nearest
+from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_info
 from xarray.core.dataset import Dataset
 import numpy as np
 import rasterio
@@ -25,7 +25,6 @@ EPSILON = 0.5
 FILL_VALUE = -9999.0
 NEIGHBOURS = 16
 RADIUS_OF_INFLUENCE = 50000
-ROWS_PER_SCAN = 8  # The number of overlapping rows in the swath (needed for EWA)
 
 
 def resample_all_variables(message_parameters: Dict,
@@ -184,8 +183,9 @@ def pyresample_ewa(message_parameters: Dict, dataset: Dataset, variable_name: st
     if np.issubdtype(variable_values.dtype, np.integer):
         variable_values = variable_values.astype(float)
 
+    # This call falls back on the EWA rows_per_scan default of total input rows
     _, results = fornav(ewa_information['columns'], ewa_information['rows'],
-                        target_area, variable_values, rows_per_scan=ROWS_PER_SCAN)
+                        target_area, variable_values)
 
     write_netcdf(variable_output_path,
                  results,
@@ -203,7 +203,10 @@ def pyresample_nearest_neighbour(message_parameters: Dict,
                                  target_area: AreaDefinition,
                                  variable_output_path: str,
                                  logger: Logger) -> None:
-    """ Use nearest neighbour interpolation to produce the target output.
+    """ Use nearest neighbour interpolation to produce the target output. If
+        the same source coordinates have been processed for a previous
+        variable, use applicable information (from get_neighbour_info) rather
+        than recreating it.
 
         Once the variable has been interpolated, output to a new NetCDF file,
         which will be merged with others after all variables have been
@@ -213,14 +216,34 @@ def pyresample_nearest_neighbour(message_parameters: Dict,
     variable = dataset.variables.get(variable_name)
     variable_values = get_variable_values(dataset, variable)
     coordinates = create_coordinates_key(variable.attrs.get('coordinates'))
-    swath_definition = get_swath_definition(dataset, coordinates)
 
-    results = resample_nearest(swath_definition,
-                               variable_values,
-                               target_area,
-                               radius_of_influence=RADIUS_OF_INFLUENCE,
-                               fill_value=FILL_VALUE,
-                               epsilon=EPSILON)
+    if coordinates in reprojection_information:
+        logger.debug('Retrieving previous nearest neighbour information for '
+                     f'{variable_name}')
+        near_information = reprojection_information[coordinates]
+    else:
+        logger.debug('Calculating nearest neighbour information for '
+                     f'{variable_name}')
+        swath_definition = get_swath_definition(dataset, coordinates)
+        near_info = get_neighbour_info(swath_definition, target_area,
+                                       RADIUS_OF_INFLUENCE, epsilon=EPSILON,
+                                       neighbours=1)
+
+        near_information = {'valid_input_index': near_info[0],
+                            'valid_output_index': near_info[1],
+                            'index_array': near_info[2],
+                            'distance_array': near_info[3]}
+
+        reprojection_information[coordinates] = near_information
+
+    results = get_sample_from_neighbour_info(
+        'nn', target_area.shape, variable_values,
+        near_information['valid_input_index'],
+        near_information['valid_output_index'],
+        near_information['index_array'],
+        distance_array=near_information['distance_array'],
+        fill_value=FILL_VALUE
+    )
 
     write_netcdf(variable_output_path,
                  results,

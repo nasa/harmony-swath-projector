@@ -14,7 +14,7 @@ def walktree(top):
         for children in walktree(value):
             yield children
 
-class NC4Info:
+class NCInfo:
     def __init__(self, ncfile: str):
         self.rootgroup = Dataset(ncfile)
         self.vars_with_coords = set()
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     input_file = ARGS.file
 
     # ----------------------------------------
-    info4 = NC4Info(input_file)
+    info4 = NCInfo(input_file)
     print(info4.rootgroup.data_model)
     sciVars = info4.get_science_variables()
     print("--------- science_variables ----------")
