@@ -16,8 +16,8 @@ import xarray
 from pyproj import Proj
 from pyresample import geometry
 
+from PyMods import nc_merge
 from PyMods.nc_info import NCInfo
-from PyMods.nc_merge import create_output
 from PyMods.interpolation_gdal import gdal_resample_all_variables
 from PyMods.interpolation_pyresample import resample_all_variables
 
@@ -78,8 +78,8 @@ def reproject(msg, logger):
 
     # Now merge outputs (unless we only have one)
     metadata_variables = info.get_metadata_variables()
-    create_output(param_list.get('input_file'), output_file, temp_dir,
-                  metadata_variables, logger)
+    nc_merge.create_output(param_list.get('input_file'), output_file, temp_dir,
+                           metadata_variables, logger)
 
     # Return the output file back to Harmony
     return param_list.get('granule'), output_file
