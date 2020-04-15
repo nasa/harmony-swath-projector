@@ -5,7 +5,8 @@ from unittest.mock import patch
 import numpy as np
 import xarray
 
-from PyMods.interpolation_gdal import (gdal_resample_all_variables,
+from PyMods.interpolation_gdal import (create_gdal_variable_name,
+                                       gdal_resample_all_variables,
                                        gdal_resample)
 from test.test_utils import TestBase
 
@@ -13,20 +14,15 @@ from test.test_utils import TestBase
 class TestInterpolationGdal(TestBase):
 
     def setUp(self):
-        self.file_information = (
-            'SUBDATASET_1_NAME=NETCDF:"test/data/africa.nc":lat\n'
-            'SUBDATASET_2_NAME=NETCDF:"test/data/africa.nc":lon\n'
-            'SUBDATASET_3_NAME=NETCDF:"test/data/africa.nc":red_var\n'
-            'SUBDATASET_4_NAME=NETCDF:"test/data/africa.nc":green_var\n'
-            'SUBDATASET_5_NAME=NETCDF:"test/data/africa.nc":blue_var\n'
-            'SUBDATASET_6_NAME=NETCDF:"test/data/africa.nc":alpha_var\n'
-        )
+        self.science_variables = ('red_var', 'green_var', 'blue_var',
+                                  'alpha_var')
         self.message_parameters = {'input_file': 'test/data/africa.nc'}
         self.temp_directory = '/tmp/01234'
         self.variable = 'NETCDF:"file.nc":variable_name'
+        self.short_variable = 'variable_name'
         self.output_file = 'path/to/output.nc'
         self.logger = Logger('test')
-        self.base_parameters = {'crs': 'EPSG:4326'}
+        self.base_parameters = {'crs': 'EPSG:4326', 'input_file': 'file.nc'}
         self.basic_command = ['gdalwarp', '-geoloc', '-t_srs', 'EPSG:4326',
                               self.variable, self.output_file]
 
@@ -37,7 +33,7 @@ class TestInterpolationGdal(TestBase):
 
         """
         output_variables = gdal_resample_all_variables(self.message_parameters,
-                                                       self.file_information,
+                                                       self.science_variables,
                                                        self.temp_directory,
                                                        self.logger)
         expected_output = ['red_var', 'green_var', 'blue_var', 'alpha_var']
@@ -45,10 +41,9 @@ class TestInterpolationGdal(TestBase):
         self.assertEqual(mock_gdal_resample.call_count, 4)
 
         for variable in expected_output:
-            full_variable = f'NETCDF:"test/data/africa.nc":{variable}'
             variable_output_path = f'/tmp/01234/{variable}.nc'
             mock_gdal_resample.assert_any_call(self.message_parameters,
-                                               full_variable,
+                                               variable,
                                                variable_output_path,
                                                self.logger)
 
@@ -61,7 +56,7 @@ class TestInterpolationGdal(TestBase):
         mock_gdal_resample.side_effect = [KeyError('random'), None, None, None]
 
         output_variables = gdal_resample_all_variables(self.message_parameters,
-                                                       self.file_information,
+                                                       self.science_variables,
                                                        self.temp_directory,
                                                        self.logger)
 
@@ -72,10 +67,9 @@ class TestInterpolationGdal(TestBase):
         all_variables = expected_output + ['red_var']
 
         for variable in all_variables:
-            full_variable = f'NETCDF:"test/data/africa.nc":{variable}'
             variable_output_path = f'/tmp/01234/{variable}.nc'
             mock_gdal_resample.assert_any_call(self.message_parameters,
-                                               full_variable,
+                                               variable,
                                                variable_output_path,
                                                self.logger)
 
@@ -87,7 +81,7 @@ class TestInterpolationGdal(TestBase):
         """
 
         with self.subTest('No additional command options'):
-            gdal_resample(self.base_parameters, self.variable,
+            gdal_resample(self.base_parameters, self.short_variable,
                           self.output_file, self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
@@ -101,7 +95,7 @@ class TestInterpolationGdal(TestBase):
         with self.subTest('With valid interpolation'):
             parameters = {'interpolation': 'near'}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with([
                 'gdalwarp', '-geoloc', '-t_srs', 'EPSG:4326', '-r', 'near',
@@ -112,7 +106,7 @@ class TestInterpolationGdal(TestBase):
             mock_check_output.reset_mock()
             parameters = {'interpolation': 'ewa'}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
@@ -132,7 +126,7 @@ class TestInterpolationGdal(TestBase):
                           'y_max': 35}
 
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with([
                 'gdalwarp', '-geoloc', '-t_srs', 'EPSG:4326', '-te', '-20',
@@ -145,7 +139,7 @@ class TestInterpolationGdal(TestBase):
                           'x_min': -20,
                           'x_max': 60}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
@@ -156,7 +150,7 @@ class TestInterpolationGdal(TestBase):
                           'y_min': 10,
                           'y_max': 35}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
@@ -172,7 +166,8 @@ class TestInterpolationGdal(TestBase):
             # placed in the correct order.
             parameters = {'xres': 36, 'yres': 12}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file, self.logger)
+            gdal_resample(parameters, self.short_variable, self.output_file,
+                          self.logger)
             mock_check_output.assert_called_once_with([
                 'gdalwarp', '-geoloc', '-t_srs', 'EPSG:4326', '-tr', '36',
                 '12', self.variable, self.output_file
@@ -182,7 +177,7 @@ class TestInterpolationGdal(TestBase):
             mock_check_output.reset_mock()
             parameters = {'xres': 36}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
@@ -191,7 +186,7 @@ class TestInterpolationGdal(TestBase):
             mock_check_output.reset_mock()
             parameters = {'yres': 12}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
@@ -205,7 +200,7 @@ class TestInterpolationGdal(TestBase):
         with self.subTest('With valid width and height'):
             parameters = {'height': 500, 'width': 1000}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with([
                 'gdalwarp', '-geoloc', '-t_srs', 'EPSG:4326', '-ts', '1000',
@@ -216,7 +211,7 @@ class TestInterpolationGdal(TestBase):
             mock_check_output.reset_mock()
             parameters = {'width': 1000}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
@@ -225,7 +220,17 @@ class TestInterpolationGdal(TestBase):
             mock_check_output.reset_mock()
             parameters = {'height': 500}
             parameters.update(self.base_parameters)
-            gdal_resample(parameters, self.variable, self.output_file,
+            gdal_resample(parameters, self.short_variable, self.output_file,
                           self.logger)
             mock_check_output.assert_called_once_with(self.basic_command,
                                                       stderr=STDOUT)
+
+    def test_create_gdal_variable_name(self):
+        """ Ensure the correctly formatted full variable name is created,
+            including the file driver, the file name and the variable name.
+
+        """
+        self.assertEqual(
+            create_gdal_variable_name('NETCDF', 'file.nc', 'variable_name'),
+            'NETCDF:"file.nc":variable_name'
+        )

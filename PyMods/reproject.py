@@ -5,20 +5,19 @@ import argparse
 import functools
 import os
 import re
-import subprocess
 from tempfile import mkdtemp
 import logging
 import json
 
 import numpy as np
 import rasterio
-# from affine import Affine
 from rasterio.transform import Affine
 import xarray
 from pyproj import Proj
 from pyresample import geometry
 
-from PyMods import NetCDF4Merger
+from PyMods import nc_merge
+from PyMods.nc_info import NCInfo
 from PyMods.interpolation_gdal import gdal_resample_all_variables
 from PyMods.interpolation_pyresample import resample_all_variables
 
@@ -49,39 +48,38 @@ def reproject(msg, logger):
     logger.info(f'Selected CRS: {param_list.get("crs")}\t'
                 f'Interpolation: {param_list.get("interpolation")}')
 
-    # Use gdalinfo to get the sub-datasets in the input file as well as the file type.
     try:
-        info = subprocess.check_output(['gdalinfo', param_list.get('input_file')],
-                                       stderr=subprocess.STDOUT).decode('utf-8')
-        input_format = re.search(r'Driver:\s*([^/]+)', info).group(1)
+        info = NCInfo(param_list['input_file'])
     except Exception as err:
-        logger.error(f'Unable to determine input file format: {str(err)}')
-        raise Exception('Cannot determine input file format')
+        logger.error(f'Unable to parse input file variables: {str(err)}')
+        raise Exception('Unable to parse input file varialbes')
 
-    logger.info("Input file format: " + input_format)
-    datasets = [line.split('=')[-1] for line in info.split('\n')
-                if re.match(r'^\s*SUBDATASET_\d+_NAME=', line)]
+    science_variables = info.get_science_variables()
 
-    if not datasets:
-        raise Exception('No subdatasets found in input file')
-    logger.info(f'Input file has {len(datasets)} datasets')
+    if len(science_variables) == 0:
+        raise Exception('No science variables found in input file')
+
+    logger.info(f'Input file has {len(science_variables)} science variables')
 
     # Loop through each dataset and reproject
     if REPR_MODE == 'gdal':
         logger.debug('Using gdal for reprojection.')
-        outputs = gdal_resample_all_variables(param_list, info, temp_dir, logger)
+        outputs = gdal_resample_all_variables(param_list, science_variables,
+                                              temp_dir, logger)
     elif REPR_MODE == 'pyresample':
         logger.debug('Using pyresample for reprojection.')
-        outputs = resample_all_variables(param_list, info, temp_dir, logger)
+        outputs = resample_all_variables(param_list, science_variables,
+                                         temp_dir, logger)
     else:
         raise Exception(f'Invalid reprojection mode: {REPR_MODE}')
-
-    # Now merge outputs (unless we only have one)
 
     if not outputs:
         raise Exception("No subdatasets could be reprojected")
 
-    NetCDF4Merger.create_output(param_list.get('input_file'), output_file, temp_dir)
+    # Now merge outputs (unless we only have one)
+    metadata_variables = info.get_metadata_variables()
+    nc_merge.create_output(param_list.get('input_file'), output_file, temp_dir,
+                           metadata_variables, logger)
 
     # Return the output file back to Harmony
     return param_list.get('granule'), output_file

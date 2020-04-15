@@ -21,20 +21,23 @@ class NCInfo:
         self.vars_meta = set()
         self.dims = set()
         self.coords = set()
-        self.auxs = set()  # TODO:auxiliary Information
+        self.ancillary_data = set()  # TODO: include ancillary_data check
 
         for children in walktree(self.rootgroup):
             if self.rootgroup.variables:
                 for nvar, var in self.rootgroup.variables.items():
                     if 'coordinates' in var.ncattrs():
-                        self.vars_with_coords.add(f'/{nvar}')
+                        self.vars_with_coords.add(nvar)
                         split_coords = self._extract_coordinates(var.coordinates)
                         self.coords.update(split_coords)
+                    elif 'grid_mapping' in var.ncattrs():
+                        self.vars_with_coords.add(nvar)
+                        self.ancillary_data.add(var.grid_mapping)
                     else:
-                        self.vars_meta.add(f'/{nvar}')
+                        self.vars_meta.add(nvar)
 
                 for dim in self.rootgroup.dimensions:
-                    self.dims.add(f'/{dim}')
+                    self.dims.add(dim)
 
             for child in children:
                 if child.variables:
@@ -43,6 +46,9 @@ class NCInfo:
                             self.vars_with_coords.add(f'{child.path}/{varn}')
                             split_coords = self._extract_coordinates(var.coordinates)
                             self.coords.update(split_coords)
+                        elif 'grid_mapping' in var.ncattrs():
+                            self.vars_with_coords.add(varn)
+                            self.ancillary_data.add(var.grid_mapping)
                         else:
                             self.vars_meta.add(f'{child.path}/{varn}')
 
@@ -50,17 +56,17 @@ class NCInfo:
                         self.dims.add(f'{child.path}/{dim}')
 
     def get_science_variables(self) -> Set[str]:
-        return self.vars_with_coords - self.dims - self.coords
+        return self.vars_with_coords - self.dims - self.coords - self.ancillary_data
 
     def get_metadata_variables(self) -> Set[str]:
-        return self.vars_meta - self.dims - self.coords
+        return self.vars_meta - self.dims - self.coords - self.ancillary_data
 
     def _extract_coordinates(self, coordinates: str) -> List[str]:
         """ Take a string of potentially coordinate datasets and return a list
         of separate coordinate dataset names.
 
         """
-        return [f'/{coord}' for coord in re.split('\s+|,\s*', coordinates)]
+        return re.split('\s+|,\s*', coordinates)
 
 
 # Main program start for testing with any input file
