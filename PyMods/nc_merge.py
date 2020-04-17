@@ -273,7 +273,6 @@ def get_fill_value_from_attributes(variable_attributes: Dict) -> Optional:
 
 # main program
 if __name__ == "__main__":
-    print('Main')
     PARSER = argparse.ArgumentParser(prog='nc_merge',
                                      description='Merged reprojected netcdf4 files into one')
     PARSER.add_argument('--ori-inputfile', dest='ori_inputfile',

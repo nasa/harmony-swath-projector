@@ -18,11 +18,15 @@ class TestNominalReproject(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_single_band_input(self, cleanup, completed_with_local_file):
         """Nominal (successful) reprojection"""
-        test_data = {'granules' : [{'local_filename' : '/home/test/data/VNL2_oneBand.nc'}]}
+        test_data = {
+            'granules' : [{
+                'local_filename' : '/home/test/data/VNL2_oneBand.nc'
+            }],
+            'format': {'height': 500, 'width': 1000}
+        }
         reprojector = HarmonyAdapter(test_data)
         granule = reprojector.message.granules[0]
         reprojector.invoke()
-        print(reprojector.completed_with_local_file)
 
         completed_with_local_file.assert_called_once_with(contains('VNL2_oneBand_repr.nc'), source_granule=granule, is_regridded=True, mime='application/x-netcdf')
         cleanup.assert_called_once()

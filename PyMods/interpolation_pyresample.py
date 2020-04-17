@@ -313,6 +313,8 @@ def get_target_area(parameters: Dict) -> AreaDefinition:
         interpolated to.
 
     """
+    # TODO: Account for if area is Geographic and  crosses the International
+    # Date Line (Swapping order of x_min and x_max doesn't seem to work)
     grid_extent = (parameters['x_min'], parameters['y_min'],
                    parameters['x_max'], parameters['y_max'])
 
