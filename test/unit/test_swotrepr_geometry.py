@@ -118,6 +118,7 @@ class TestSwotReprGeometry(TestBase):
         """ Ensure the International Date Line is correctly identified. """
         not_crossing_lon = np.array([[10, 20, 30], [10, 20, 30]])
         crossing_lon = np.array([[165, 175, -175], [165, 175, -175]])
+        crossing_vertical = np.array([[101.0, 101.0], [10.0, 10.0]])
 
         not_cross_diff = np.diff(not_crossing_lon, n=1, axis=1)
         cross_diff = np.diff(crossing_lon, n=1, axis=1)
@@ -128,4 +129,8 @@ class TestSwotReprGeometry(TestBase):
 
         with self.subTest('Returns True when crossing'):
             crosses = swath_crosses_international_date_line(crossing_lon)
+            self.assertTrue(crosses)
+
+        with self.subTest('Returns True when crossing between rows'):
+            crosses = swath_crosses_international_date_line(crossing_vertical)
             self.assertTrue(crosses)

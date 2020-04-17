@@ -116,9 +116,12 @@ def get_absolute_resolution(polygon_area: float, n_pixels: int) -> float:
 def swath_crosses_international_date_line(longitudes: np.ndarray) -> bool:
     """ Check if swath begins west of the International Date Line and ends to
         the east of it. In this case there should be a discontinuity between
-        two adjacent longitude columns.
+        either two adjacent longitude columns or rows.
 
     """
     # TODO: Mask fill_value pixels
-    longitudes_difference = np.diff(longitudes, n=1, axis=1)
-    return np.max(np.abs(longitudes_difference)) > 90.0
+    longitudes_difference_row = np.diff(longitudes, n=1, axis=0)
+    longitudes_difference_column = np.diff(longitudes, n=1, axis=1)
+    max_column_difference = np.max(np.abs(longitudes_difference_column))
+    max_row_difference = np.max(np.abs(longitudes_difference_row))
+    return np.max([max_column_difference, max_row_difference]) > 90.0

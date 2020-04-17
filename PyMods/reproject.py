@@ -29,8 +29,6 @@ CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 # with a default value to fall back on.
 REPR_MODE = 'pyresample'  # or 'gdal'
 
-''' TODO: Resolve issues re. get_resolution and get_extents and various data architectures
-'''
 
 def reproject(msg, logger):
     # Set up source and destination files
