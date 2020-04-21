@@ -11,7 +11,7 @@ ARG EDL_PASSWORD
 WORKDIR "/home"
 
 # Bundle app source
-COPY ./PyMods Pymods
+COPY ./PyMods PyMods
 COPY swotrepr.py .
 COPY conda_requirements.txt .
 COPY pip_requirements.txt .
@@ -32,4 +32,4 @@ RUN pip install -r pip_requirements.txt
 # URL encoding additional characters besides '@' may be required
 RUN pip install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git"
 
-ENTRYPOINT ["conda", "run", "--name", "swotrepr", "python", "swotrepr.py"]
+ENTRYPOINT ["conda", "run", "--name", "swotrepr", "PYTHONPATH=.", "python", "swotrepr.py"]
