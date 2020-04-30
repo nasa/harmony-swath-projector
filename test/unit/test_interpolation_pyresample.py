@@ -8,7 +8,6 @@ import xarray
 
 from PyMods.interpolation_pyresample import (check_for_valid_interpolation,
                                              EPSILON,
-                                             FILL_VALUE,
                                              get_swath_definition,
                                              get_target_area,
                                              pyresample_bilinear,
@@ -292,6 +291,7 @@ class TestInterpolationPyResample(TestBase):
                               'projection': projection,
                               'grid_transform': 'grid_transform value'}
         target_area = Mock(spec=AreaDefinition, shape='ta_shape')
+        alpha_var_fill = 0.0
 
         with self.subTest('No pre-existing nearest neighbour information'):
             pyresample_nearest_neighbour(message_parameters, 'alpha_var', {},
@@ -308,7 +308,7 @@ class TestInterpolationPyResample(TestBase):
                                                     'valid_output_index',
                                                     'index_array',
                                                     distance_array='distance_array',
-                                                    fill_value=FILL_VALUE)
+                                                    fill_value=alpha_var_fill)
             mock_write_netcdf.assert_called_once_with('path/to/output',
                                                       'results',
                                                       projection,
@@ -339,7 +339,7 @@ class TestInterpolationPyResample(TestBase):
                                                     'old_valid_output',
                                                     'old_index_array',
                                                     distance_array='old_distance',
-                                                    fill_value=FILL_VALUE)
+                                                    fill_value=alpha_var_fill)
             mock_write_netcdf.assert_called_once_with('path/to/output',
                                                       'results',
                                                       projection,
