@@ -17,11 +17,12 @@ import rasterio
 import xarray
 
 from PyMods.utilities import (create_coordinates_key, get_coordinate_variable,
-                              get_variable_group_and_name, get_variable_values)
+                              get_variable_group_and_name,
+                              get_variable_numeric_fill_value,
+                              get_variable_values)
 
 
 EPSILON = 0.5
-FILL_VALUE = -9999.0
 NEIGHBOURS = 16
 RADIUS_OF_INFLUENCE = 50000
 
@@ -217,6 +218,7 @@ def pyresample_nearest_neighbour(message_parameters: Dict,
 
     variable = dataset.variables.get(variable_name)
     variable_values = get_variable_values(dataset, variable)
+    variable_fill_value = get_variable_numeric_fill_value(variable)
     coordinates = create_coordinates_key(variable.attrs.get('coordinates'))
 
     if coordinates in reprojection_information:
@@ -244,7 +246,7 @@ def pyresample_nearest_neighbour(message_parameters: Dict,
         near_information['valid_output_index'],
         near_information['index_array'],
         distance_array=near_information['distance_array'],
-        fill_value=FILL_VALUE
+        fill_value=variable_fill_value
     )
 
     write_netcdf(variable_output_path,

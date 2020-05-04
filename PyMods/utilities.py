@@ -1,9 +1,13 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 import re
 
-from numpy import ndarray
 from xarray.core.dataset import Dataset
 from xarray.core.variable import Variable
+import numpy as np
+
+
+FillValueType = Optional[Union[float, int]]
+
 
 def create_coordinates_key(coordinates: str) -> Tuple[str]:
     """ Create a unique, hashable entity from a coordinates attribute in an
@@ -13,7 +17,7 @@ def create_coordinates_key(coordinates: str) -> Tuple[str]:
     return tuple(re.split('\s+|,\s*', coordinates))
 
 
-def get_variable_values(input_file: Dataset, variable: Variable) -> ndarray:
+def get_variable_values(input_file: Dataset, variable: Variable) -> np.ndarray:
     """ A helper function to retrieve the values of a specified dataset. This
         function accounts for 2-D and 3-D datasets based on whether the time
         variable is present in the dataset.
@@ -56,3 +60,22 @@ def get_variable_group_and_name(variable: str) -> Tuple[str, str]:
     """
     split_variable = variable.split('/')
     return '/'.join(split_variable[:-1]), split_variable[-1]
+
+
+def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
+    """ Retrieve the _FillValue attribute for a given variable. If there is no
+        _FillValue attribute, return None. The pyresample
+        `get_sample_from_neighbour_info` function will only accept float or int
+        inputs for `fill_value`. Non-numeric fill values are returned as None.
+
+    """
+    fill_value = variable.attrs.get('_FillValue')
+
+    if isinstance(fill_value, (np.integer, np.long, int)):
+        fill_value = int(fill_value)
+    elif isinstance(fill_value, (np.floating, float)):
+        fill_value = float(fill_value)
+    else:
+        fill_value = None
+
+    return fill_value
