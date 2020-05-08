@@ -1,26 +1,35 @@
-FROM osgeo/gdal:alpine-normal-3.0.2
+FROM continuumio/miniconda3
 
 ARG EDL_USERNAME
 ARG EDL_PASSWORD
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Note GIT credentials could have issue if password contains certain characters.
-# Escaping may be required
 WORKDIR "/home"
 
-RUN pip3 install --upgrade pip \
-    && pip3 install requests --user --trusted-host=pypi.python.org --trusted-host=pypi.org --trusted-host=files.pythonhosted.org boto3 \
-    && pip3 install coverage \
-    && apk add build-base python3-dev py-numpy-dev \
-    && apk add --no-cache --allow-untrusted --repository http://dl-3.alpinelinux.org/alpine/edge/testing hdf5-dev netcdf-dev \
-    && pip3 install netCDF4 pylint safety \
-    && apk del py-numpy-dev python3-dev build-base
-
-
 # Bundle app source
-
 COPY ./test test
-COPY ./reproject reproject
-COPY ./Mergers Mergers
+COPY ./PyMods PyMods
+COPY swotrepr.py .
+COPY conda_requirements.txt .
+COPY pip_requirements.txt .
 
-ENTRYPOINT ["/home/test/run"]
+# Create Conda environment
+RUN conda create --name swotrepr --file conda_requirements.txt python=3.7 \
+	--channel conda-forge \
+	--channel defaults
+
+# Make RUN commands use the Conda environment
+SHELL ["conda", "run", "--name", "swotrepr", "/bin/bash", "-c"]
+
+# Install additional Pip requirements (for SwotRepr itself)
+RUN pip install -r pip_requirements.txt
+
+# Install additional Pip requirements (for testing)
+RUN pip install -r test/pip_test_requirements.txt
+
+# Install Harmony
+# Note GIT credentials could have issue if password contains certain characters.
+# Escaping may be required
+RUN pip install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git"
+
+ENTRYPOINT ["conda", "run", "--name", "swotrepr", "/home/test/run"]

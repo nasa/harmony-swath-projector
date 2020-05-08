@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#
+# Script to run env-Dockerfile, building an image containing the full set
+# of Conda and Pip dependencies. This script should be run once, then bin/run-dev
+# can be run multiple times, taking much less time than running bin/build-test
+# and bin/run-test for each edit.
+#
+
+image="sds/swot-reproject-env"
+tag=${1:-latest}
+
+
+# Look for old version of image and remove
+#
+old=$(docker images | grep "$image" | grep "$tag" | awk '{print $3}')
+if [ ! -z "$old" ]; then
+    docker rmi "$old"
+fi
+
+
+# If we have no EDL credentials passed in through the environment,
+# check to see if we can pull some out of a .netrc file.
+#
+if [ -z "$EDL_USERNAME" -o -z "$EDL_PASSWORD" ]; then
+    if [ -f ~/.netrc ]; then
+        creds=$(egrep "\s+urs.earthdata.nasa.gov" ~/.netrc)
+        if [ ! -z "$creds" ]; then
+            EDL_USERNAME=$(echo "$creds" | awk '{print $4}')
+            EDL_PASSWORD=$(echo "$creds" | awk '{print $6}')
+        fi
+    fi
+fi
+
+
+# If no credentials in .netrc, prompt user for them
+#
+if [ -z "$EDL_USERNAME" -o -z "$EDL_PASSWORD" ]; then
+    read -p "Enter Earthdata Login username: " EDL_USERNAME
+    echo -n "Enter Earthdata Login password: "
+    read -s  EDL_PASSWORD
+    echo ""
+fi
+
+export EDL_USERNAME
+export EDL_PASSWORD
+
+
+# Build the image
+#
+docker build -t ${image}:${tag} \
+	--file bin/env-Dockerfile \
+	--build-arg EDL_USERNAME \
+	--build-arg EDL_PASSWORD .

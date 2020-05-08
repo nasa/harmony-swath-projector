@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Look for all versions of images containing the string "sds/swot-reproject"
+# and remove them. This is primarily for clean-up after development.
+#
+image_base_name="sds/swot-reproject"
+
+old=$(docker images | grep "${image_base_name}" | awk '{print $3}')
+if [ ! -z "$old" ]; then
+    docker rmi "$old"
+fi
