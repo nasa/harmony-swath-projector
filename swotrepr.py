@@ -89,5 +89,5 @@ if __name__ == "__main__":
     PARSER.add_argument('--harmony-input',
                         help='The input data for the action provided by Harmony')
 
-    ARGS = PARSER.parse_args()
+    ARGS, _ = PARSER.parse_known_args()
     harmony.run_cli(PARSER, ARGS, HarmonyAdapter)
