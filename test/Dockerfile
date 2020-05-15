@@ -1,7 +1,5 @@
 FROM continuumio/miniconda3
 
-ARG EDL_USERNAME
-ARG EDL_PASSWORD
 ENV PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR "/home"
@@ -26,10 +24,5 @@ RUN pip install -r pip_requirements.txt
 
 # Install additional Pip requirements (for testing)
 RUN pip install -r test/pip_test_requirements.txt
-
-# Install Harmony
-# Note GIT credentials could have issue if password contains certain characters.
-# Escaping may be required
-RUN pip install "git+https://${EDL_USERNAME}:${EDL_PASSWORD}@git.earthdata.nasa.gov/scm/harmony/harmony-service-lib-py.git"
 
 ENTRYPOINT ["conda", "run", "--name", "swotrepr", "/home/test/run"]
