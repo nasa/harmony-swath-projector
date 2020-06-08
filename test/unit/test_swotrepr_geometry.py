@@ -1,11 +1,20 @@
+from random import shuffle
+from unittest.mock import patch
+
 from pyproj import Proj
+from xarray import Variable
 import numpy as np
 
-from PyMods.swotrepr_geometry import (get_absolute_resolution,
+from PyMods.swotrepr_geometry import (clockwise_point_sort,
+                                      get_absolute_resolution,
                                       get_extents_from_perimeter,
-                                      get_perimeter_points, get_polygon_area,
+                                      get_perimeter_coordinates,
+                                      get_polygon_area,
                                       get_projected_resolution,
+                                      get_slice_edges,
+                                      get_valid_coordinates_mask,
                                       reproject_perimeter_points,
+                                      sort_perimeter_points,
                                       swath_crosses_international_date_line)
 from test.test_utils import TestBase
 
@@ -16,12 +25,14 @@ class TestSwotReprGeometry(TestBase):
     def setUpClass(cls):
         cls.ease_projection = Proj('EPSG:6933')
         cls.geographic_coordinates = Proj('EPSG:4326')
-        cls.latitudes = np.array([[25.0, 25.0, 25.0, 25.0],
-                                  [20.0, 20.0, 20.0, 20.0],
-                                  [15.0, 15.0, 15.0, 15.0]])
-        cls.longitudes = np.array([[40.0, 45.0, 50.0, 55.0],
-                                   [40.0, 45.0, 50.0, 55.0],
-                                   [40.0, 45.0, 50.0, 55.0]])
+        cls.lat_data = np.array([[25.0, 25.0, 25.0, 25.0],
+                                 [20.0, 20.0, 20.0, 20.0],
+                                 [15.0, 15.0, 15.0, 15.0]])
+        cls.lon_data = np.array([[40.0, 45.0, 50.0, 55.0],
+                                 [40.0, 45.0, 50.0, 55.0],
+                                 [40.0, 45.0, 50.0, 55.0]])
+        cls.latitudes = Variable(dims=('ni', 'nj'), data=cls.lat_data)
+        cls.longitudes = Variable(dims=('ni', 'nj'), data=cls.lon_data)
 
     def test_get_projected_resolution(self):
         """ Ensure the calculated resolution from the input longitudes and
@@ -63,25 +74,31 @@ class TestSwotReprGeometry(TestBase):
             self.assertAlmostEqual(y_min, 1892380.583, places=3)
             self.assertAlmostEqual(y_max, 3091555.561, places=3)
 
-    def test_get_perimeter_points(self):
-        """ Given two supplied numpy arrays, ensure that pairs of coordinates
-            for each point on the perimeter are returned. Note, one of the
-            corners should be present twice, to ensure an enclosed polygon.
+    def test_get_perimeter_coordinates(self):
+        """ Ensure a full list of longitude, latitude points are returned for
+            a given coordinate mask. These points will be unordered.
 
         """
-        expected_points = [(40.0, 25.0), (40.0, 20.0), (40.0, 15.0),
-                           (45.0, 15.0), (50.0, 15.0), (55.0, 15.0),
-                           (55.0, 20.0), (55.0, 25.0), (50.0, 25.0),
-                           (45.0, 25.0)]
+        valid_pixels = [[False, True, True, False],
+                        [True, True, True, True],
+                        [True, True, False, False]]
 
-        perimeter_points = get_perimeter_points(self.longitudes,
-                                                self.latitudes)
+        expected_points = [(self.longitudes[0][1], self.latitudes[0][1]),
+                           (self.longitudes[0][2], self.latitudes[0][2]),
+                           (self.longitudes[1][0], self.latitudes[1][0]),
+                           (self.longitudes[1][2], self.latitudes[1][2]),
+                           (self.longitudes[1][3], self.latitudes[1][3]),
+                           (self.longitudes[2][0], self.latitudes[2][0]),
+                           (self.longitudes[2][1], self.latitudes[2][1])]
 
-        self.assertCountEqual(perimeter_points, expected_points,
-                              'Correct number of points')
-        self.assertCountEqual(perimeter_points, set(perimeter_points),
-                              'All points unique')
-        self.assertEqual(perimeter_points, expected_points)
+        mask = np.ma.masked_where(np.logical_not(valid_pixels),
+                                  np.ones(self.longitudes.shape))
+
+        coordinates = get_perimeter_coordinates(self.longitudes,
+                                                self.latitudes,
+                                                mask)
+
+        self.assertCountEqual(coordinates, expected_points)
 
     def test_reproject_perimeter_points(self):
         """ Ensure a set of points will be correctly projected. """
@@ -91,6 +108,8 @@ class TestSwotReprGeometry(TestBase):
         expected_y = np.array([19718541.688, 19664336.706, 19607585.857])
 
         x_values, y_values = reproject_perimeter_points(input_points, proj)
+        self.assertEqual(len(x_values), len(expected_x))
+        self.assertEqual(len(y_values), len(expected_y))
         np.testing.assert_allclose(x_values, expected_x, atol=0.001, rtol=0)
         np.testing.assert_allclose(y_values, expected_y, atol=0.001, rtol=0)
 
@@ -107,7 +126,7 @@ class TestSwotReprGeometry(TestBase):
         self.assertEqual(square_area, 4.0)
 
     def test_get_absolute_resolution(self):
-        """ Ensure the expeted resolution value is returned. """
+        """ Ensure the expected resolution value is returned. """
         area = 16.0
         n_pixels = 4
         resolution = get_absolute_resolution(area, n_pixels)
@@ -120,9 +139,6 @@ class TestSwotReprGeometry(TestBase):
         crossing_lon = np.array([[165, 175, -175], [165, 175, -175]])
         crossing_vertical = np.array([[101.0, 101.0], [10.0, 10.0]])
 
-        not_cross_diff = np.diff(not_crossing_lon, n=1, axis=1)
-        cross_diff = np.diff(crossing_lon, n=1, axis=1)
-
         with self.subTest('Returns False when not crossing'):
             crosses = swath_crosses_international_date_line(not_crossing_lon)
             self.assertFalse(crosses)
@@ -134,3 +150,107 @@ class TestSwotReprGeometry(TestBase):
         with self.subTest('Returns True when crossing between rows'):
             crosses = swath_crosses_international_date_line(crossing_vertical)
             self.assertTrue(crosses)
+
+    def test_clockwise_point_sort(self):
+        """ Ensure the correct lengths and angles are calculated. """
+        test_args = [
+            ['Point is at origin', [0, 0], [0, 0], (-np.pi, 0)],
+            ['Point is in vertical direction', [0, 0], [0, 30], (0.0, 30)],
+            ['Point at 45 degrees', [0, 0], [3, 3], (np.pi / 4.0, np.sqrt(18.0))]
+        ]
+
+        for description, origin, point, expected_results in test_args:
+            with self.subTest(description):
+                self.assertEqual(clockwise_point_sort(origin, point),
+                                 expected_results)
+
+    def test_sort_perimeter_points(self):
+        """ Ensure unsorted x and y coordinates are returned in order.
+            The points in the `square_points` and `polygon_points` lists are
+            ordered to be the expected output.
+
+        """
+        square_points = [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1],
+                         [2, 0], [1, 0]]
+        polygon_points = [[20, 10], [10, 30], [20, 40], [10, 50], [20, 60],
+                          [30, 60], [40, 50], [50, 60], [50, 40], [60, 40],
+                          [50, 30], [60, 10]]
+
+        test_args = [['Simple square', square_points],
+                     ['Polygon', polygon_points]]
+
+        for description, ordered_points in test_args:
+            with self.subTest(description):
+                expected_x, expected_y = zip(*ordered_points)
+
+                disordered_points = ordered_points.copy()
+                shuffle(disordered_points)
+                disordered_x, disordered_y = zip(*disordered_points)
+
+                ordered_x, ordered_y = sort_perimeter_points(disordered_x,
+                                                             disordered_y)
+                self.assertEqual(ordered_x, expected_x)
+                self.assertEqual(ordered_y, expected_y)
+
+    @patch('PyMods.swotrepr_geometry.get_variable_numeric_fill_value')
+    def test_get_valid_coordinates_mask(self, mock_get_fill_value):
+        """ Ensure all logical conditions are respected. """
+        fill_value = -9999.0
+        mock_get_fill_value.return_value = fill_value
+
+        valid_lon = np.array([[1.0, 2.0], [3.0, 4.0]])
+        valid_lat = np.array([[5.0, 6.0], [7.0, 8.0]])
+
+        nan_lon = np.array([[np.nan, 2.0], [3.0, 4.0]])
+        nan_lat = np.array([[5.0, np.nan], [7.0, 8.0]])
+
+        fill_lon = np.array([[1.0, 2.0], [fill_value, 4.0]])
+        fill_lat = np.array([[5.0, 6.0], [7.0, fill_value]])
+
+        combined_lon = np.array([[np.nan, 2.0], [fill_value, 4.0]])
+        combined_lat = np.array([[5.0, np.nan], [7.0, fill_value]])
+
+        test_args = [
+            ['All valid', valid_lon, valid_lat, [[1, 1], [1, 1]]],
+            ['Longitude NaN', nan_lon, valid_lat, [[0, 1], [1, 1]]],
+            ['Longitude fill', fill_lon, valid_lat, [[1, 1], [0, 1]]],
+            ['Latitude NaN', valid_lon, nan_lat, [[1, 0], [1, 1]]],
+            ['Latitude fill', valid_lon, fill_lat, [[1, 1], [1, 0]]],
+            ['Combination', combined_lon, combined_lat, [[0, 0], [0, 0]]]
+        ]
+
+        for description, lon_data, lat_data, expected_mask in test_args:
+            with self.subTest(description):
+                latitudes = Variable(dims=('ni', 'nj'), data=lat_data)
+                longitudes = Variable(dims=('ni', 'nj'), data=lon_data)
+
+                np.testing.assert_array_equal(
+                    get_valid_coordinates_mask(longitudes, latitudes),
+                    expected_mask
+                )
+
+    def test_get_slice_edges(self):
+        """ Ensure the pixel coordinates for exterior points are returned,
+            this should order the elements based on whether the input slice
+            is a row or a column.
+
+        """
+        data_slice = np.array([2, 3, 4, 5, 6, 7, 8, 9])
+        slice_index = 6
+
+        expected_row_results = [(6, 2), (6, 9)]
+        expected_column_results = [(2, 6), (9, 6)]
+
+        test_args = [['Row', True, expected_row_results],
+                     ['Column', False, expected_column_results]]
+
+        for description, is_row, expected_results in test_args:
+            with self.subTest(description):
+                self.assertEqual(
+                    get_slice_edges(data_slice, slice_index, is_row=is_row),
+                    expected_results
+                )
+
+        with self.subTest('Default (to row)'):
+            self.assertEqual(get_slice_edges(data_slice, slice_index),
+                             expected_row_results)
