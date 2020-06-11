@@ -109,8 +109,8 @@ def get_params_from_msg(message, logger):
     try:
         latlon_group, data_group = get_group(input_file)
         file_data = get_input_file_data(input_file, latlon_group)
-        latitudes = file_data.get("latitudes")
-        longitudes = file_data.get("longitudes")
+        latitudes = file_data.get('latitudes')
+        longitudes = file_data.get('longitudes')
         lon_res = file_data.get('lon_res')
         lat_res = file_data.get('lat_res')
     except Exception as err:
@@ -213,22 +213,22 @@ def get_input_file_data(file_name, group):
     """
     with xarray.open_dataset(file_name, decode_cf=True, group=group) as dataset:
         try:
-            latitudes = dataset.coords.variables.get('lat').values
-            longitudes = dataset.coords.variables.get('lon').values
+            latitudes = dataset.coords.variables('lat')
+            longitudes = dataset.coords.variables('lon')
         except:
             variables = dataset.variables
             for variable in dataset.variables:
-                if "lat" in variable:
-                    latitudes = variables[variable].values
-                elif "lon" in variable:
-                    longitudes = variables[variable].values
+                if 'lat' in variable:
+                    latitudes = variables[variable]
+                elif 'lon' in variable:
+                    longitudes = variables[variable]
 
         metadata = dataset.attrs
         lat_res = dataset.attrs.get('geospatial_lat_resolution')
         lon_res = dataset.attrs.get('geospatial_lon_resolution')
 
-    swath_definition = geometry.SwathDefinition(lons=longitudes,
-                                                lats=latitudes)
+    swath_definition = geometry.SwathDefinition(lons=longitudes.values,
+                                                lats=latitudes.values)
     return {'latitudes': latitudes,
             'longitudes': longitudes,
             'metadata': metadata,
