@@ -4,6 +4,6 @@ set -ex
 
 find . | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
 
-docker run --rm sds/swot-reproject-test "$@"
+docker run --rm sds/swot-reproject-test -e ENV=test "$@"
 
 
