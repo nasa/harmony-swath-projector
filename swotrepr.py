@@ -82,12 +82,22 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 # Main program start
 #
 if __name__ == "__main__":
-    PARSER = argparse.ArgumentParser(prog='Reproject', description='Run the Data Services Reprojection Tool')
+    PARSER = argparse.ArgumentParser(
+        prog='Reproject',
+        description='Run the Data Services Reprojection Tool'
+    )
     PARSER.add_argument('--harmony-action',
                         choices=['invoke'],
                         help='The action Harmony needs to perform (currently only "invoke")')
     PARSER.add_argument('--harmony-input',
                         help='The input data for the action provided by Harmony')
+
+    PARSER.add_argument('--harmony-wrap-stdout',
+                        action='store_const',
+                        const=True,
+                        default=True,
+                        help=('Do not wrap STDOUT and STDERR in the Harmony '
+                              'log output format'))
 
     ARGS, _ = PARSER.parse_known_args()
     harmony.run_cli(PARSER, ARGS, HarmonyAdapter)
