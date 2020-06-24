@@ -86,18 +86,10 @@ if __name__ == "__main__":
         prog='Reproject',
         description='Run the Data Services Reprojection Tool'
     )
-    PARSER.add_argument('--harmony-action',
-                        choices=['invoke'],
-                        help='The action Harmony needs to perform (currently only "invoke")')
-    PARSER.add_argument('--harmony-input',
-                        help='The input data for the action provided by Harmony')
-
-    PARSER.add_argument('--harmony-wrap-stdout',
-                        action='store_const',
-                        const=True,
-                        default=True,
-                        help=('Do not wrap STDOUT and STDERR in the Harmony '
-                              'log output format'))
-
+    harmony.setup_cli(PARSER)
     ARGS, _ = PARSER.parse_known_args()
     harmony.run_cli(PARSER, ARGS, HarmonyAdapter)
+    if (harmony.is_harmony_cli(ARGS)):
+        harmony.run_cli(PARSER, ARGS, HarmonyAdapter)
+    else:
+        PARSER.error("Only --harmony CLIs are supported")
