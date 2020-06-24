@@ -89,7 +89,3 @@ if __name__ == "__main__":
     harmony.setup_cli(PARSER)
     ARGS, _ = PARSER.parse_known_args()
     harmony.run_cli(PARSER, ARGS, HarmonyAdapter)
-    if (harmony.is_harmony_cli(ARGS)):
-        harmony.run_cli(PARSER, ARGS, HarmonyAdapter)
-    else:
-        PARSER.error("Only --harmony CLIs are supported")
