@@ -17,4 +17,5 @@ COPY ./test test
 COPY ./PyMods PyMods
 COPY swotrepr.py .
 
-ENTRYPOINT ["conda", "run", "--name", "swotrepr", "/home/test/run"]
+# Configure a container to be executable via the `docker run` command.
+ENTRYPOINT ["/home/test/run"]
