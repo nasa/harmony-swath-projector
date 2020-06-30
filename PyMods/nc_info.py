@@ -25,7 +25,7 @@ class NCInfo:
 
         for children in walktree(self.rootgroup):
             if self.rootgroup.variables:
-                for nvar, var in self.rootgroup.variables.items():
+                for nvar, var in self.rootgroup.variables.items(): # pylint: disable=E1101
                     if 'coordinates' in var.ncattrs():
                         self.vars_with_coords.add(nvar)
                         split_coords = self._extract_coordinates(var.coordinates)
@@ -36,7 +36,7 @@ class NCInfo:
                     else:
                         self.vars_meta.add(nvar)
 
-                for dim in self.rootgroup.dimensions:
+                for dim in self.rootgroup.dimensions: # pylint: disable=E1133
                     self.dims.add(dim)
 
             for child in children:

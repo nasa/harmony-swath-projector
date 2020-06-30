@@ -55,10 +55,10 @@ def create_output(input_file: str, output_file: str, temp_dir: str,
 
         for dataset_file in files:
             logger.info(f'Adding "{dataset_file}" to the output')
-            data = netCDF4.Dataset(os.sep.join([temp_dir, dataset_file]))
+            data = netCDF4.Dataset(os.sep.join([temp_dir, dataset_file])) # pylint: disable=E1101
             set_dimension(data, output_dataset)
 
-            for name, var in data.variables.items():
+            for name, var in data.variables.items(): # pylint: disable=E1101
                 if name not in list(output_dataset.variables.keys()):
                     if name != GDAL_DATASET_NAME:
                         copy_variable(input_dataset, output_dataset, data,
