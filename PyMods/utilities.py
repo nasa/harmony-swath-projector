@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 import re
 
 from xarray.core.dataset import Dataset
@@ -14,7 +14,7 @@ def create_coordinates_key(coordinates: str) -> Tuple[str]:
         Net-CDF4 file.
 
     """
-    return tuple(re.split('\s+|,\s*', coordinates))
+    return tuple(re.split(r'\s+|,\s*', coordinates))
 
 
 def get_variable_values(input_file: Dataset, variable: Variable) -> np.ndarray:
@@ -65,17 +65,14 @@ def get_variable_group_and_name(variable: str) -> Tuple[str, str]:
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
     """ Retrieve the _FillValue attribute for a given variable. If there is no
         _FillValue attribute, return None. The pyresample
-        `get_sample_from_neighbour_info` function will only accept float or int
+        `get_sample_from_neighbour_info` function will only accept numerical
         inputs for `fill_value`. Non-numeric fill values are returned as None.
 
     """
     fill_value = variable.attrs.get('_FillValue')
 
-    if isinstance(fill_value, (np.integer, np.long, int)):
-        fill_value = int(fill_value)
-    elif isinstance(fill_value, (np.floating, float)):
-        fill_value = float(fill_value)
-    else:
+    if not isinstance(fill_value,
+                      (np.integer, np.long, np.floating, int, float)):
         fill_value = None
 
     return fill_value
