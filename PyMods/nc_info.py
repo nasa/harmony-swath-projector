@@ -66,7 +66,7 @@ class NCInfo:
         of separate coordinate dataset names.
 
         """
-        return re.split('\s+|,\s*', coordinates)
+        return re.split(r'\s+|,\s*', coordinates)
 
 
 # Main program start for testing with any input file

@@ -32,7 +32,6 @@ def get_projected_resolution(projection: Proj, longitudes: Variable,
 
     ordered_x, ordered_y = sort_perimeter_points(x_values, y_values)
     projected_area = get_polygon_area(ordered_x, ordered_y)
-    print(type(coordinates_mask))
     absolute_resolution = get_absolute_resolution(
         projected_area,
         coordinates_mask.count() # pylint: disable=E1101
