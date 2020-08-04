@@ -1,19 +1,20 @@
 """
  Data Services Reprojection service for Harmony
 """
+from tempfile import mkdtemp
+from typing import Dict, Tuple
 import argparse
 import functools
+import json
+import logging
 import os
 import re
-from tempfile import mkdtemp
-import logging
-import json
 
-import rasterio
-from rasterio.transform import Affine
-import xarray
 from pyproj import Proj
 from pyresample import geometry
+from rasterio.transform import Affine
+import rasterio
+import xarray
 
 from PyMods import nc_merge
 from PyMods.nc_info import NCInfo
@@ -24,6 +25,7 @@ from PyMods.swotrepr_geometry import (get_extents_from_perimeter,
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
+INTERPOLATION_DEFAULT = 'near'
 
 # The REPR_MODE should probably become a parameter in the call to reproject,
 # with a default value to fall back on.
@@ -31,6 +33,12 @@ REPR_MODE = 'pyresample'  # or 'gdal'
 
 
 def reproject(msg, logger):
+    """ Derive reprojection parameters from the input Harmony message. Then
+        extract listing of science variables and coordinate variables from the
+        source granule. Then reproject all science variables. Finally merge all
+        individual output bands back into a single netCDF-4 file.
+
+    """
     # Set up source and destination files
     param_list = get_params_from_msg(msg, logger)
     temp_dir = mkdtemp()
@@ -79,9 +87,21 @@ def reproject(msg, logger):
 
 
 def get_params_from_msg(message, logger):
-    # TODO: test for incomplete message, consider defaults as None or undefined
+    """ A helper function to parse the input Harmony message and extract
+        required information. If the message is missing parameters, then
+        default values will be used.
+
+    """
+    # TODO: Full refactor, including breaking out separate functions, and
+    #       removing use of `locals()` (also, ensuring all members of the
+    #       output dictionary are actually used, if not removing them).
     crs = rgetattr(message, 'format.crs', CRS_DEFAULT)
-    interpolation = rgetattr(message, 'format.interpolation', 'near')  # near, bilinear, ewa
+    interpolation = rgetattr(message, 'format.interpolation',
+                             INTERPOLATION_DEFAULT)  # near, bilinear, ewa
+
+    if interpolation in [None, '', 'None']:
+        interpolation = INTERPOLATION_DEFAULT
+
     x_extent = rgetattr(message, 'format.scaleExtent.x', None)
     y_extent = rgetattr(message, 'format.scaleExtent.y', None)
     width = rgetattr(message, 'format.width', None)
@@ -180,7 +200,7 @@ def get_params_from_msg(message, logger):
     return locals()
 
 
-def get_group(file_name):
+def get_group(file_name: str) -> Tuple[str, str]:
     dataset = rasterio.open(file_name)
     latlon_group = None
     data_group = None
@@ -203,7 +223,7 @@ def get_group(file_name):
     return latlon_group, data_group
 
 
-def get_input_file_data(file_name, group):
+def get_input_file_data(file_name: str, group: str) -> Dict:
     """Get the input dataset (sea surface temperature) and coordinate
     information. Using the coordinate information derive a swath
     definition.
@@ -237,7 +257,7 @@ def get_input_file_data(file_name, group):
             'lon_res':lon_res}
 
 
-def rgetattr(obj, attr, *args):
+def rgetattr(obj, attr: str, *args):
     """ Recursive get attribute
         Returns attribute from an attribute hierarchy, e.g. a.b.c, if it exists
     """
@@ -250,12 +270,6 @@ def rgetattr(obj, attr, *args):
     # First call takes first two items, thus need [obj] as first item in sequence
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
-
-'''
-class to_object(data):  # treats data as a dictionary
-    def __init__(self, data):
-        self.__dict__ = data
-'''
 
 def to_object(item):
     """ Recursively converts item into object with attributes
@@ -279,7 +293,10 @@ def to_object(item):
 # Main program start for testing
 #
 if __name__ == "__main__":
-    PARSER = argparse.ArgumentParser(prog='Reproject', description='Run the Data Services Reprojection Tool')
+    PARSER = argparse.ArgumentParser(
+        prog='Reproject',
+        description='Run the Data Services Reprojection Tool'
+    )
     PARSER.add_argument('--message',
                         help='The input data for the action provided by Harmony')
 
@@ -293,7 +310,8 @@ if __name__ == "__main__":
     logger = logging.getLogger("SwotRepr")
     syslog = logging.StreamHandler()
     formatter = logging.Formatter(
-            "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s")
+        "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
+    )
     #       "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] [%(user)s] %(message)s")
     syslog.setFormatter(formatter)
     logger.addHandler(syslog)
