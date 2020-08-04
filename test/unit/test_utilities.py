@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import numpy as np
 import xarray
 
-from PyMods.utilities import (create_coordinates_key, get_variable_values,
+from pymods.utilities import (create_coordinates_key, get_variable_values,
                               get_coordinate_variable,
                               get_variable_numeric_fill_value,
                               get_variable_group_and_name)

@@ -4,7 +4,7 @@ import os
 from netCDF4 import Dataset
 from numpy.testing import assert_array_equal
 
-from PyMods.nc_merge import (copy_metadata_variable, copy_time_dimension,
+from pymods.nc_merge import (copy_metadata_variable, copy_time_dimension,
                              get_fill_value_from_attributes)
 from test.test_utils import TestBase
 

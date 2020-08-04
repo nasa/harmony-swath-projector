@@ -5,7 +5,7 @@ import subprocess
 
 import xarray
 
-from PyMods.utilities import get_variable_group_and_name
+from pymods.utilities import get_variable_group_and_name
 
 
 def gdal_resample_all_variables(message_parameters: Dict,

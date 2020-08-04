@@ -16,11 +16,11 @@ from rasterio.transform import Affine
 import rasterio
 import xarray
 
-from PyMods import nc_merge
-from PyMods.nc_info import NCInfo
-from PyMods.interpolation_gdal import gdal_resample_all_variables
-from PyMods.interpolation_pyresample import resample_all_variables
-from PyMods.swotrepr_geometry import (get_extents_from_perimeter,
+from pymods import nc_merge
+from pymods.nc_info import NCInfo
+from pymods.interpolation_gdal import gdal_resample_all_variables
+from pymods.interpolation_pyresample import resample_all_variables
+from pymods.swotrepr_geometry import (get_extents_from_perimeter,
                                       get_projected_resolution)
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html

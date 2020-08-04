@@ -6,7 +6,7 @@ from pyresample.geometry import AreaDefinition
 import numpy as np
 import xarray
 
-from PyMods.interpolation_pyresample import (check_for_valid_interpolation,
+from pymods.interpolation_pyresample import (check_for_valid_interpolation,
                                              EPSILON,
                                              get_swath_definition,
                                              get_target_area,
@@ -30,8 +30,8 @@ class TestInterpolationPyResample(TestBase):
         self.logger = Logger('test')
 
     @patch('xarray.open_dataset')
-    @patch('PyMods.interpolation_pyresample.get_target_area')
-    @patch('PyMods.interpolation_pyresample.resample_variable')
+    @patch('pymods.interpolation_pyresample.get_target_area')
+    @patch('pymods.interpolation_pyresample.resample_variable')
     def test_resample_all_variables(self, mock_resample_variable,
                                     mock_target_area, mock_open_dataset):
         """ Ensure resample_variable is called for each non-coordinate
@@ -67,8 +67,8 @@ class TestInterpolationPyResample(TestBase):
                                                    self.logger)
 
     @patch('xarray.open_dataset')
-    @patch('PyMods.interpolation_pyresample.get_target_area')
-    @patch('PyMods.interpolation_pyresample.resample_variable')
+    @patch('pymods.interpolation_pyresample.get_target_area')
+    @patch('pymods.interpolation_pyresample.resample_variable')
     def test_resample_single_exception(self, mock_resample_variable,
                                        mock_target_area, mock_open_dataset):
         """ Ensure that if a single variable fails reprojection, the remaining
@@ -106,11 +106,12 @@ class TestInterpolationPyResample(TestBase):
                                                    variable_output_path,
                                                    self.logger)
 
-    @patch('PyMods.interpolation_pyresample.pyresample_nearest_neighbour')
-    @patch('PyMods.interpolation_pyresample.pyresample_ewa')
-    @patch('PyMods.interpolation_pyresample.pyresample_ewa_nn')
-    @patch('PyMods.interpolation_pyresample.pyresample_bilinear')
-    def test_resample_variable(self, mock_bilinear, mock_ewa_nn, mock_ewa, mock_nearest):
+    @patch('pymods.interpolation_pyresample.pyresample_nearest_neighbour')
+    @patch('pymods.interpolation_pyresample.pyresample_ewa')
+    @patch('pymods.interpolation_pyresample.pyresample_ewa_nn')
+    @patch('pymods.interpolation_pyresample.pyresample_bilinear')
+    def test_resample_variable(self, mock_bilinear, mock_ewa_nn, mock_ewa,
+                               mock_nearest):
         """ Ensure that for each interpolation method, the correct function is
             called to reproject the variable.
         """
@@ -136,11 +137,11 @@ class TestInterpolationPyResample(TestBase):
                 self.assertEqual(mock_ewa_nn.call_count, ewa_nn_calls)
                 self.assertEqual(mock_nearest.call_count, nearest_calls)
 
-    @patch('PyMods.interpolation_pyresample.write_netcdf')
-    @patch('PyMods.interpolation_pyresample.get_swath_definition')
-    @patch('PyMods.interpolation_pyresample.get_variable_values')
-    @patch('PyMods.interpolation_pyresample.get_sample_from_bil_info')
-    @patch('PyMods.interpolation_pyresample.get_bil_info')
+    @patch('pymods.interpolation_pyresample.write_netcdf')
+    @patch('pymods.interpolation_pyresample.get_swath_definition')
+    @patch('pymods.interpolation_pyresample.get_variable_values')
+    @patch('pymods.interpolation_pyresample.get_sample_from_bil_info')
+    @patch('pymods.interpolation_pyresample.get_bil_info')
     def test_resample_bilinear(self, mock_get_bil_info, mock_get_sample,
                                mock_get_values, mock_get_swath,
                                mock_write_netcdf):
@@ -213,11 +214,11 @@ class TestInterpolationPyResample(TestBase):
                                                       projection,
                                                       'grid_transform value')
 
-    @patch('PyMods.interpolation_pyresample.write_netcdf')
-    @patch('PyMods.interpolation_pyresample.get_swath_definition')
-    @patch('PyMods.interpolation_pyresample.get_variable_values')
-    @patch('PyMods.interpolation_pyresample.fornav')
-    @patch('PyMods.interpolation_pyresample.ll2cr')
+    @patch('pymods.interpolation_pyresample.write_netcdf')
+    @patch('pymods.interpolation_pyresample.get_swath_definition')
+    @patch('pymods.interpolation_pyresample.get_variable_values')
+    @patch('pymods.interpolation_pyresample.fornav')
+    @patch('pymods.interpolation_pyresample.ll2cr')
     def test_resample_ewa(self, mock_ll2cr, mock_fornav, mock_get_values,
                           mock_get_swath, mock_write_netcdf):
         """ EWA interpolation should call both ll2cr and fornav if there are
@@ -269,11 +270,11 @@ class TestInterpolationPyResample(TestBase):
                                                       projection,
                                                       'grid_transform value')
 
-    @patch('PyMods.interpolation_pyresample.write_netcdf')
-    @patch('PyMods.interpolation_pyresample.get_swath_definition')
-    @patch('PyMods.interpolation_pyresample.get_variable_values')
-    @patch('PyMods.interpolation_pyresample.fornav')
-    @patch('PyMods.interpolation_pyresample.ll2cr')
+    @patch('pymods.interpolation_pyresample.write_netcdf')
+    @patch('pymods.interpolation_pyresample.get_swath_definition')
+    @patch('pymods.interpolation_pyresample.get_variable_values')
+    @patch('pymods.interpolation_pyresample.fornav')
+    @patch('pymods.interpolation_pyresample.ll2cr')
     def test_resample_ewa_nn(self, mock_ll2cr, mock_fornav, mock_get_values,
                           mock_get_swath, mock_write_netcdf):
         """ EWA-NN interpolation should call both ll2cr and fornav if there are
@@ -326,11 +327,11 @@ class TestInterpolationPyResample(TestBase):
                                                       projection,
                                                       'grid_transform value')
 
-    @patch('PyMods.interpolation_pyresample.write_netcdf')
-    @patch('PyMods.interpolation_pyresample.get_swath_definition')
-    @patch('PyMods.interpolation_pyresample.get_variable_values')
-    @patch('PyMods.interpolation_pyresample.get_sample_from_neighbour_info')
-    @patch('PyMods.interpolation_pyresample.get_neighbour_info')
+    @patch('pymods.interpolation_pyresample.write_netcdf')
+    @patch('pymods.interpolation_pyresample.get_swath_definition')
+    @patch('pymods.interpolation_pyresample.get_variable_values')
+    @patch('pymods.interpolation_pyresample.get_sample_from_neighbour_info')
+    @patch('pymods.interpolation_pyresample.get_neighbour_info')
     def test_resample_nearest(self, mock_get_info, mock_get_sample,
                               mock_get_values, mock_get_swath,
                               mock_write_netcdf):

@@ -5,7 +5,7 @@ from pyproj import Proj
 from xarray import Variable
 import numpy as np
 
-from PyMods.swotrepr_geometry import (clockwise_point_sort,
+from pymods.swotrepr_geometry import (clockwise_point_sort,
                                       get_absolute_resolution,
                                       get_extents_from_perimeter,
                                       get_perimeter_coordinates,
@@ -192,7 +192,7 @@ class TestSwotReprGeometry(TestBase):
                 self.assertEqual(ordered_x, expected_x)
                 self.assertEqual(ordered_y, expected_y)
 
-    @patch('PyMods.swotrepr_geometry.get_variable_numeric_fill_value')
+    @patch('pymods.swotrepr_geometry.get_variable_numeric_fill_value')
     def test_get_valid_coordinates_mask(self, mock_get_fill_value):
         """ Ensure all logical conditions are respected. """
         fill_value = -9999.0

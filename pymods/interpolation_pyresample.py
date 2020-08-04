@@ -16,7 +16,7 @@ import numpy as np
 import rasterio
 import xarray
 
-from PyMods.utilities import (create_coordinates_key, get_coordinate_variable,
+from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
                               get_variable_group_and_name,
                               get_variable_numeric_fill_value,
                               get_variable_values)

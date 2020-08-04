@@ -2,8 +2,8 @@ import os
 
 import netCDF4
 
-from PyMods.nc_info import NCInfo
-from PyMods.nc_merge import (create_output, get_data_type, get_dimensions,
+from pymods.nc_info import NCInfo
+from pymods.nc_merge import (create_output, get_data_type, get_dimensions,
                              read_attrs)
 from test.test_utils import TestBase
 
