@@ -1,4 +1,5 @@
 from typing import Optional, Tuple, Union
+import os
 import re
 
 from xarray.core.dataset import Dataset
@@ -76,3 +77,19 @@ def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
         fill_value = None
 
     return fill_value
+
+
+def get_variable_file_path(temp_dir: str, variable_name: str,
+                           extension: str) -> str:
+    """ Create a file name for the variable, that should be unique, even if
+        there are other variables of the same name in a different group, e.g.:
+
+        /gt1r/land_segments/dem_h
+        /gt1l/land_segments/dem_h
+
+        Leading forward slashes will be stripped from the variable name, and
+        those within the string are replaced with underscores.
+
+    """
+    converted_variable_name = variable_name.lstrip('/').replace('/', '_')
+    return os.sep.join([temp_dir, f'{converted_variable_name}{extension}'])
