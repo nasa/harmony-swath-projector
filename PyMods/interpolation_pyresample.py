@@ -6,7 +6,6 @@ from logging import Logger
 from typing import Dict, List, Tuple
 import os
 
-from functools import partial
 from pyproj import Proj
 from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
