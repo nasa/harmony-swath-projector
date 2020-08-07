@@ -59,7 +59,7 @@ def gdal_resample(parameters: Dict, variable: str, output_file: str,
     gdal_cmd = ['gdalwarp', '-geoloc', '-t_srs', parameters.get('crs')]
     if (
             parameters.get('interpolation') and
-            parameters.get('interpolation') != 'ewa'
+            parameters.get('interpolation') not in ['ewa', 'ewa-nn']
     ):
         gdal_cmd.extend(['-r', parameters.get('interpolation')])
         logger.info(f'Selected interpolation: {parameters.get("interpolation")}')

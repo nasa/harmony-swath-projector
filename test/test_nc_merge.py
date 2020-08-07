@@ -12,9 +12,9 @@ class TestNCMerge(TestBase):
 
     @classmethod
     def setUpClass(cls):
-        cls.input_file = '/home/test/data/VNL2_test_data.nc'
-        cls.tmp_dir = '/home/test/data/test_tmp/'
-        cls.output_file = '/home/test/data/VNL2_test_data_repr.nc'
+        cls.input_file = 'test/data/VNL2_test_data.nc'
+        cls.tmp_dir = 'test/data/test_tmp/'
+        cls.output_file = 'test/data/VNL2_test_data_repr.nc'
         create_output(cls.input_file, cls.output_file, cls.tmp_dir)
 
     @classmethod

@@ -19,10 +19,10 @@ class TestNominalReproject(TestBase):
     def test_single_band_input(self, cleanup, completed_with_local_file):
         """Nominal (successful) reprojection"""
         test_data = {
-            'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
+            'granules': [{'local_filename': 'test/data/VNL2_oneBand.nc'}],
             'format': {
                 'crs': 'EPSG:32603',
-                'interpolation': 'near',
+                'interpolation': 'ewa-nn',
                 'scaleExtent': {'x': {'min': 0, 'max': 1500000},
                                 'y': {'min': 2500000, 'max': 3300000}}
             }

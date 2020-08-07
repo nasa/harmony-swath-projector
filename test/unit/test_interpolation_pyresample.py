@@ -12,6 +12,7 @@ from PyMods.interpolation_pyresample import (check_for_valid_interpolation,
                                              get_target_area,
                                              pyresample_bilinear,
                                              pyresample_ewa,
+                                             pyresample_ewa_nn,
                                              pyresample_nearest_neighbour,
                                              resample_all_variables,
                                              resample_variable,
@@ -44,7 +45,7 @@ class TestInterpolationPyResample(TestBase):
         fake_target_area = 'a target area'
         mock_target_area.return_value = fake_target_area
 
-        parameters = {'interpolation': 'near'}
+        parameters = {'interpolation': 'ewa-nn'}
         parameters.update(self.message_parameters)
 
         output_variables = resample_all_variables(parameters,
@@ -82,7 +83,7 @@ class TestInterpolationPyResample(TestBase):
 
         mock_resample_variable.side_effect = [KeyError('random'), None, None, None]
 
-        parameters = {'interpolation': 'near'}
+        parameters = {'interpolation': 'ewa-nn'}
         parameters.update(self.message_parameters)
 
         output_variables = resample_all_variables(parameters,
@@ -107,18 +108,22 @@ class TestInterpolationPyResample(TestBase):
 
     @patch('PyMods.interpolation_pyresample.pyresample_nearest_neighbour')
     @patch('PyMods.interpolation_pyresample.pyresample_ewa')
+    @patch('PyMods.interpolation_pyresample.pyresample_ewa_nn')
     @patch('PyMods.interpolation_pyresample.pyresample_bilinear')
-    def test_resample_variable(self, mock_bilinear, mock_ewa, mock_nearest):
+    def test_resample_variable(self, mock_bilinear, mock_ewa_nn, mock_ewa, mock_nearest):
         """ Ensure that for each interpolation method, the correct function is
             called to reproject the variable.
-
         """
-        test_args = [['bilinear', 1, 0, 0], ['ewa', 0, 1, 0], ['near', 0, 0, 1]]
+        test_args = [['bilinear', 1, 0, 0, 0],
+                     ['ewa', 0, 1, 0, 0],
+                     ['ewa-nn', 0, 0, 1, 0],
+                     ['near', 0, 0, 0, 1]]
 
-        for interpolation, bilinear_calls, ewa_calls, nearest_calls in test_args:
+        for interpolation, bilinear_calls, ewa_calls, ewa_nn_calls, nearest_calls in test_args:
             with self.subTest(interpolation):
                 mock_bilinear.reset_mock()
                 mock_ewa.reset_mock()
+                mock_ewa_nn.reset_mock()
                 mock_nearest.reset_mock()
 
                 parameters = {'interpolation': interpolation}
@@ -128,6 +133,7 @@ class TestInterpolationPyResample(TestBase):
 
                 self.assertEqual(mock_bilinear.call_count, bilinear_calls)
                 self.assertEqual(mock_ewa.call_count, ewa_calls)
+                self.assertEqual(mock_ewa_nn.call_count, ewa_nn_calls)
                 self.assertEqual(mock_nearest.call_count, nearest_calls)
 
     @patch('PyMods.interpolation_pyresample.write_netcdf')
@@ -216,9 +222,8 @@ class TestInterpolationPyResample(TestBase):
                           mock_get_swath, mock_write_netcdf):
         """ EWA interpolation should call both ll2cr and fornav if there are
             no matching entries for the coordinates in the reprojection
-            information. If there is an entry, then only fornav  should be
+            information. If there is an entry, then only fornav should be
             called.
-
         """
         mock_ll2cr.return_value = ['swath_points_in_grid', 'columns', 'rows']
         mock_fornav.return_value = ('', 'results')
@@ -239,7 +244,7 @@ class TestInterpolationPyResample(TestBase):
 
             mock_ll2cr.assert_called_once_with('swath', target_area)
             mock_fornav.assert_called_once_with('columns', 'rows', target_area,
-                                                mock_values)
+                                                mock_values, maximum_weight_mode=False)
             mock_write_netcdf.assert_called_once_with('path/to/output',
                                                       'results',
                                                       projection,
@@ -258,7 +263,64 @@ class TestInterpolationPyResample(TestBase):
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
-                                                target_area, mock_values)
+                                                target_area, mock_values, maximum_weight_mode=False)
+            mock_write_netcdf.assert_called_once_with('path/to/output',
+                                                      'results',
+                                                      projection,
+                                                      'grid_transform value')
+
+    @patch('PyMods.interpolation_pyresample.write_netcdf')
+    @patch('PyMods.interpolation_pyresample.get_swath_definition')
+    @patch('PyMods.interpolation_pyresample.get_variable_values')
+    @patch('PyMods.interpolation_pyresample.fornav')
+    @patch('PyMods.interpolation_pyresample.ll2cr')
+    def test_resample_ewa_nn(self, mock_ll2cr, mock_fornav, mock_get_values,
+                          mock_get_swath, mock_write_netcdf):
+        """ EWA-NN interpolation should call both ll2cr and fornav if there are
+                    no matching entries for the coordinates in the reprojection
+                    information. If there is an entry, then only fornav should be
+                    called.
+        """
+
+        mock_ll2cr.return_value = ['swath_points_in_grid', 'columns', 'rows']
+        mock_fornav.return_value = ('', 'results')
+        mock_get_swath.return_value = 'swath'
+        mock_values = np.ones((2, 3))
+        mock_get_values.return_value = mock_values
+
+        projection = Proj('+proj=longlat +ellps=WGS84')
+
+        message_parameters = {'input_file': 'test/data/africa.nc',
+                              'projection': projection,
+                              'grid_transform': 'grid_transform value'}
+        target_area = Mock(spec=AreaDefinition)
+
+        with self.subTest('No pre-existing EWA-NN information'):
+            pyresample_ewa_nn(message_parameters, 'alpha_var', {}, target_area,
+                           'path/to/output', self.logger)
+
+            mock_ll2cr.assert_called_once_with('swath', target_area)
+            mock_fornav.assert_called_once_with('columns', 'rows', target_area,
+                                                mock_values, maximum_weight_mode=True)
+            mock_write_netcdf.assert_called_once_with('path/to/output',
+                                                      'results',
+                                                      projection,
+                                                      'grid_transform value')
+
+        with self.subTest('Pre-existing EWA-NN information'):
+            mock_ll2cr.reset_mock()
+            mock_fornav.reset_mock()
+            mock_write_netcdf.reset_mock()
+
+            ewa_nn_information = {('lon', 'lat'): {'columns': 'old_columns',
+                                                'rows': 'old_rows'}}
+
+            pyresample_ewa_nn(message_parameters, 'alpha_var', ewa_nn_information,
+                           target_area, 'path/to/output', self.logger)
+
+            mock_ll2cr.assert_not_called()
+            mock_fornav.assert_called_once_with('old_columns', 'old_rows',
+                                                target_area, mock_values, maximum_weight_mode=True)
             mock_write_netcdf.assert_called_once_with('path/to/output',
                                                       'results',
                                                       projection,
@@ -347,7 +409,7 @@ class TestInterpolationPyResample(TestBase):
 
     def test_check_for_valid_interpolation(self):
         """ Ensure all valid interpolations don't raise an exception. """
-        interpolations = ['bilinear', 'ewa', 'near']
+        interpolations = ['bilinear', 'ewa', 'ewa-nn', 'near']
 
         for interpolation in interpolations:
             with self.subTest(interpolation):
