@@ -17,7 +17,7 @@ class TestNominalReproject(TestBase):
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_single_band_input(self, cleanup, completed_with_local_file):
         """Nominal (successful) reprojection for africa.nc"""
-        test_data = {'granules': [{'local_filename': '/home/test/data/africa.nc'}],
+        test_data = {'granules': [{'local_filename': 'test/data/africa.nc'}],
                      'format': {'crs': 'EPSG:4326',
                                 'interpolation': 'bilinear',
                                 'scaleExtent': {'x': {'min': -20, 'max': 60},

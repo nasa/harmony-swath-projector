@@ -144,20 +144,25 @@ def pyresample_bilinear(message_parameters: Dict, full_variable: str,
                  f'{variable_output_path}')
 
 
-def pyresample_ewa(message_parameters: Dict, full_variable: str,
-                   reprojection_information: Dict, target_area: AreaDefinition,
-                   variable_output_path: str, logger: Logger) -> None:
+def pyresample_ewa_helper(message_parameters: Dict, full_variable: str,
+                          reprojection_information: Dict, target_area: AreaDefinition,
+                          variable_output_path: str, logger: Logger,
+                          maximum_weight_mode: bool) -> None:
     """ Use Elliptical Weighted Average (EWA) interpolation to produce the
         target output. The `pyresample` EWA algorithm assumes that the data are
         presented one scan row at a time in the input array. If the same
         source coordinates have been processed for a previous variable, use
         applicable information (from ll2cr) rather than recreating it.
 
+        If maximum_weight_mode is False, a weighted average of all swath cells
+        that map to a particular grid cell is used. If True, the swath cell having
+        the maximum weight of all swath cells that map to a particular grid cell is used.
+
         Once the variable has been interpolated, output to a new NetCDF file,
         which will be merged with others after all variables have been
         interpolated.
-
     """
+
     variable_group, variable_name = get_variable_group_and_name(full_variable)
     dataset = xarray.open_dataset(message_parameters['input_file'],
                                   decode_cf=False,
@@ -184,7 +189,8 @@ def pyresample_ewa(message_parameters: Dict, full_variable: str,
 
     # This call falls back on the EWA rows_per_scan default of total input rows
     _, results = fornav(ewa_information['columns'], ewa_information['rows'],
-                        target_area, variable_values)
+                        target_area, variable_values,
+                        maximum_weight_mode=maximum_weight_mode)
 
     write_netcdf(variable_output_path,
                  results,
@@ -193,6 +199,34 @@ def pyresample_ewa(message_parameters: Dict, full_variable: str,
 
     logger.debug(f'Saved {variable_name} output to temporary file: '
                  f'{variable_output_path}')
+
+
+def pyresample_ewa(message_parameters: Dict, full_variable: str,
+                   reprojection_information: Dict, target_area: AreaDefinition,
+                   variable_output_path: str, logger: Logger) -> None:
+    """ Use Elliptical Weighted Average (EWA) interpolation to produce the
+            target output. A weighted average of all swath cells that map
+            to a particular grid cell is used.
+    """
+
+    pyresample_ewa_helper(message_parameters, full_variable,
+                          reprojection_information, target_area,
+                          variable_output_path, logger,
+                          maximum_weight_mode=False)
+
+
+def pyresample_ewa_nn(message_parameters: Dict, full_variable: str,
+                      reprojection_information: Dict, target_area: AreaDefinition,
+                      variable_output_path: str, logger: Logger) -> None:
+    """ Use Elliptical Weighted Average (EWA) interpolation to produce the
+            target output. The swath cell having the maximum weight of all
+            swath cells that map to a particular grid cell is used.
+        """
+
+    pyresample_ewa_helper(message_parameters, full_variable,
+                          reprojection_information, target_area,
+                          variable_output_path, logger,
+                          maximum_weight_mode=True)
 
 
 def pyresample_nearest_neighbour(message_parameters: Dict,
@@ -279,6 +313,7 @@ def get_resampling_functions() -> Dict:
     """Return a mapping of interpolation options to resampling functions."""
     return {'bilinear': pyresample_bilinear,
             'ewa': pyresample_ewa,
+            'ewa-nn': pyresample_ewa_nn,
             'near': pyresample_nearest_neighbour}
 
 

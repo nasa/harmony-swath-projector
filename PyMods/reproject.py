@@ -25,11 +25,12 @@ from PyMods.swotrepr_geometry import (get_extents_from_perimeter,
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
-INTERPOLATION_DEFAULT = 'near'
-
-# The REPR_MODE should probably become a parameter in the call to reproject,
-# with a default value to fall back on.
 REPR_MODE = 'pyresample'  # or 'gdal'
+
+if REPR_MODE == 'pyresample':
+    INTERPOLATION_DEFAULT = 'ewa-nn'
+else:
+    INTERPOLATION_DEFAULT = 'near'
 
 
 def reproject(msg, logger):

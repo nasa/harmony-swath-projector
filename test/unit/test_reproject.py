@@ -28,10 +28,10 @@ class TestReproject(TestBase):
     def setUpClass(cls):
         """ Class properties that only need to be set once. """
         cls.logger = Logger('Reproject test')
-        cls.granule = '/home/test/data/africa.nc'
+        cls.granule = 'test/data/africa.nc'
         cls.granules = [{'local_filename': cls.granule}]
         cls.file_data = get_input_file_data(cls.granule, '')
-        cls.default_interpolation = 'near'
+        cls.default_interpolation = 'ewa-nn'
         cls.height = 1200
         cls.width = 1200
         cls.x_extent = {'min': -180.0, 'max': 180.0}
@@ -61,9 +61,9 @@ class TestReproject(TestBase):
         """
         test_args = [['No interpolation', {}, self.default_interpolation],
                      ['Non default', {'interpolation': 'ewa'}, 'ewa'],
-                     ['None interpolation', {'interpolation': None}, 'near'],
-                     ['String None', {'interpolation': 'None'}, 'near'],
-                     ['Empty string', {'interpolation': ''}, 'near']]
+                     ['None interpolation', {'interpolation': None}, 'ewa-nn'],
+                     ['String None', {'interpolation': 'None'}, 'ewa-nn'],
+                     ['Empty string', {'interpolation': ''}, 'ewa-nn']]
 
         for description, format_attribute, expected_interpolation in test_args:
             with self.subTest(description):

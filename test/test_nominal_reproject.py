@@ -20,7 +20,7 @@ class TestNominalReproject(TestBase):
         """Nominal (successful) reprojection"""
         test_data = {
             'granules' : [{
-                'local_filename' : '/home/test/data/VNL2_oneBand.nc'
+                'local_filename' : 'test/data/VNL2_oneBand.nc'
             }],
             'format': {'height': 500, 'width': 1000}
         }

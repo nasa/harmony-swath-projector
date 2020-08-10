@@ -30,7 +30,7 @@ class TestGDALReproject(TestBase):
             with self.subTest(f'gdalwarp "{interpolation}" interpolation.'):
                 test_data = {
                     'granules': [{
-                        'local_filename': '/home/test/data/VOL2PSST_2017.nc'
+                        'local_filename': 'test/data/VOL2PSST_2017.nc'
                     }],
                     'format': {'crs': 'EPSG:32603',
                                'interpolation': interpolation,
