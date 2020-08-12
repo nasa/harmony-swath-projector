@@ -16,7 +16,8 @@ import numpy as np
 import rasterio
 import xarray
 
-from PyMods.utilities import (create_coordinates_key, get_coordinate_variable,
+from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
+                              get_variable_file_path,
                               get_variable_group_and_name,
                               get_variable_numeric_fill_value,
                               get_variable_values)
@@ -48,11 +49,9 @@ def resample_all_variables(message_parameters: Dict,
 
     for variable in science_variables:
         try:
-            _, variable_name = get_variable_group_and_name(variable)
-
-            variable_output_path = os.sep.join([
-                temp_directory, f'{variable_name}{output_extension}'
-            ])
+            variable_output_path = get_variable_file_path(temp_directory,
+                                                          variable,
+                                                          output_extension)
 
             logger.info(f'Reprojecting subdataset "{variable}"')
             logger.info(f'Reprojected output: "{variable_output_path}"')
@@ -61,11 +60,11 @@ def resample_all_variables(message_parameters: Dict,
                               reprojection_information, target_area,
                               variable_output_path, logger)
 
-            output_variables.append(variable_name)
+            output_variables.append(variable)
         except Exception as error:
             # Assume for now variable cannot be reprojected. TBD add checks for
             # other error conditions.
-            logger.error(f'Cannot reproject {variable_name}')
+            logger.error(f'Cannot reproject {variable}')
             logger.error(error)
 
     return output_variables

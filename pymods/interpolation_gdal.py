@@ -3,9 +3,7 @@ from typing import Dict, List
 import os
 import subprocess
 
-import xarray
-
-from PyMods.utilities import get_variable_group_and_name
+from pymods.utilities import get_variable_file_path
 
 
 def gdal_resample_all_variables(message_parameters: Dict,
@@ -26,22 +24,20 @@ def gdal_resample_all_variables(message_parameters: Dict,
 
     for variable in science_variables:
         try:
-            _, variable_name = get_variable_group_and_name(variable)
+            variable_output_path = get_variable_file_path(temp_directory,
+                                                          variable,
+                                                          output_extension)
 
-            variable_output_path = os.sep.join([
-                temp_directory, f'{variable_name}{output_extension}'
-            ])
-
-            logger.info(f'Reprojecting subdataset "{variable_name}"')
+            logger.info(f'Reprojecting subdataset "{variable}"')
             logger.info(f'Reprojected output "{variable_output_path}"')
 
             gdal_resample(message_parameters, variable, variable_output_path, logger)
 
-            output_variables.append(variable_name)
+            output_variables.append(variable)
         except Exception as err:
             # Assume for now variable cannot be reprojected. TBD add checks for
             # other error conditions.
-            logger.info(f'Cannot reproject {variable_name}')
+            logger.info(f'Cannot reproject {variable}')
             logger.info(err)
 
     return output_variables

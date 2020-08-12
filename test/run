@@ -19,7 +19,7 @@ fi
 
 # Run pylint
 #
-pylint PyMods swotrepr.py --disable=E0401 --extension-pkg-whitelist=netCDF4
+pylint pymods swotrepr.py --disable=E0401 --extension-pkg-whitelist=netCDF4
 RESULT=$?
 RESULT=$((3 & $RESULT))
 if [ "$RESULT" -ne "0" ]; then

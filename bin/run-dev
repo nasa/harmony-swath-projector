@@ -20,7 +20,7 @@ if [ ! -z "$old" ]; then
 fi
 
 
-# Build the image with updated swotrepr.py, PyMods and test directories
+# Build the image with updated swotrepr.py, pymods and test directories
 #
 docker build -t ${image}:${tag} --file bin/dev-Dockerfile .
 

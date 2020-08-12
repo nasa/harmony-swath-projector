@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 import xarray
 
-from PyMods.interpolation_gdal import (create_gdal_variable_name,
+from pymods.interpolation_gdal import (create_gdal_variable_name,
                                        gdal_resample_all_variables,
                                        gdal_resample)
 from test.test_utils import TestBase
@@ -26,7 +26,7 @@ class TestInterpolationGdal(TestBase):
         self.basic_command = ['gdalwarp', '-geoloc', '-t_srs', 'EPSG:4326',
                               self.variable, self.output_file]
 
-    @patch('PyMods.interpolation_gdal.gdal_resample')
+    @patch('pymods.interpolation_gdal.gdal_resample')
     def test_gdal_resample_all_variables(self, mock_gdal_resample):
         """ Ensure gdal_resample is called for each non-coordinate variable,
             and those variables are all included in the list of outputs.
@@ -47,7 +47,7 @@ class TestInterpolationGdal(TestBase):
                                                variable_output_path,
                                                self.logger)
 
-    @patch('PyMods.interpolation_gdal.gdal_resample')
+    @patch('pymods.interpolation_gdal.gdal_resample')
     def test_gdal_resample_single_exception(self, mock_gdal_resample):
         """ Ensure that if a single variable fails reprojection, the remaining
             variables will still be reprojected.

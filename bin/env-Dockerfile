@@ -5,7 +5,7 @@
 # This Dockerfile will create a base image containing all the Conda and Pip
 # requirements for SwotRepr.
 #
-# This Dockerfile does not copy the PyMods or the test directory, these will
+# This Dockerfile does not copy the pymods or the test directory, these will
 # be copied when the image is run as a container, to allow more rapid
 # development iteration.
 #
@@ -15,15 +15,13 @@ FROM continuumio/miniconda3
 WORKDIR "/home"
 
 # Bundle app source
-# COPY ./PyMods Pymods
-# COPY swotrepr.py .
 COPY conda_requirements.txt .
 COPY pip_requirements.txt .
 COPY test/pip_test_requirements.txt .
 
 # Create Conda environment
 # --channel conda-forge
-RUN conda create --name swotrepr --file conda_requirements.txt python=3.7 \
+RUN conda create --name swotrepr --file conda_requirements.txt python=3.7 -q \
 	--channel conda-forge \
 	--channel defaults
 

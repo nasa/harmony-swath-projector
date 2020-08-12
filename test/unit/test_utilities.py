@@ -3,8 +3,9 @@ from unittest.mock import Mock
 import numpy as np
 import xarray
 
-from PyMods.utilities import (create_coordinates_key, get_variable_values,
+from pymods.utilities import (create_coordinates_key, get_variable_values,
                               get_coordinate_variable,
+                              get_variable_file_path,
                               get_variable_numeric_fill_value,
                               get_variable_group_and_name)
 from test.test_utils import TestBase
@@ -133,3 +134,23 @@ class TestUtilities(TestBase):
             variable.attrs.get.return_value = None
             self.assertEqual(get_variable_numeric_fill_value(variable),
                              expected_output)
+
+    def test_get_variable_file_path(self):
+        """ Ensure that a file path is correctly constructed from a variable
+            name. This should also handle a variable within a group, not just
+            at the root level of the dataset.
+
+        """
+        temporary_directory = '/tmp_dir'
+        file_extension = '.nc'
+
+        test_args = [['Root variable', 'var_one', '/tmp_dir/var_one.nc'],
+                     ['Nested variable', '/group/var_two',
+                      '/tmp_dir/group_var_two.nc']]
+
+        for description, variable_name, expected_path in test_args:
+            with self.subTest(description):
+                variable_path = get_variable_file_path(temporary_directory,
+                                                       variable_name,
+                                                       file_extension)
+            self.assertEqual(variable_path, expected_path)

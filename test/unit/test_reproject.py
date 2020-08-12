@@ -6,7 +6,7 @@ from numpy.testing import assert_array_equal
 from pyproj import Proj
 from xarray import Variable
 
-from PyMods.reproject import (CRS_DEFAULT, get_input_file_data,
+from pymods.reproject import (CRS_DEFAULT, get_input_file_data,
                               get_params_from_msg, rgetattr)
 from swotrepr import HarmonyAdapter
 from test.test_utils import TestBase
@@ -135,7 +135,7 @@ class TestReproject(TestBase):
                     get_params_from_msg(message, self.logger)
                     self.assertTrue('Missing' in str(exception))
 
-    @patch('PyMods.reproject.REPR_MODE', 'gdal')
+    @patch('pymods.reproject.REPR_MODE', 'gdal')
     def test_get_params_from_msg_gdal(self):
         """ Ensure that default parameters are set, when things are largely
             unspecified for resampling to use gdalwarp.
@@ -171,9 +171,9 @@ class TestReproject(TestBase):
             parameters = get_params_from_msg(message, self.logger)
             self.assert_parameters_equal(parameters, expected_parameters)
 
-    @patch('PyMods.reproject.get_projected_resolution')
-    @patch('PyMods.reproject.get_extents_from_perimeter')
-    @patch('PyMods.reproject.REPR_MODE', 'pyresample')
+    @patch('pymods.reproject.get_projected_resolution')
+    @patch('pymods.reproject.get_extents_from_perimeter')
+    @patch('pymods.reproject.REPR_MODE', 'pyresample')
     def test_get_params_from_msg_pyresample(self, mock_get_extents,
                                             mock_get_resolution):
         """ Ensure that default parameters are set, when things are largely

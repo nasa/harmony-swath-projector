@@ -2,9 +2,9 @@ import os
 
 import netCDF4
 
-from PyMods.nc_info import NCInfo
-from PyMods.nc_merge import (create_output, get_data_type, get_dimensions,
-                             read_attrs)
+from pymods.exceptions import MissingReprojectedDataError
+from pymods.nc_info import NCInfo
+from pymods.nc_merge import create_output, get_dimensions, read_attrs
 from test.test_utils import TestBase
 
 
@@ -15,7 +15,11 @@ class TestNCMerge(TestBase):
         cls.input_file = 'test/data/VNL2_test_data.nc'
         cls.tmp_dir = 'test/data/test_tmp/'
         cls.output_file = 'test/data/VNL2_test_data_repr.nc'
-        create_output(cls.input_file, cls.output_file, cls.tmp_dir)
+        cls.science_variables = {'brightness_temperature_4um',
+                                 'satellite_zenith_angle',
+                                 'sea_surface_temperature', 'wind_speed'}
+        create_output(cls.input_file, cls.output_file, cls.tmp_dir,
+                      cls.science_variables)
 
     @classmethod
     def tearDownClass(cls):
@@ -24,10 +28,10 @@ class TestNCMerge(TestBase):
 
     def test_output_has_all_variables(self):
         """ Output file has all expected varaiables from the input file. """
-        num_of_proj_files = len(os.listdir(self.tmp_dir))
         output_info = NCInfo(self.output_file)
         output_science_variables = output_info.get_science_variables()
-        self.assertEqual(len(output_science_variables), num_of_proj_files)
+        self.assertEqual(len(output_science_variables),
+                         len(self.science_variables))
 
         # Output also has a CRS variable, and three dimensions:
         self.assertEqual(output_info.ancillary_data, {'latitude_longitude'})
@@ -78,6 +82,21 @@ class TestNCMerge(TestBase):
         test_variable = 'sea_surface_temperature'
         in_dataset = netCDF4.Dataset(self.input_file)
         out_dataset = netCDF4.Dataset(self.output_file)
-        input_data_type = get_data_type(in_dataset, test_variable)
-        output_data_type = get_data_type(out_dataset, test_variable)
+        input_data_type = in_dataset[test_variable].datatype
+        output_data_type = out_dataset[test_variable].datatype
         self.assertEqual(input_data_type, output_data_type, "Should be equal")
+
+    def test_missing_file_raises_error(self):
+        """ If a science variable should be included in the output, but there
+            is no associated output file, an exception should be raised.
+
+        """
+        test_variables = {'missing_variable'}
+        temporary_output_file = 'test/data/unit_test.nc4'
+
+        with self.assertRaises(MissingReprojectedDataError):
+            create_output(self.input_file, temporary_output_file, self.tmp_dir,
+                          test_variables)
+
+        if os.path.exists(temporary_output_file):
+            os.remove(temporary_output_file)

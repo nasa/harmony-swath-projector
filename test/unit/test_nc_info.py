@@ -1,4 +1,4 @@
-from PyMods.nc_info import NCInfo
+from pymods.nc_info import NCInfo
 from test.test_utils import TestBase
 
 

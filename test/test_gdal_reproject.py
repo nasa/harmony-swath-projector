@@ -13,10 +13,10 @@ from test.test_utils import contains, TestBase
 class TestGDALReproject(TestBase):
     """A suite of tests to test SwotRepr, using GDAL and the valid input
     interpolation options. These tests will enforce REPR_MODE = 'gdal',
-    regardless of the actual value of REPR_MODE set in PyMods.reproject.py
+    regardless of the actual value of REPR_MODE set in pymods.reproject.py
 
     """
-    @patch('PyMods.reproject.REPR_MODE', 'gdal')
+    @patch('pymods.reproject.REPR_MODE', 'gdal')
     @patch.object(BaseHarmonyAdapter, 'completed_with_local_file')
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_gdal_interpolation(self, cleanup, completed_with_local_file):

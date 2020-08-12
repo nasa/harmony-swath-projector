@@ -8,13 +8,13 @@ FROM continuumio/miniconda3
 WORKDIR "/home"
 
 # Bundle app source
-COPY ./PyMods PyMods
+COPY ./pymods pymods
 COPY swotrepr.py .
 COPY conda_requirements.txt .
 COPY pip_requirements.txt .
 
 # Create Conda environment
-RUN conda create --name swotrepr --file conda_requirements.txt python=3.7 \
+RUN conda create --name swotrepr --file conda_requirements.txt python=3.7 -q \
 	--channel conda-forge \
 	--channel defaults
 

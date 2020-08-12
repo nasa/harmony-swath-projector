@@ -10,7 +10,7 @@ from pyproj import Proj
 from xarray import Variable
 import numpy as np
 
-from PyMods.utilities import get_variable_numeric_fill_value
+from pymods.utilities import get_variable_numeric_fill_value
 
 
 def get_projected_resolution(projection: Proj, longitudes: Variable,
