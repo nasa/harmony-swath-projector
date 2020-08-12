@@ -2,6 +2,7 @@ import os
 
 import netCDF4
 
+from pymods.exceptions import MissingReprojectedDataError
 from pymods.nc_info import NCInfo
 from pymods.nc_merge import create_output, get_dimensions, read_attrs
 from test.test_utils import TestBase
@@ -84,3 +85,18 @@ class TestNCMerge(TestBase):
         input_data_type = in_dataset[test_variable].datatype
         output_data_type = out_dataset[test_variable].datatype
         self.assertEqual(input_data_type, output_data_type, "Should be equal")
+
+    def test_missing_file_raises_error(self):
+        """ If a science variable should be included in the output, but there
+            is no associated output file, an exception should be raised.
+
+        """
+        test_variables = {'missing_variable'}
+        temporary_output_file = 'test/data/unit_test.nc4'
+
+        with self.assertRaises(MissingReprojectedDataError):
+            create_output(self.input_file, temporary_output_file, self.tmp_dir,
+                          test_variables)
+
+        if os.path.exists(temporary_output_file):
+            os.remove(temporary_output_file)

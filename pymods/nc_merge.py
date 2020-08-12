@@ -12,6 +12,7 @@ import warnings
 import netCDF4
 import numpy as np
 
+from pymods.exceptions import MissingReprojectedDataError
 from pymods.utilities import get_variable_file_path
 
 GDAL_DATASET_NAME = 'Band1'
@@ -83,8 +84,8 @@ def create_output(input_file: str, output_file: str, temp_dir: str,
 
                 data.close()
             else:
-                logger.info(f'Cannot find "{dataset_file}". Skipping addition '
-                            f'of "{variable_name}".')
+                logger.error(f'Cannot find "{dataset_file}".')
+                raise MissingReprojectedDataError(variable_name)
 
         # if 'crs' exists in output, rename it to the grid_mapping_name
         # and update grid_mapping attributes
