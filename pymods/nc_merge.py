@@ -188,7 +188,11 @@ def copy_variable(input_dataset: netCDF4.Dataset,
 
     output_dataset[dataset_name].setncatts(attrs)
 
-    # manually compute the data value if offset and scale_factor exist for integers
+    # Manually compute the data value if offset and scale_factor exist for
+    # integers. This is necessary so that the netCDF4 library can recompute the
+    # integer value from the science value. The library does not support
+    # directly providing the integer value when offset and scale_factor are
+    # defined.
 
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', category=UserWarning)
