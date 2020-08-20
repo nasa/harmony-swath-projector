@@ -16,6 +16,7 @@ if [ "$RESULT" -ne "0" ]; then
 fi
 
 
+echo "Test Coverage Estimates"
 coverage report
 
 
