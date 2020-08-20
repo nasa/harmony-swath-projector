@@ -16,7 +16,7 @@ if [ "$RESULT" -ne "0" ]; then
 fi
 
 
-coverage xml -o test/reports/coverage.xml
+coverage report
 
 
 # Run pylint
