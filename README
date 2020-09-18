@@ -13,6 +13,116 @@ cd swotrepr
 ./bin/build-image
 ```
 
+### To run the service locally in Docker:
+
+SwotRepr can either be run within its Docker container, or purely by invoking
+the Python module `swotrepr.py`.
+
+A minimal example of running within the Docker container, specifying a granule
+in the local file system:
+
+```
+./bin/build-image
+./bin/run-image --harmony-action 'invoke' --harmony-input '{"sources": [{"granules": [{"url": "test/data/africa.nc"}]}], "user": "usr_user", "callback": ""}'
+```
+Note, this will require a `.env` file within the root level of this directory.
+If authentication for granule download is to be done via Earthdata Login (EDL)
+credentials, the file should contain:
+
+```
+EDL_USERNAME=narmstrong
+EDL_PASSWORD=4p0ll0_11
+ENV=test
+```
+
+In the `run-image` command above, the `--harmony-input` contains a string representation
+of the input Harmony message. More details on the schema for these messages can
+be seen [here](https://git.earthdata.nasa.gov/projects/HARMONY/repos/harmony-service-lib-py/browse/harmony/message.py), in the documentation string of the `Message` class.
+
+Alternatively, if authentication is to be done via an EDL token, that token
+should be specified in the Harmony message as the `accessToken` property:
+
+```
+./bin/run-image --harmony-action 'invoke' --harmony-input '{"sources": [{"granules": [{"url": "test/data/africa.nc"}]}], "user": "usr_user", "callback": "", "accessToken": "encrypted_token"}'
+```
+
+The token should be sent encrypted using a shared secret. This shared secret
+should also be specified in the `.env` file, so the token can be decrypted for
+use:
+
+```
+ENV=test
+SHARED_SECRET_KEY=_THIS_IS_MY_32_CHARS_SECRET_KEY_
+```
+
+### To run the service locally, by invoking the Python module directly.
+
+First ensure you are in a conda environment, with the conda and Pip dependencies
+installed, as specified in their requirements files.
+
+```
+conda create --name=swotrepr-local --file conda_requirements.txt python=3.7 --channel conda-forge --channel defaults
+conda activate swotrepr-local
+pip install -r pip_requirements.txt
+```
+
+The Python module will not parse the `.env`, so the invocation of that code
+will require the environment variables be specified at runtime:
+
+```
+python swotrepr.py -e EDL_USERNAME=narmstrong -e EDL_PASSWORD=4p0ll0_11 -e ENV=test --harmony-action 'invoke' --harmony-input '{"sources": [{"granules": [{"url": "test/data/africa.nc"}]}], "user": "usr_user", "callback": ""}'
+```
+
+Again, note this example assumes granule downloads will be authenticated via
+EDL username and password, not token. If a token is to be used, it should be
+specified in the Harmony message content.
+
+### Message schema:
+
+The SWOT Reprojection tool can specify several options for reprojection in the
+`format` property of the Harmony message:
+
+```
+{
+  ...,
+  "format": {
+    "crs": "CRS:84",
+    "interpolation": "bilinear",
+    "width": 1000,
+    "height": 500,
+    "scaleExtent": {
+      "x": {"min": -180, "max": 180},
+	  "y": {"min": -90, "max": 90}
+    },
+    "scaleSize": {"x": 1, "y": 1}
+  },
+  ...
+}
+```
+
+* `crs`: Either an EPSG code, or a Proj4 string. Default to geographic coordintes.
+* `interpolation`: `near`, `bilinear`, `ewa` or `ewa-nn`. Currently defaults to
+  `ewa-nn`, which uses elliptically weighted averaging to pick the value of the
+  highest weighted pixel in relation to the output grid pixel.
+* `width`: The number of output grid pixels in the `x` dimension. Should be used
+  with `height`. The default value is the `x` `scaleExtent` divided by the `x`
+  resolution.
+* `height`: The number of output grid pixels in the `y` dimension. Should be used
+  with `width`. The default value is the `y` `scaleExtent` divided by the `y`
+  resolution.
+* `scaleExtent`: An object for each of the `x` and `y` dimension of the image,
+  specifying the minimum and maximum extent of that dimension in the reprojected
+  CRS. If the `scaleExtent` is not specified, it is derived from the walking the
+  perimeter of the input grid, reprojected those points to the target CRS, and
+  finding the extreme values in each reprojected dimension.
+* `scaleSize`: The resolution of each output pixel in the reprojected CRS. This
+  should not be specified if the `height` and `width` are also supplied. The
+  default values are derived from finding the total area of the swath via Gauss'
+  Area formula, and assuming the pixels are square.
+
+All the attributes in the `format` property are optional, and have defaults as
+described.
+
 ### Development notes:
 
 SwotRepr runs within a Docker container (both the project itself, and the tests
@@ -35,7 +145,10 @@ SwotRepr has Python tests that use the `unittest` package. These can be run
 within a Docker container using the following two scripts:
 
 ```bash
+# Build a Docker image with all test files and dependencies
 ./bin/build-test
+
+# Execute the `unittest` suite within a Docker container
 ./bin/run-test /full/path/to/swotrepr-coverage
 ```
 Coverage reports are being generate for each build in Bamboo, and saved as artifacts.
