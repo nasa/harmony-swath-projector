@@ -36,5 +36,9 @@ within a Docker container using the following two scripts:
 
 ```bash
 ./bin/build-test
-./bin/run-test
+./bin/run-test /full/path/to/swotrepr-coverage
 ```
+Coverage reports are being generate for each build in Bamboo, and saved as artifacts.
+Following URL is an example coverage report in Bamboo:
+
+https://ci.earthdata.nasa.gov/artifact/HARMONY-SRT41/BRT/build-3/Coverage-Report/source/test/coverage/index.html
