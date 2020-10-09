@@ -16,7 +16,6 @@ class TestPyResampleReproject(TestBase):
     regardless of the actual value of REPR_MODE set in pymods.reproject.py
 
     """
-    @patch('pymods.reproject.REPR_MODE', 'pyresample')
     @patch.object(BaseHarmonyAdapter, 'completed_with_local_file')
     @patch.object(BaseHarmonyAdapter, 'cleanup')
     def test_pyresample_interpolation(self, cleanup, completed_with_local_file):

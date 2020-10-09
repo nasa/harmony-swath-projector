@@ -87,10 +87,9 @@ def resample_variable(message_parameters: Dict, full_variable: str,
                                                               logger)
 
 
-def pyresample_bilinear(message_parameters: Dict, full_variable: str,
-                        reprojection_information: Dict,
-                        target_area: AreaDefinition, variable_output_path: str,
-                        logger: Logger) -> None:
+def bilinear(message_parameters: Dict, full_variable: str,
+             reprojection_information: Dict, target_area: AreaDefinition,
+             variable_output_path: str, logger: Logger) -> None:
     """ Use bilinear interpolation to produce the target output. If the same
         source coordinates have been processed for a previous variable, use
         applicable information (from get_bil_info) rather than recreating it.
@@ -143,10 +142,10 @@ def pyresample_bilinear(message_parameters: Dict, full_variable: str,
                  f'{variable_output_path}')
 
 
-def pyresample_ewa_helper(message_parameters: Dict, full_variable: str,
-                          reprojection_information: Dict, target_area: AreaDefinition,
-                          variable_output_path: str, logger: Logger,
-                          maximum_weight_mode: bool) -> None:
+def ewa_helper(message_parameters: Dict, full_variable: str,
+               reprojection_information: Dict, target_area: AreaDefinition,
+               variable_output_path: str, logger: Logger,
+               maximum_weight_mode: bool) -> None:
     """ Use Elliptical Weighted Average (EWA) interpolation to produce the
         target output. The `pyresample` EWA algorithm assumes that the data are
         presented one scan row at a time in the input array. If the same
@@ -200,40 +199,36 @@ def pyresample_ewa_helper(message_parameters: Dict, full_variable: str,
                  f'{variable_output_path}')
 
 
-def pyresample_ewa(message_parameters: Dict, full_variable: str,
-                   reprojection_information: Dict, target_area: AreaDefinition,
-                   variable_output_path: str, logger: Logger) -> None:
+def ewa(message_parameters: Dict, full_variable: str,
+        reprojection_information: Dict, target_area: AreaDefinition,
+        variable_output_path: str, logger: Logger) -> None:
     """ Use Elliptical Weighted Average (EWA) interpolation to produce the
             target output. A weighted average of all swath cells that map
             to a particular grid cell is used.
     """
 
-    pyresample_ewa_helper(message_parameters, full_variable,
-                          reprojection_information, target_area,
-                          variable_output_path, logger,
-                          maximum_weight_mode=False)
+    ewa_helper(message_parameters, full_variable, reprojection_information,
+               target_area, variable_output_path, logger,
+               maximum_weight_mode=False)
 
 
-def pyresample_ewa_nn(message_parameters: Dict, full_variable: str,
-                      reprojection_information: Dict, target_area: AreaDefinition,
-                      variable_output_path: str, logger: Logger) -> None:
+def ewa_nn(message_parameters: Dict, full_variable: str,
+           reprojection_information: Dict, target_area: AreaDefinition,
+           variable_output_path: str, logger: Logger) -> None:
     """ Use Elliptical Weighted Average (EWA) interpolation to produce the
             target output. The swath cell having the maximum weight of all
             swath cells that map to a particular grid cell is used.
         """
 
-    pyresample_ewa_helper(message_parameters, full_variable,
-                          reprojection_information, target_area,
-                          variable_output_path, logger,
-                          maximum_weight_mode=True)
+    ewa_helper(message_parameters, full_variable, reprojection_information,
+               target_area, variable_output_path, logger,
+               maximum_weight_mode=True)
 
 
-def pyresample_nearest_neighbour(message_parameters: Dict,
-                                 full_variable: str,
-                                 reprojection_information: Dict,
-                                 target_area: AreaDefinition,
-                                 variable_output_path: str,
-                                 logger: Logger) -> None:
+def nearest_neighbour(message_parameters: Dict, full_variable: str,
+                      reprojection_information: Dict,
+                      target_area: AreaDefinition, variable_output_path: str,
+                      logger: Logger) -> None:
     """ Use nearest neighbour interpolation to produce the target output. If
         the same source coordinates have been processed for a previous
         variable, use applicable information (from get_neighbour_info) rather
@@ -246,8 +241,7 @@ def pyresample_nearest_neighbour(message_parameters: Dict,
     """
     variable_group, variable_name = get_variable_group_and_name(full_variable)
     dataset = xarray.open_dataset(message_parameters['input_file'],
-                                  decode_cf=False,
-                                  group=variable_group)
+                                  decode_cf=False, group=variable_group)
 
     variable = dataset.variables.get(variable_name)
     variable_values = get_variable_values(dataset, variable)
@@ -310,10 +304,10 @@ def write_netcdf(file_name: str, data: np.ndarray, projection: Proj, transform):
 
 def get_resampling_functions() -> Dict:
     """Return a mapping of interpolation options to resampling functions."""
-    return {'bilinear': pyresample_bilinear,
-            'ewa': pyresample_ewa,
-            'ewa-nn': pyresample_ewa_nn,
-            'near': pyresample_nearest_neighbour}
+    return {'bilinear': bilinear,
+            'ewa': ewa,
+            'ewa-nn': ewa_nn,
+            'near': nearest_neighbour}
 
 
 def check_for_valid_interpolation(message_parameters: Dict, logger: Logger) -> None:

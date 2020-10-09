@@ -18,19 +18,13 @@ import xarray
 
 from pymods import nc_merge
 from pymods.nc_info import NCInfo
-from pymods.interpolation_gdal import gdal_resample_all_variables
-from pymods.interpolation_pyresample import resample_all_variables
+from pymods.interpolation import resample_all_variables
 from pymods.swotrepr_geometry import (get_extents_from_perimeter,
                                       get_projected_resolution)
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
-REPR_MODE = 'pyresample'  # or 'gdal'
-
-if REPR_MODE == 'pyresample':
-    INTERPOLATION_DEFAULT = 'ewa-nn'
-else:
-    INTERPOLATION_DEFAULT = 'near'
+INTERPOLATION_DEFAULT = 'ewa-nn'
 
 
 def reproject(msg, logger):
@@ -64,16 +58,9 @@ def reproject(msg, logger):
     logger.info(f'Input file has {len(science_variables)} science variables')
 
     # Loop through each dataset and reproject
-    if REPR_MODE == 'gdal':
-        logger.debug('Using gdal for reprojection.')
-        outputs = gdal_resample_all_variables(param_list, science_variables,
-                                              temp_dir, logger)
-    elif REPR_MODE == 'pyresample':
-        logger.debug('Using pyresample for reprojection.')
-        outputs = resample_all_variables(param_list, science_variables,
-                                         temp_dir, logger)
-    else:
-        raise Exception(f'Invalid reprojection mode: {REPR_MODE}')
+    logger.debug('Using pyresample for reprojection.')
+    outputs = resample_all_variables(param_list, science_variables, temp_dir,
+                                     logger)
 
     if not outputs:
         raise Exception("No subdatasets could be reprojected")
@@ -158,45 +145,44 @@ def get_params_from_msg(message, logger):
         y_min = rgetattr(y_extent, 'min', None)
         y_max = rgetattr(y_extent, 'max', None)
 
-    if REPR_MODE == 'pyresample':
-        if x_extent is None and y_extent is None:
-            # If extents aren't specified, they should be the input ranges
-            x_min, x_max, y_min, y_max = get_extents_from_perimeter(projection,
-                                                                    longitudes,
-                                                                    latitudes)
-            logger.info(f'Calculated x extent: x_min: {x_min}, x_max: {x_max}')
-            logger.info(f'Calculated y extent: y_min: {y_min}, y_max: {y_max}')
-        else:
-            logger.info(f'Message x extent: x_min: {x_min}, x_max: {x_max}')
-            logger.info(f'Message y extent: y_min: {y_min}, y_max: {y_max}')
+    if x_extent is None and y_extent is None:
+        # If extents aren't specified, they should be the input ranges
+        x_min, x_max, y_min, y_max = get_extents_from_perimeter(projection,
+                                                                longitudes,
+                                                                latitudes)
+        logger.info(f'Calculated x extent: x_min: {x_min}, x_max: {x_max}')
+        logger.info(f'Calculated y extent: y_min: {y_min}, y_max: {y_max}')
+    else:
+        logger.info(f'Message x extent: x_min: {x_min}, x_max: {x_max}')
+        logger.info(f'Message y extent: y_min: {y_min}, y_max: {y_max}')
 
-        if (
-                (xres is None or yres is None) and
-                (width is not None and height is not None)
-        ):
-            xres = (x_max - x_min) / width
-            # Note: This hard-codes a negative y-resolution
-            yres = (y_min - y_max) / height
-            logger.info(f'Calculated x resolution from width: {xres}')
-            logger.info(f'Calculated y resolution from height: {yres}')
-        elif (xres is None or yres is None):
-            xres = get_projected_resolution(projection, longitudes, latitudes)
-            # TODO: Determine sign of y resolution from projected y data.
-            yres = -1.0 * xres
-            logger.info(f'Calculated projected resolutions: ({xres}, {yres})')
-        else:
-            logger.info(f'Resolutions from message: ({xres}, {yres})')
+    if (
+            (xres is None or yres is None) and
+            (width is not None and height is not None)
+    ):
+        xres = (x_max - x_min) / width
+        # Note: This hard-codes a negative y-resolution
+        yres = (y_min - y_max) / height
+        logger.info(f'Calculated x resolution from width: {xres}')
+        logger.info(f'Calculated y resolution from height: {yres}')
+    elif (xres is None or yres is None):
+        xres = get_projected_resolution(projection, longitudes, latitudes)
+        # TODO: Determine sign of y resolution from projected y data.
+        yres = -1.0 * xres
+        logger.info(f'Calculated projected resolutions: ({xres}, {yres})')
+    else:
+        logger.info(f'Resolutions from message: ({xres}, {yres})')
 
-        if not width and not height:
-            # TODO: Handle width if Geographic coordinates and crossing dateline
-            width = abs(round((x_min - x_max) / xres))
-            height = abs(round((y_min - y_max) / yres))
-            logger.info(f'Calculated width: {width}')
-            logger.info(f'Calculated height: {height}')
+    if not width and not height:
+        # TODO: Handle width if Geographic coordinates and crossing dateline
+        width = abs(round((x_min - x_max) / xres))
+        height = abs(round((y_min - y_max) / yres))
+        logger.info(f'Calculated width: {width}')
+        logger.info(f'Calculated height: {height}')
 
-        # GDAL Standard geo-transform tuple
-        geotransform = (x_min, xres, 0.0, y_max, 0.0, yres)
-        grid_transform = Affine.from_gdal(*geotransform)
+    # GDAL Standard geo-transform tuple
+    geotransform = (x_min, xres, 0.0, y_max, 0.0, yres)
+    grid_transform = Affine.from_gdal(*geotransform)
 
     return locals()
 
@@ -254,8 +240,8 @@ def get_input_file_data(file_name: str, group: str) -> Dict:
             'longitudes': longitudes,
             'metadata': metadata,
             'swath_definition': swath_definition,
-            'lat_res':lat_res,
-            'lon_res':lon_res}
+            'lat_res': lat_res,
+            'lon_res': lon_res}
 
 
 def rgetattr(obj, attr: str, *args):

@@ -19,8 +19,8 @@ class TestNominalReproject(TestBase):
     def test_single_band_input(self, cleanup, completed_with_local_file):
         """Nominal (successful) reprojection"""
         test_data = {
-            'granules' : [{
-                'local_filename' : 'test/data/VNL2_oneBand.nc'
+            'granules': [{
+                'local_filename': 'test/data/VNL2_oneBand.nc'
             }],
             'format': {'height': 500, 'width': 1000}
         }
