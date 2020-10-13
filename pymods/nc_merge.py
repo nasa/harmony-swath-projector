@@ -1,6 +1,6 @@
 """ Reprojection support for merging single-dataset NetCDF-4 files, produced by
-    either gdalwarp or pyresample, back into a single output file with all the
-    necessary attributes.
+    `pyresample`, back into a single output file with all the necessary
+    attributes.
 """
 from typing import Dict, Optional, Set, Tuple
 import argparse
@@ -31,8 +31,8 @@ def create_output(input_file: str, output_file: str, temp_dir: str,
                   science_variables: Set[str],
                   metadata_variables: Set[str] = set(),
                   logger: Optional[logging.Logger] = None) -> None:
-    """ Merging the reprojected single-dataset netCDF4 files from GDAL or
-        `pyresample` into NETCDF-4 file, copying global attributes and metadata
+    """ Merging the reprojected single-dataset netCDF4 files from `pyresample`
+        into a NETCDF-4 file, copying global attributes and metadata
         variables (those without coordinates, which therefore can't be
         reprojected) from the original input file. Then for each listed science
         variable, retrieve the single-band file and copy the reprojected

@@ -36,11 +36,5 @@ ENV CONDA_SHLVL 2
 ENV PATH "/opt/conda/envs/swotrepr/bin:${PATH}"
 ENV SHLVL 1
 
-ENV CPL_ZIP_ENCODING UTF-8
-ENV GDAL_DATA /opt/conda/envs/swotrepr/share/gdal
-ENV GSETTINGS_SCHEMA_DIR /opt/conda/envs/swotrepr/share/glib-2.0/schemas
-ENV GSETTINGS_SCHEMA_DIR_CONDA_BACKUP ''
-ENV PROJ_LIB /opt/conda/envs/swotrepr/share/proj
-
 # Configure a container to be executable via the `docker run` command.
 ENTRYPOINT ["python", "swotrepr.py"]

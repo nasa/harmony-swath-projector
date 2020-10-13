@@ -135,47 +135,9 @@ class TestReproject(TestBase):
                     get_params_from_msg(message, self.logger)
                     self.assertTrue('Missing' in str(exception))
 
-    @patch('pymods.reproject.REPR_MODE', 'gdal')
-    def test_get_params_from_msg_gdal(self):
-        """ Ensure that default parameters are set, when things are largely
-            unspecified for resampling to use gdalwarp.
-
-            Note, the file_data parameter is not checked. This probably
-            shouldn't be included in the output anyway, and is a result of
-            using the `locals()` function.
-        """
-
-
-        with self.subTest('Message relying on defaults'):
-            message_content = {'granules': self.granules}
-            message = create_message(message_content)
-            expected_parameters = {'crs': CRS_DEFAULT,
-                                   'data_group': '',
-                                   'granule': message.granules[0],
-                                   'height': None,
-                                   'input_file': self.granule,
-                                   'interpolation': self.default_interpolation,
-                                   'latlon_group': '',
-                                   'latitudes': self.file_data['latitudes'],
-                                   'lat_res': self.file_data['lat_res'],
-                                   'logger': self.logger,
-                                   'longitudes': self.file_data['longitudes'],
-                                   'lon_res': self.file_data['lon_res'],
-                                   'message': message,
-                                   'projection': Proj(CRS_DEFAULT),
-                                   'width': None,
-                                   'x_extent': None,
-                                   'xres': None,
-                                   'y_extent': None,
-                                   'yres': None}
-            parameters = get_params_from_msg(message, self.logger)
-            self.assert_parameters_equal(parameters, expected_parameters)
-
     @patch('pymods.reproject.get_projected_resolution')
     @patch('pymods.reproject.get_extents_from_perimeter')
-    @patch('pymods.reproject.REPR_MODE', 'pyresample')
-    def test_get_params_from_msg_pyresample(self, mock_get_extents,
-                                            mock_get_resolution):
+    def test_get_params_from_msg(self, mock_get_extents, mock_get_resolution):
         """ Ensure that default parameters are set, when things are largely
             unspecified for resampling to use pyresample.
 
@@ -207,7 +169,6 @@ class TestReproject(TestBase):
                                'y_min': self.y_extent['min'],
                                'y_max': self.y_extent['max'],
                                'yres': self.y_res}
-
 
         empty_format = {}
         extents_format = {'scaleExtent': {'x': self.x_extent,
