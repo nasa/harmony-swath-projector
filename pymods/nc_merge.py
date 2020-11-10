@@ -2,8 +2,8 @@
     `pyresample`, back into a single output file with all the necessary
     attributes.
 """
-from typing import Dict, Optional, Set, Tuple
-import argparse
+from argparse import ArgumentParser
+from typing import Dict, Optional, Set, Tuple, Union
 import logging
 import os
 import re
@@ -15,7 +15,7 @@ import numpy as np
 from pymods.exceptions import MissingReprojectedDataError
 from pymods.utilities import get_variable_file_path
 
-GDAL_DATASET_NAME = 'Band1'
+GDAL_VARIABLE_NAME = 'Band1'
 
 STD_COOR_ATTRS = {  # only for non-geographic projection case, i.e. not lat/lon
     'x': {'long_name': 'x coordinate of projection',
@@ -29,7 +29,7 @@ STD_COOR_ATTRS = {  # only for non-geographic projection case, i.e. not lat/lon
 
 def create_output(input_file: str, output_file: str, temp_dir: str,
                   science_variables: Set[str],
-                  metadata_variables: Set[str] = set(),
+                  metadata_variables: Set[str],
                   logger: Optional[logging.Logger] = None) -> None:
     """ Merging the reprojected single-dataset netCDF4 files from `pyresample`
         into a NETCDF-4 file, copying global attributes and metadata
@@ -66,47 +66,49 @@ def create_output(input_file: str, output_file: str, temp_dir: str,
                                                   output_extension)
 
             if os.path.isfile(dataset_file):
-                data = netCDF4.Dataset(dataset_file) # pylint: disable=E1101
-                set_dimension(data, output_dataset)
+                with netCDF4.Dataset(dataset_file) as data:
+                    set_dimension(data, output_dataset)
 
-                copy_variable(input_dataset, output_dataset, data,
-                              variable_name, logger)
+                    # TODO: DAS-599, when single band output has proper variable
+                    # name, can use a single loop over all data.variables,
+                    # only checking the variable isn't already present in the
+                    # output.
+                    copy_variable(input_dataset, output_dataset, data,
+                                  variable_name, logger)
 
+                    # Note: This assumes single band output files contain
+                    # coordinates and CRS information in the root of the dataset.
+                    for variable_key in data.variables:
+                        if (
+                                variable_key not in output_dataset.variables and
+                                variable_key != GDAL_VARIABLE_NAME
+                        ):
+                            copy_variable(input_dataset, output_dataset, data,
+                                          variable_key, logger)
 
-                # Note: This assumes single band output files contain
-                # coordinates and CRS information in the root of the dataset.
-                for variable_key in data.variables: # pylint: disable=E1133
-                    existing_keys = list(output_dataset.variables.keys())
-                    existing_keys += [GDAL_DATASET_NAME, variable_name]
-                    if variable_key not in existing_keys:
-                        copy_variable(input_dataset, output_dataset, data,
-                                      variable_key, logger)
-
-                data.close()
             else:
                 logger.error(f'Cannot find "{dataset_file}".')
                 raise MissingReprojectedDataError(variable_name)
 
         # if 'crs' exists in output, rename it to the grid_mapping_name
         # and update grid_mapping attributes
-        if 'crs' in output_dataset.variables.keys():
+        if 'crs' in output_dataset.variables:
             new_crs_name = output_dataset['crs'].grid_mapping_name
             output_dataset.renameVariable('crs', new_crs_name)
             for name, var in output_dataset.variables.items():
                 # avoid the new crs var itself, replace grid_mapping attribute
-                if name != new_crs_name \
-                        and hasattr(var, 'grid_mapping'):
+                if name != new_crs_name and hasattr(var, 'grid_mapping'):
                     var.grid_mapping = new_crs_name
 
 
-def read_attrs(inf):
-    """read attribute from a file/dataset"""
-    return inf.__dict__
+def read_attrs(dataset: Union[netCDF4.Dataset, netCDF4.Variable]) -> Dict:
+    """ Read attributes from either a NetCDF4 Dataset or variable object. """
+    return dataset.__dict__
 
 
-def has_time_dimension(inf):
+def has_time_dimension(dataset: netCDF4.Dataset) -> bool:
     """check if time dimension exists"""
-    return 'time' in list(inf.dimensions.keys())
+    return 'time' in dataset.dimensions
 
 
 def copy_time_dimension(input_dataset: netCDF4.Dataset,
@@ -119,12 +121,15 @@ def copy_time_dimension(input_dataset: netCDF4.Dataset,
     copy_metadata_variable(input_dataset, output_dataset, 'time', logger)
 
 
-def set_dimension(inf, out):
-    """set dimension in the output"""
-    for name, dimension in inf.dimensions.items():
-        if not (dimension.isunlimited()
-                or name in list(out.dimensions.keys())):
-            out.createDimension(name, len(dimension))
+def set_dimension(input_dataset: netCDF4.Dataset,
+                  output_dataset: netCDF4.Dataset) -> None:
+    """ Check single band intermediate file dimensions, and add them to the
+        output dataset, if they are not already present.
+
+    """
+    for name, dimension in input_dataset.dimensions.items():
+        if not (dimension.isunlimited() or name in output_dataset.dimensions):
+            output_dataset.createDimension(name, len(dimension))
 
 
 def copy_metadata_variable(input_dataset: netCDF4.Dataset,
@@ -154,8 +159,8 @@ def copy_metadata_variable(input_dataset: netCDF4.Dataset,
 def copy_variable(input_dataset: netCDF4.Dataset,
                   output_dataset: netCDF4.Dataset,
                   single_band_output: netCDF4.Dataset,
-                  dataset_name: str, logger: logging.Logger) -> None:
-    """ Write a reprojected dataset from a single-band output file to the
+                  variable_name: str, logger: logging.Logger) -> None:
+    """ Write a reprojected variable from a single-band output file to the
         merged output file. This will first obtain metadata (dimensions,
         data type and  attributes) from either the single-band output, or from
         the original input file dataset. Then the variable values from the
@@ -164,29 +169,26 @@ def copy_variable(input_dataset: netCDF4.Dataset,
         accordingly.
 
     """
-    logger.info(f'Adding reprojected "{dataset_name}" to the output')
+    logger.info(f'Adding reprojected "{variable_name}" to the output')
 
     # set data type, dimensions, and attributes
     dims, data_type, attrs = get_dataset_meta(input_dataset,
                                               single_band_output,
-                                              dataset_name)
+                                              variable_name)
     fill_value = get_fill_value_from_attributes(attrs)
 
-    if dataset_name not in single_band_output.variables.keys():
-        ori_dataset_name = GDAL_DATASET_NAME
+    # NOTE: DAS-599 will probably make variable name the actual name in the
+    # single band output (instead of "Band1"), so this logic may be removable.
+    if variable_name not in single_band_output.variables:
+        ori_variable_name = GDAL_VARIABLE_NAME
     else:
-        ori_dataset_name = dataset_name
+        ori_variable_name = variable_name
 
-    if dims:
-        output_dataset.createVariable(dataset_name, data_type, dimensions=dims,
-                                      fill_value=fill_value, zlib=True,
-                                      complevel=6)
-    else:
-        output_dataset.createVariable(dataset_name, data_type,
-                                      fill_value=fill_value, zlib=True,
-                                      complevel=6)
+    output_dataset.createVariable(variable_name, data_type, dimensions=dims,
+                                  fill_value=fill_value, zlib=True,
+                                  complevel=6)
 
-    output_dataset[dataset_name].setncatts(attrs)
+    output_dataset[variable_name].setncatts(attrs)
 
     # Manually compute the data value if offset and scale_factor exist for
     # integers. This is necessary so that the netCDF4 library can recompute the
@@ -197,79 +199,107 @@ def copy_variable(input_dataset: netCDF4.Dataset,
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', category=UserWarning)
         if (
-                single_band_output[ori_dataset_name].shape !=
-                output_dataset[dataset_name].shape
+                single_band_output[ori_variable_name].shape !=
+                output_dataset[variable_name].shape
         ):
-            reshaped = single_band_output[ori_dataset_name][:].reshape(
-                output_dataset[dataset_name].shape
+            reshaped = single_band_output[ori_variable_name][:].reshape(
+                output_dataset[variable_name].shape
             )
             if 'add_offset' in attrs and 'scale_factor' in attrs:
-                reshaped = (
-                    (reshaped * output_dataset[dataset_name].scale_factor)
-                    + output_dataset[dataset_name].add_offset
+                reshaped = np.add(
+                    np.multiply(reshaped,
+                                output_dataset[variable_name].scale_factor),
+                    output_dataset[variable_name].add_offset
                 )
 
-            output_dataset[dataset_name][:] = reshaped
+            output_dataset[variable_name][:] = reshaped
         else:
-            output_dataset[dataset_name][:] = single_band_output[ori_dataset_name][:]
+            output_dataset[variable_name][:] = single_band_output[ori_variable_name][:]
 
 
-def get_dataset_meta(inf: netCDF4.Dataset,
+def get_dataset_meta(input_dataset: netCDF4.Dataset,
                      single_band_output: netCDF4.Dataset,
-                     dataset_name: str) -> Tuple[Tuple, np.dtype, Dict]:
-    """get dataset data type, dimensions, and attributes from reprojection or input"""
-    if GDAL_DATASET_NAME in single_band_output.variables:
-        single_band_name = GDAL_DATASET_NAME
+                     variable_name: str) -> Tuple[Tuple, np.dtype, Dict]:
+    """ Extract variable metadata. If a variable with the science variable's
+        name is present in the single band, reprojected output file, then use
+        the data type, dimensions and attributes from that output, otherwise
+        use the same information from the un-projected variable in the input
+        granule.
+
+        Prior to DAS-599, it is expected that the reprojected science variable
+        will be called `GDAL_VARIABLE_NAME` (Band1) in the single band file.
+
+    """
+    # NOTE: DAS-599 will probably make variable name the actual name in the
+    # single band output (instead of "Band1"), so this logic will be removable.
+    if GDAL_VARIABLE_NAME in single_band_output.variables:
+        single_band_name = GDAL_VARIABLE_NAME
     else:
-        single_band_name = dataset_name
+        single_band_name = variable_name
 
     # TODO: refactor to properly address merging dimensions and reprojected dimensions ?
     # TODO: at least add commentary
-    if dataset_name in single_band_output.variables.keys():  # when is this true?
-        data_type = single_band_output[dataset_name].datatype
-        dims = get_dimensions(single_band_output, dataset_name)
-        attrs = read_attrs(inf[dataset_name]) \
-            if dataset_name in inf.variables.keys() \
-            else read_attrs(single_band_output[dataset_name])
-        if dataset_name in STD_COOR_ATTRS:
-            attrs.update(STD_COOR_ATTRS[dataset_name])
+    # NOTE: This condition below will become true when addressing DAS-599.
+    # Should decide which file should take precedence: input or single band output?
+    if variable_name in single_band_output.variables:
+        data_type = single_band_output[variable_name].datatype
+        dims = get_dimensions(single_band_output, variable_name)
+
+        if variable_name in input_dataset.variables:
+            attrs = read_attrs(input_dataset[variable_name])
+        else:
+            attrs = read_attrs(single_band_output[variable_name])
+
+        if variable_name in STD_COOR_ATTRS:
+            attrs.update(STD_COOR_ATTRS[variable_name])
+
     else:
-        data_type = inf[dataset_name].datatype
-        dims = get_dimensions(single_band_output, dataset_name, inf)
-        attrs = read_attrs(inf[dataset_name])
+        data_type = input_dataset[variable_name].datatype
+        dims = get_dimensions(single_band_output, variable_name, input_dataset)
+        attrs = read_attrs(input_dataset[variable_name])
 
         if single_band_output[single_band_name].grid_mapping:
             attrs['grid_mapping'] = single_band_output[single_band_name].grid_mapping
 
     # remove coordinates attribute if it is no longer valid
-    if 'coordinates' in attrs and not check_coor_valid(attrs, inf,
+    if 'coordinates' in attrs and not check_coor_valid(attrs, input_dataset,
                                                        single_band_output):
         del attrs['coordinates']
 
     return dims, data_type, attrs
 
 
-def get_dimensions(single_band_dataset: netCDF4.Dataset, dataset_name: str,
-                   inf: netCDF4.Dataset = None) -> Tuple[str]:
-    """get dimensions from input"""
+def get_dimensions(single_band_dataset: netCDF4.Dataset, variable_name: str,
+                   input_dataset: netCDF4.Dataset = None) -> Tuple[str]:
+    """ Retrieve the dimensions from the single-band reprojected dataset. If
+        the original input dataset is included in the function call, then check
+        that dataset for the time dimension, too.
+
+        If the variable has no dimensions (e.g. is a scalar), then return an
+        empty tuple, which is the default value for the `dimensions` keyword
+        argument in the `netCDF4.createVariable` function.
+
+    """
     # TODO: refactor to properly address merging dimensions and reprojected dimensions ?
-    if inf:
-        if 'time' in list(inf.dimensions.keys()):
-            return ('time',) + single_band_dataset[GDAL_DATASET_NAME].dimensions
+    # NOTE: DAS-599 will remove GDAL_VARIABLE_NAME, so will become variable_name
+    if input_dataset is not None:
+        if 'time' in input_dataset.dimensions:
+            dimensions = ('time',) + single_band_dataset[GDAL_VARIABLE_NAME].dimensions
         else:
-            return single_band_dataset[GDAL_DATASET_NAME].dimensions
-#       return inf[dataset_name].dimensions  # when is this the right answer?
+            dimensions = single_band_dataset[GDAL_VARIABLE_NAME].dimensions
 
-    if single_band_dataset[dataset_name].size > 1:
-        return (dataset_name,)
+    elif single_band_dataset[variable_name].size > 1:
+        dimensions = (variable_name,)
+    else:
+        dimensions = ()
 
-    return None
+    return dimensions
 
 
-def check_coor_valid(attrs: Dict, inf: netCDF4.Dataset,
+def check_coor_valid(attrs: Dict, input_dataset: netCDF4.Dataset,
                      single_band_dataset: netCDF4.Dataset) -> bool:
-    """ Check if coordinates attributes is still valid after reprojection
-        Invalid coordinate reference cases:
+    """ Check if variables listed in the coordinates metadata attributes are
+        still valid after reprojection. Invalid coordinate reference cases:
 
           1) Coordinate variable listed in attribute does not exist in single
              band output dataset.
@@ -280,27 +310,26 @@ def check_coor_valid(attrs: Dict, inf: netCDF4.Dataset,
     coordinates_attribute = attrs.get('coordinates')
 
     if coordinates_attribute is not None:
-        coors = re.split(' |,', coordinates_attribute)
+        # TODO: DAS-900 Fully qualify these coordinate paths
+        coors = re.split(r'\s+|,\s*', coordinates_attribute)
     else:
         coors = []
 
-    valid = True
-
-    for coor in coors:
-        if coor not in single_band_dataset.variables:
-            valid = False
-            break
-        elif coor in single_band_dataset.variables and coor in inf.variables:
-            if single_band_dataset[coor].shape != inf[coor].shape:
-                valid = False
-                break
+    if not set(coors).issubset(single_band_dataset.variables.keys()):
+        # Coordinates from original variable aren't all present in reprojected
+        # output (single band file).
+        valid = False
+    else:
+        valid = all(single_band_dataset[coord].shape == input_dataset[coord].shape
+                    for coord in coors)
 
     return valid
 
 
 def get_fill_value_from_attributes(variable_attributes: Dict) -> Optional:
-    """ Check attributes for _FillValue. If present return this and remove the
-        _FillValue attribute from the input dictionary. Otherwise return None.
+    """ Check attributes for _FillValue. If present return the value and
+        remove the _FillValue attribute from the input dictionary. Otherwise
+        return None.
 
     """
     return variable_attributes.pop('_FillValue', None)
@@ -308,19 +337,23 @@ def get_fill_value_from_attributes(variable_attributes: Dict) -> Optional:
 
 # main program
 if __name__ == "__main__":
-    PARSER = argparse.ArgumentParser(prog='nc_merge',
-                                     description='Merged reprojected netcdf4 files into one')
+    PARSER = ArgumentParser(prog='nc_merge',
+                            description='Merge reprojected NetCDF4 files into one')
     PARSER.add_argument('--ori-inputfile', dest='ori_inputfile',
-                        help='Original input netcdf4 file(before reprojection)')
+                        help='Source NetCDF4 file (before reprojection)')
     PARSER.add_argument('--output-filename', dest='output_filename',
-                        help='Merged netcdf4 output file')
+                        help='Merged NetCDF4 output file')
     PARSER.add_argument('--proj-dir', dest='proj_dir',
-                        help='Output directory where projected netcdf4 files are')
+                        help='Output directory with projected NetCDF4 files')
     PARSER.add_argument('--science-variables', dest='science_variables',
                         help='Variables to include in the merged output file')
+    PARSER.add_argument('--metadata-variables', dest='metadata_variables',
+                        help='Variables without coordinate references',
+                        default=set())
     ARGS = PARSER.parse_args()
 
-    logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+    logging.basicConfig(format='%(asctime)s %(message)s',
+                        datefmt='%m/%d/%Y %I:%M:%S %p')
 
     create_output(ARGS.ori_inputfile, ARGS.output_filename, ARGS.proj_dir,
-                  ARGS.science_variables)
+                  ARGS.science_variables, ARGS.metadata_variables)
