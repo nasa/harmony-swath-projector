@@ -255,7 +255,8 @@ def get_dataset_meta(input_dataset: netCDF4.Dataset,
 
     else:
         data_type = input_dataset[variable_name].datatype
-        dims = get_dimensions(single_band_output, variable_name, input_dataset)
+        dims = get_dimensions(single_band_output, single_band_name,
+                              input_dataset)
         attrs = read_attrs(input_dataset[variable_name])
 
         if single_band_output[single_band_name].grid_mapping:
@@ -275,23 +276,21 @@ def get_dimensions(single_band_dataset: netCDF4.Dataset, variable_name: str,
         the original input dataset is included in the function call, then check
         that dataset for the time dimension, too.
 
-        If the variable has no dimensions (e.g. is a scalar), then return an
-        empty tuple, which is the default value for the `dimensions` keyword
-        argument in the `netCDF4.createVariable` function.
+        If the variable has no dimensions (e.g. is a scalar), an empty tuple
+        will be returned, which is the default value for the `dimensions`
+        keyword argument in the `netCDF4.createVariable` function.
 
     """
     # TODO: refactor to properly address merging dimensions and reprojected dimensions ?
     # NOTE: DAS-599 will remove GDAL_VARIABLE_NAME, so will become variable_name
-    if input_dataset is not None:
-        if 'time' in input_dataset.dimensions:
-            dimensions = ('time',) + single_band_dataset[GDAL_VARIABLE_NAME].dimensions
-        else:
-            dimensions = single_band_dataset[GDAL_VARIABLE_NAME].dimensions
-
-    elif single_band_dataset[variable_name].size > 1:
-        dimensions = (variable_name,)
+    if input_dataset is None or 'time' not in input_dataset.dimensions:
+        dimensions = single_band_dataset[variable_name].dimensions
     else:
-        dimensions = ()
+        dimensions = ('time',) + single_band_dataset[variable_name].dimensions
+
+    if len(dimensions) == 0 and single_band_dataset[variable_name].size > 1:
+        # This variable is a dimension variable, and should refer to itself.
+        dimensions = (variable_name,)
 
     return dimensions
 

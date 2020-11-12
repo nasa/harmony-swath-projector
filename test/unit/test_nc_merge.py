@@ -44,18 +44,11 @@ class TestNCMerge(TestBase):
             number of dimensions.
 
         """
-        test_dataset = 'sea_surface_temperature.nc'
-        test_file = netCDF4.Dataset(f'{self.tmp_dir}{test_dataset}')
+        test_dataset = 'sea_surface_temperature'
         in_dataset = netCDF4.Dataset(self.input_file)
         out_dataset = netCDF4.Dataset(self.output_file)
-        input_dim = get_dimensions(test_file,
-                                   os.path.splitext(test_dataset)[0],
-                                   in_dataset)
-        output_dim = get_dimensions(test_file,
-                                    os.path.splitext(test_dataset)[0],
-                                    out_dataset)
-
-        self.assertEqual(len(input_dim), len(output_dim))
+        self.assertEqual(len(in_dataset[test_dataset].dimensions),
+                         len(out_dataset[test_dataset].dimensions))
 
     def test_same_global_attributes(self):
         """ The root group of the input and output files should have same
@@ -169,7 +162,7 @@ class TestNCMerge(TestBase):
 
         with self.subTest('No input_dataset, single band is array'):
             self.assertTupleEqual(get_dimensions(single_band_dataset, 'Band1'),
-                                  ('Band1',))
+                                  ('lat', 'lon'))
 
         with self.subTest('No input_dataset, single band is scalar'):
             self.assertTupleEqual(get_dimensions(single_band_dataset, 'crs'),
@@ -180,10 +173,9 @@ class TestNCMerge(TestBase):
                                                  input_dataset),
                                   ('time', 'lat', 'lon'))
 
-        with self.subTest('input_dataset does not have time dimension'):
-            self.assertTupleEqual(get_dimensions(single_band_dataset, 'Band1',
-                                                 single_band_dataset),
-                                  ('lat', 'lon'))
+        with self.subTest('Dimension variable refers to itself'):
+            self.assertTupleEqual(get_dimensions(single_band_dataset, 'lat'),
+                                  ('lat',))
 
     def test_get_dataset_meta(self):
         """ Check the dimensions, datatype and attributes are correctly
@@ -199,7 +191,7 @@ class TestNCMerge(TestBase):
             metadata = get_dataset_meta(input_dataset, single_band_dataset,
                                         'Band1')
 
-            self.assertTupleEqual(metadata[0], ('Band1',))
+            self.assertTupleEqual(metadata[0], ('lat', 'lon'))
             self.assertEqual(metadata[1],
                              single_band_dataset['Band1'].datatype)
             self.assertDictEqual(metadata[2],
