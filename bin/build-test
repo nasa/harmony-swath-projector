@@ -7,7 +7,7 @@ tag=${1:-latest}
 # Look for old version of image and remove
 #
 old=$(docker images | grep "$image" | grep "$tag" | awk '{print $3}')
-if [ ! -z "$old" ]; then
+if [ ! -z "$old" ] && [ "$2" != "--no-delete" ]; then
     docker rmi "$old"
 fi
 

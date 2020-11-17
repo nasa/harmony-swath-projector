@@ -69,7 +69,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             # Get the data file
             asset = next(v for k, v in item.assets.items() if 'data' in (v.roles or []))
             token = self.message.accessToken
-            input_filename = download(asset.href, workdir, logger=logger, access_token=token, cfg=self.config)
+            input_filename = download(asset.href,
+                                      workdir,
+                                      logger=logger,
+                                      access_token=token,
+                                      cfg=self.config)
 
             logger.info("Granule data copied")
 
@@ -78,7 +82,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             # Stage the output file with a conventional filename
             output_filename = generate_output_filename(asset.href, is_regridded=True)
-            mimetype, _ = mimetypes.guess_type(output_filename, False) or ('application/x-netcdf4', None)
+            mimetype, _ = (mimetypes.guess_type(output_filename, False) or
+                           ('application/x-netcdf4', None))
 
             url = harmony.util.stage(working_filename,
                                      output_filename,
@@ -97,11 +102,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
         except Exception as err:
             logger.error("Reprojection failed: " + str(err), exc_info=1)
-            raise HarmonyException("Reprojection failed with error: " + str(err))
+            raise HarmonyException("Reprojection failed with error: " + str(err)) from err
 
         finally:
             # Clean up any intermediate resources
-            shutil.rmtree(workdir)
+            shutil.rmtree(workdir, ignore_errors=True)
 
     def validate_message(self):
         """ Check the service was triggered by a valid message containing

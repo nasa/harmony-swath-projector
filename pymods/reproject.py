@@ -8,6 +8,8 @@ import json
 import logging
 import os
 import re
+import shutil
+from tempfile import mkdtemp
 
 from pyproj import Proj
 from pyresample import geometry
@@ -310,4 +312,8 @@ if __name__ == "__main__":
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
-    reproject(msg, logger)
+    workdir = mkdtemp()
+    try:
+        reproject(msg, msg.sources[0].granules[0].url, workdir, logger)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
