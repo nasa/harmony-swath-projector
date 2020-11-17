@@ -67,12 +67,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         workdir = mkdtemp()
         try:
             # Get the data file
-            asset = next(v for k, v in item.assets.items() if 'data' in (v.roles or []))
-            token = self.message.accessToken
+            asset = next(v for v in item.assets.values() if 'data' in (v.roles or []))
             input_filename = download(asset.href,
                                       workdir,
                                       logger=logger,
-                                      access_token=token,
+                                      access_token=self.message.accessToken,
                                       cfg=self.config)
 
             logger.info("Granule data copied")

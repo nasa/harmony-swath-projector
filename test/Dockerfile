@@ -18,9 +18,8 @@ RUN conda create -y --name swotrepr --file conda_requirements.txt python=3.7 -q 
 COPY pip_requirements.txt .
 RUN conda run --name swotrepr pip install -r pip_requirements.txt
 
-COPY ./test/pip_test_requirements.txt test/pip_test_requirements.txt
-
 # Install additional Pip requirements (for testing)
+COPY ./test/pip_test_requirements.txt test/pip_test_requirements.txt
 RUN conda run --name swotrepr pip install -r test/pip_test_requirements.txt
 
 # Bundle app source
