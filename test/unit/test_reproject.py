@@ -1,25 +1,15 @@
 from logging import Logger
-from typing import Dict
 from unittest.mock import patch
 
 from numpy.testing import assert_array_equal
 from pyproj import Proj
 from xarray import Variable
 
+from harmony.message import Message
+
 from pymods.reproject import (CRS_DEFAULT, get_input_file_data,
                               get_params_from_msg, rgetattr)
-from swotrepr import HarmonyAdapter
 from test.test_utils import TestBase
-
-
-def create_message(test_data: Dict):
-    """ A helper function to create a Harmony message from an input dictionary.
-        Note, there is no validation of the message content (beyond anything
-        internal to the Harmony Message class.
-
-    """
-    reprojector = HarmonyAdapter(test_data)
-    return reprojector.message
 
 
 class TestReproject(TestBase):
@@ -69,8 +59,8 @@ class TestReproject(TestBase):
             with self.subTest(description):
                 message_content = {'format': format_attribute,
                                    'granules': self.granules}
-                message = create_message(message_content)
-                parameters = get_params_from_msg(message, self.logger)
+                message = Message(message_content)
+                parameters = get_params_from_msg(message, self.granule, self.logger)
 
                 self.assertEqual(parameters['interpolation'],
                                  expected_interpolation)
@@ -109,8 +99,8 @@ class TestReproject(TestBase):
                         if has_y_res:
                             message_content['scaleSize']['y'] = self.y_res
 
-                    message = create_message(message_content)
-                    get_params_from_msg(message, self.logger)
+                    message = Message(message_content)
+                    get_params_from_msg(message, self.granule, self.logger)
                     self.assertTrue(exception_snippet in str(exception))
 
     def test_get_params_missing_extents_or_dimensions(self):
@@ -131,8 +121,8 @@ class TestReproject(TestBase):
                     message_content = {'granules': self.granules,
                                        'format': format_content}
 
-                    message = create_message(message_content)
-                    get_params_from_msg(message, self.logger)
+                    message = Message(message_content)
+                    get_params_from_msg(message, self.granule, self.logger)
                     self.assertTrue('Missing' in str(exception))
 
     @patch('pymods.reproject.get_projected_resolution')
@@ -185,9 +175,9 @@ class TestReproject(TestBase):
             with self.subTest(description):
                 message_content = {'granules': self.granules,
                                    'format': format_contents}
-                message = create_message(message_content)
+                message = Message(message_content)
 
-                parameters = get_params_from_msg(message, self.logger)
+                parameters = get_params_from_msg(message, self.granule, self.logger)
                 self.assert_parameters_equal(parameters, expected_parameters)
 
     def test_rgetattr(self):

@@ -1,13 +1,10 @@
-import os
-import sys
-import time
-import unittest
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 
-from harmony import BaseHarmonyAdapter
+from harmony.message import Message
+from harmony.util import config
 
 from swotrepr import HarmonyAdapter
-from test.test_utils import contains, TestBase
+from test.test_utils import TestBase, contains
 
 
 class TestPyResampleReproject(TestBase):
@@ -16,9 +13,8 @@ class TestPyResampleReproject(TestBase):
     regardless of the actual value of REPR_MODE set in pymods.reproject.py
 
     """
-    @patch.object(BaseHarmonyAdapter, 'completed_with_local_file')
-    @patch.object(BaseHarmonyAdapter, 'cleanup')
-    def test_pyresample_interpolation(self, cleanup, completed_with_local_file):
+    @patch('harmony.util.stage', return_value='https://example.com/data')
+    def test_pyresample_interpolation(self, mock_stage):
         """Ensure SwotRepr will successfully complete when using pyresample and
         each specified interpolation.
 
@@ -27,28 +23,34 @@ class TestPyResampleReproject(TestBase):
 
         for interpolation in valid_interpolations:
             with self.subTest(f'pyresample "{interpolation}" interpolation.'):
-                test_data = {
-                    'granules': [{
-                        'local_filename': 'test/data/VOL2PSST_2017.nc'
+                test_data = Message({
+                    'callback': 'https://example.com/callback',
+                    'stagingLocation': 's3://example-bucket/example-path/',
+                    'sources': [{
+                        'granules': [{
+                            'url': 'test/data/VOL2PSST_2017.nc',
+                            'temporal': {
+                                'start': '2020-01-01T00:00:00.000Z',
+                                'end': '2020-01-02T00:00:00.000Z'
+                            },
+                            'bbox': [-180, -90, 180, 90]
+                        }],
                     }],
                     'format': {'crs': 'EPSG:32603',
                                'interpolation': interpolation,
                                'width': 1000,
                                'height': 500}
-                }
+                })
 
-                reprojector = HarmonyAdapter(test_data)
-                granule = reprojector.message.granules[0]
+                reprojector = HarmonyAdapter(test_data, config=config(False))
                 reprojector.invoke()
 
-                completed_with_local_file.assert_called_once_with(
+                mock_stage.assert_called_once_with(
                     contains('VOL2PSST_2017_repr.nc'),
-                    source_granule=granule,
-                    is_regridded=True,
-                    mime='application/x-netcdf'
-                )
-                cleanup.assert_called_once()
+                    'VOL2PSST_2017_regridded.nc',
+                    'application/x-netcdf',
+                    location='s3://example-bucket/example-path/',
+                    logger=ANY)
 
                 # Reset mock calls for next interpolation
-                completed_with_local_file.reset_mock()
-                cleanup.reset_mock()
+                mock_stage.reset_mock()

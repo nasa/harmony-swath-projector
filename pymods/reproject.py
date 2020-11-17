@@ -1,7 +1,6 @@
 """
  Data Services Reprojection service for Harmony
 """
-from tempfile import mkdtemp
 from typing import Dict, Tuple
 import argparse
 import functools
@@ -15,6 +14,7 @@ from pyresample import geometry
 from rasterio.transform import Affine
 import rasterio
 import xarray
+from harmony.message import Message
 
 from pymods import nc_merge
 from pymods.nc_info import NCInfo
@@ -27,7 +27,7 @@ CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
 
 
-def reproject(msg, logger):
+def reproject(msg: Message, filename: str, temp_dir: str, logger: logging.Logger) -> str:
     """ Derive reprojection parameters from the input Harmony message. Then
         extract listing of science variables and coordinate variables from the
         source granule. Then reproject all science variables. Finally merge all
@@ -35,8 +35,8 @@ def reproject(msg, logger):
 
     """
     # Set up source and destination files
-    param_list = get_params_from_msg(msg, logger)
-    temp_dir = mkdtemp()
+    param_list = get_params_from_msg(msg, filename, logger)
+
     root_ext = os.path.splitext(os.path.basename(param_list.get('input_file')))
     output_file = temp_dir + os.sep + root_ext[0] + '_repr' + root_ext[1]
 
@@ -71,10 +71,10 @@ def reproject(msg, logger):
                            science_variables, metadata_variables, logger)
 
     # Return the output file back to Harmony
-    return param_list.get('granule'), output_file
+    return output_file
 
 
-def get_params_from_msg(message, logger):
+def get_params_from_msg(message, input_file, logger):
     """ A helper function to parse the input Harmony message and extract
         required information. If the message is missing parameters, then
         default values will be used.
@@ -83,7 +83,7 @@ def get_params_from_msg(message, logger):
     # TODO: Full refactor, including breaking out separate functions, and
     #       removing use of `locals()` (also, ensuring all members of the
     #       output dictionary are actually used, if not removing them).
-    crs = rgetattr(message, 'format.crs', CRS_DEFAULT)
+    crs = rgetattr(message, 'format.crs') or CRS_DEFAULT
     interpolation = rgetattr(message, 'format.interpolation',
                              INTERPOLATION_DEFAULT)  # near, bilinear, ewa
 
@@ -96,7 +96,15 @@ def get_params_from_msg(message, logger):
     height = rgetattr(message, 'format.height', None)
     xres = rgetattr(message, 'format.scaleSize.x', None)
     yres = rgetattr(message, 'format.scaleSize.y', None)
-    granule = rgetattr(message, 'granules', [None])[0]
+
+    # Mark properties we use as having been processed
+    message.format.process(
+        'crs',
+        'interpolation',
+        'scaleExtent',
+        'width',
+        'height',
+        'scaleSize')
 
     # ERROR 5: -tr and -ts options cannot be used at the same time.
     if (
@@ -105,8 +113,6 @@ def get_params_from_msg(message, logger):
     ):
         raise Exception("'scaleSize', 'width' or/and 'height' cannot "
                         "be used at the same time in the message.")
-
-    input_file = rgetattr(granule, 'local_filename', None)
 
     if input_file is None:
         raise Exception('Invalid local_filename attribute for granule.')
@@ -195,15 +201,14 @@ def get_group(file_name: str) -> Tuple[str, str]:
     for subdataset in dataset.subdatasets:
         dataset_path = re.sub(r'.*\.nc:(.*)', r'\1', subdataset)
         dataset_path_arr = dataset_path.split('/')
-        dataset_name = dataset_path_arr[-1]
-        prefix = dataset_path_arr[0:-1] # if dataset_path.len > 1 else ""
+        prefix = dataset_path_arr[0:-1]  # if dataset_path.len > 1 else ""
 
         if 'lat' in dataset_path or 'lon' in dataset_path:
             latlon_group = "/".join(prefix)
         else:
             data_group = "/".join(prefix)
 
-        if latlon_group != None and data_group != None:
+        if latlon_group is not None and data_group is not None:
             # early exit from loop
             break
 

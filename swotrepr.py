@@ -5,10 +5,15 @@
 import argparse
 import mimetypes
 import os
+import shutil
+from tempfile import mkdtemp
 
+import pystac
 import harmony
+from harmony.util import download, generate_output_filename, HarmonyException
 
 from pymods.reproject import reproject
+
 
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
     """
@@ -20,62 +25,104 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
     def invoke(self):
         """
-            Callback used by BaseHarmonyAdapter to invoke the service
+        Adds validation to default process_item-based invocation
+
+        Returns
+        -------
+        pystac.Catalog
+            the output catalog
         """
         logger = self.logger
         logger.info("Starting Data Services Reprojection Service")
         os.environ['HDF5_DISABLE_VERSION_CHECK'] = '1'
+        logger.info(f'Received message: {self.message}')
+        self.validate_message()
+        return super().invoke()
 
+    def process_item(self, item: pystac.Item, source: harmony.message.Source):
+        """
+        Processes a single input item.  Services that are not aggregating multiple input files
+        should prefer to implement this method rather than #invoke
+
+        This example copies its input to the output, marking "dpi" and "variables" message
+        attributes as having been processed
+
+        Parameters
+        ----------
+        item : pystac.Item
+            the item that should be processed
+        source : harmony.message.Source
+            the input source defining the variables, if any, to subset from the item
+
+        Returns
+        -------
+        pystac.Item
+            a STAC catalog whose metadata and assets describe the service output
+        """
+        logger = self.logger
+        result = item.clone()
+        result.assets = {}
+
+        # Create a temporary dir for processing we may do
+        workdir = mkdtemp()
         try:
-            if not hasattr(self, 'message'):
-                raise Exception("No message request")
+            # Get the data file
+            asset = next(v for k, v in item.assets.items() if 'data' in (v.roles or []))
+            token = self.message.accessToken
+            input_filename = download(asset.href, workdir, logger=logger, access_token=token, cfg=self.config)
 
-            # Verify a granule URL has been provided and make a local copy of the granule file
-
-            # message schema
-            # {'granules': [{'local_filename': '/home/test/data/VNL2_oneBand.nc'}],
-            # 'format': {'crs': 'CRS:84',  'interpolation': 'bilinear',
-            #            # 'width': 1000, 'height': 500,
-            #            'scaleExtent': {
-            #                'x': {'min': -160, 'max': -30},
-            #                'y': {'min': 10, 'max': 25}
-            #            },
-            #            'scaleSize': {'x': 1, 'y': 1}
-            #            }}
-            msg = self.message
-            if not hasattr(msg, 'granules') or not msg.granules:
-                raise Exception("No granules specified for reprojection")
-            if not isinstance(msg.granules, list):
-                raise Exception("Invalid granule list")
-            if len(msg.granules) > 1:
-                raise Exception("Too many granules")
-
-            self.download_granules()
             logger.info("Granule data copied")
-            logger.info(f'Received message: {msg}')
 
             # Call Reprojection utility
-            granule, output_file = reproject(msg, logger)
+            working_filename = reproject(self.message, input_filename, workdir, logger)
+
+            # Stage the output file with a conventional filename
+            output_filename = generate_output_filename(asset.href, is_regridded=True)
+            mimetype, _ = mimetypes.guess_type(output_filename, False) or ('application/x-netcdf4', None)
+
+            url = harmony.util.stage(working_filename,
+                                     output_filename,
+                                     mimetype,
+                                     location=self.message.stagingLocation,
+                                     logger=self.logger)
+
+            # Update the STAC record
+            asset = pystac.Asset(url, title=output_filename, media_type=mimetype, roles=['data'])
+            result.assets['data'] = asset
 
             # Return the output file back to Harmony
             logger.info("Reprojection complete")
-            # TODO: mimetype should be based on output file(s)?
-            mimetype = mimetypes.guess_type(granule.local_filename, False) or ('application/x-netcdf4', None)
-            self.completed_with_local_file(
-                output_file,
-                source_granule=granule,
-                is_regridded=True,
-                mime=mimetype[0]
-            )
+
+            return result
 
         except Exception as err:
-            # TODO log the stacktrace here to make debugging much easier
-            logger.error("Reprojection failed: " + str(err))
-            self.completed_with_error("Reprojection failed with error: " + str(err))
+            logger.error("Reprojection failed: " + str(err), exc_info=1)
+            raise HarmonyException("Reprojection failed with error: " + str(err))
 
         finally:
-            self.cleanup()
+            # Clean up any intermediate resources
+            shutil.rmtree(workdir)
 
+    def validate_message(self):
+        """ Check the service was triggered by a valid message containing
+            the expected number of granules.
+
+        """
+        if not hasattr(self, 'message'):
+            raise HarmonyException('No message request')
+
+        has_granules = hasattr(self.message, 'granules') and self.message.granules
+        try:
+            has_items = bool(self.catalog and next(self.catalog.get_all_items()))
+        except StopIteration:
+            has_items = False
+
+        if not has_granules and not has_items:
+            print(has_granules, has_items, self.message.granules)
+            raise HarmonyException("No granules specified for reprojection")
+
+        if not isinstance(self.message.granules, list):
+            raise Exception("Invalid granule list")
 
 # Main program start
 #
