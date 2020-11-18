@@ -1,2 +1,2 @@
-
-#from .test_utils import contains, matches
+import os
+os.environ['ENV'] = os.environ.get('ENV') or 'test'

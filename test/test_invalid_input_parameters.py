@@ -1,88 +1,57 @@
-import os
-import sys
 import unittest
-from unittest.mock import patch
-
-from harmony import BaseHarmonyAdapter
+from harmony.util import HarmonyException, config
+from harmony.message import Message
 
 from swotrepr import HarmonyAdapter
-from test.test_utils import contains, matches, TestBase
+from pymods.reproject import reproject
+from test.test_utils import TestBase
 
 
 class TestReprojectInput(TestBase):
 
     # TEST CASE: No granules attribute
     #
-    @patch.object(BaseHarmonyAdapter, 'completed_with_error')
-    @patch.object(BaseHarmonyAdapter, 'cleanup')
-    def test_input_with_no_granules_attribute(self, cleanup, completed_with_error):
+    def test_raises_when_input_has_no_granules_attribute(self):
         """Handle a harmony message that does not list any granules"""
-        test_data = {}
-        reprojector = HarmonyAdapter(test_data)
-        reprojector.invoke()
+        reprojector = HarmonyAdapter(Message({
+            'format': {},
+            'sources': [{}]
+        }), config=config(False))
 
-        completed_with_error.assert_called_once_with(contains("No granules specified for reprojection"))
-        cleanup.assert_called_once()
+        with self.assertRaises(HarmonyException) as cm:
+            reprojector.invoke()
 
-
-
-    # TEST CASE: Invalid granules attribute
-    #
-    @patch.object(BaseHarmonyAdapter, 'completed_with_error')
-    @patch.object(BaseHarmonyAdapter, 'cleanup')
-    def test_input_with_invalid_granules_attribute(self, cleanup, completed_with_error):
-        """Handle a harmony message that has an invalid granule list"""
-        test_data = {'granules' : 'string'}
-        reprojector = HarmonyAdapter(test_data)
-        reprojector.invoke()
-
-        completed_with_error.assert_called_once_with(contains("Invalid granule list"))
-        cleanup.assert_called_once()
-
-
-    # TEST CASE: More than one granule provided
-    #
-    @patch.object(BaseHarmonyAdapter, 'completed_with_error')
-    @patch.object(BaseHarmonyAdapter, 'cleanup')
-    def test_completed_with_error_when_too_many_granules(self, cleanup, completed_with_error):
-        """Handle a harmony message that has more than one granule in the granule list"""
-        test_data = {'granules' : ["granule-1", "granule-2", "granule-3"]}
-        reprojector = HarmonyAdapter(test_data)
-        reprojector.invoke()
-
-        completed_with_error.assert_called_once_with(contains("Too many granules"))
-        cleanup.assert_called_once()
-
-
-
+        self.assertEqual(str(cm.exception), 'No granules specified for reprojection')
 
     # TEST CASE: No such local file
     #
-    @patch.object(BaseHarmonyAdapter, 'completed_with_error')
-    @patch.object(BaseHarmonyAdapter, 'cleanup')
-    def test_completed_with_error_when_local_file_not_exists(self, cleanup, completed_with_error):
+    def test_raises_when_local_file_does_not_exist(self):
         """Handle a harmony message that references a granule local file that does not exist"""
-        test_data = {'granules' : [{'local_filename' : 'test/data/no_such_file'}]}
-        reprojector = HarmonyAdapter(test_data)
-        reprojector.invoke()
+        reprojector = HarmonyAdapter(Message({
+            'format': {},
+            'sources': [{'granules': [{}]}]
+        }), config=config(False))
 
-        completed_with_error.assert_called_once_with(contains("Input file does not exist"))
-        cleanup.assert_called_once()
+        with self.assertRaises(Exception) as cm:
+            reproject(reprojector.message, 'test/data/no_such_file', '/no/such/dir', reprojector.logger)
 
-
+        self.assertEqual(str(cm.exception), 'Input file does not exist')
 
     # TEST CASE: Local file is not a valid data file
     #
-    @patch.object(BaseHarmonyAdapter, 'completed_with_error')
-    @patch.object(BaseHarmonyAdapter, 'cleanup')
-    def test_completed_with_error_when_local_file_not_valid(self, cleanup, completed_with_error):
+    def test_raises_when_local_file_not_valid(self):
         """Handle a harmony message that references a granule local file that is not valid data"""
-        test_data = {'granules' : [{'local_filename' : 'test/data/InvalidDataFile.nc'}]}
-        reprojector = HarmonyAdapter(test_data)
-        reprojector.invoke()
 
-        completed_with_error.assert_called_once_with(contains("Cannot determine input file format"))
-        cleanup.assert_called_once()
+        reprojector = HarmonyAdapter(Message({
+            'format': {},
+            'sources': [{'granules': [{}]}]
+        }), config=config(False))
+
+        with self.assertRaises(Exception) as cm:
+            reproject(reprojector.message, 'test/data/InvalidDataFile.nc', '/no/such/dir', reprojector.logger)
+
+        self.assertEqual(str(cm.exception), 'Cannot determine input file format')
+
 
 if __name__ == '__main__':
     unittest.main()
