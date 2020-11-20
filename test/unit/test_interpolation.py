@@ -3,11 +3,13 @@ from unittest.mock import Mock, patch
 
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition
+from rasterio.transform import Affine
 import numpy as np
 import xarray
 
 from pymods.interpolation import (check_for_valid_interpolation, EPSILON,
-                                  get_swath_definition, get_target_area,
+                                  get_parameters_tuple, get_swath_definition,
+                                  get_reprojection_cache, get_target_area,
                                   bilinear, ewa, ewa_nn, nearest_neighbour,
                                   resample_all_variables, resample_variable,
                                   RADIUS_OF_INFLUENCE)
@@ -19,25 +21,60 @@ class TestInterpolation(TestBase):
     def setUp(self):
         self.science_variables = ('red_var', 'green_var', 'blue_var',
                                   'alpha_var')
-        self.message_parameters = {'input_file': 'test/data/africa.nc'}
+        self.message_parameters = {
+            'crs': '+proj=longlat',
+            'input_file': 'test/data/africa.nc',
+            'interpolation': 'bilinear',
+            'projection': Proj('+proj=longlat'),
+            'height': None,
+            'width': None,
+            'x_extent': None,
+            'y_extent': None,
+            'x_min': None,
+            'x_max': None,
+            'y_min': None,
+            'y_max': None,
+            'xres': None,
+            'yres': None,
+        }
         self.temp_directory = '/tmp/01234'
         self.logger = Logger('test')
+        self.mock_target_area = Mock(spec=AreaDefinition, shape='ta_shape')
+
+    def assert_grid_transforms_equal(self, transform_one, transform_two):
+        """ Compare the properties of two Affine transforms. """
+        attributes = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
+
+        for attribute in attributes:
+            self.assertEqual(getattr(transform_one, attribute),
+                             getattr(transform_two, attribute), attribute)
+
+    def assert_areadefinitions_equal(self, area_one, area_two):
+        """ Compare the properties of two AreaDefinitions. """
+        # Check the corner points:
+        self.assertListEqual(area_one.corners, area_two.corners)
+
+        attributes = ['height', 'width', 'proj_str']
+
+        for attribute in attributes:
+            self.assertEqual(getattr(area_one, attribute),
+                             getattr(area_two, attribute), attribute)
 
     @patch('xarray.open_dataset')
-    @patch('pymods.interpolation.get_target_area')
     @patch('pymods.interpolation.resample_variable')
     def test_resample_all_variables(self, mock_resample_variable,
-                                    mock_target_area, mock_open_dataset):
+                                    mock_open_dataset):
         """ Ensure resample_variable is called for each non-coordinate
             variable, and those variables are all included in the list of
             outputs.
 
+            The default message being supplied does not have sufficient
+            information to construct a target area for all variables, so the
+            cache being sent to all variables should be empty.
+
         """
         fake_dataset = 'a dataset'
         mock_open_dataset.return_value = fake_dataset
-
-        fake_target_area = 'a target area'
-        mock_target_area.return_value = fake_target_area
 
         parameters = {'interpolation': 'ewa-nn'}
         parameters.update(self.message_parameters)
@@ -56,24 +93,19 @@ class TestInterpolation(TestBase):
             mock_resample_variable.assert_any_call(parameters,
                                                    variable,
                                                    {},
-                                                   fake_target_area,
                                                    variable_output_path,
                                                    self.logger)
 
     @patch('xarray.open_dataset')
-    @patch('pymods.interpolation.get_target_area')
     @patch('pymods.interpolation.resample_variable')
     def test_resample_single_exception(self, mock_resample_variable,
-                                       mock_target_area, mock_open_dataset):
+                                       mock_open_dataset):
         """ Ensure that if a single variable fails reprojection, the remaining
             variables will still be reprojected.
 
         """
         fake_dataset = 'a dataset'
         mock_open_dataset.return_value = fake_dataset
-
-        fake_target_area = 'a target area'
-        mock_target_area.return_value = fake_target_area
 
         mock_resample_variable.side_effect = [KeyError('random'), None, None, None]
 
@@ -96,7 +128,6 @@ class TestInterpolation(TestBase):
             mock_resample_variable.assert_any_call(parameters,
                                                    variable,
                                                    {},
-                                                   fake_target_area,
                                                    variable_output_path,
                                                    self.logger)
 
@@ -123,8 +154,7 @@ class TestInterpolation(TestBase):
 
                 parameters = {'interpolation': interpolation}
                 resample_variable(parameters, 'variable_name', {},
-                                  'target area', '/output/path.nc',
-                                  self.logger)
+                                  '/output/path.nc', self.logger)
 
                 self.assertEqual(mock_bilinear.call_count, bilinear_calls)
                 self.assertEqual(mock_ewa.call_count, ewa_calls)
@@ -133,12 +163,13 @@ class TestInterpolation(TestBase):
 
     @patch('pymods.interpolation.write_netcdf')
     @patch('pymods.interpolation.get_swath_definition')
+    @patch('pymods.interpolation.get_target_area')
     @patch('pymods.interpolation.get_variable_values')
     @patch('pymods.interpolation.get_sample_from_bil_info')
     @patch('pymods.interpolation.get_bil_info')
     def test_resample_bilinear(self, mock_get_bil_info, mock_get_sample,
-                               mock_get_values, mock_get_swath,
-                               mock_write_netcdf):
+                               mock_get_values, mock_get_target_area,
+                               mock_get_swath, mock_write_netcdf):
         """ The bilinear interpolation should call both get_bil_info and
             get_sample_from_bil_info if there are no matching entries for the
             coordinates in the reprojection information. If there is an entry,
@@ -151,20 +182,20 @@ class TestInterpolation(TestBase):
         mock_get_swath.return_value = 'swath'
         mock_values = Mock(**{'ravel.return_value': 'ravel data'})
         mock_get_values.return_value = mock_values
+        mock_get_target_area.return_value = {
+            'grid_transform': 'grid_transform value',
+            'target_area': self.mock_target_area,
+        }
 
-        dataset = xarray.open_dataset('test/data/africa.nc', decode_cf=False)
-        projection = Proj('+proj=longlat +ellps=WGS84')
-
-        message_parameters = {'input_file': 'test/data/africa.nc',
-                              'projection': projection,
-                              'grid_transform': 'grid_transform value'}
-        target_area = Mock(spec=AreaDefinition, shape='ta_shape')
+        message_parameters = self.message_parameters
+        message_parameters['interpolation'] = 'bilinear'
 
         with self.subTest('No pre-existing bilinear information'):
             bilinear(message_parameters, 'alpha_var', {},
-                     target_area, 'path/to/output', self.logger)
+                     'path/to/output', self.logger)
 
-            mock_get_bil_info.assert_called_once_with('swath', target_area,
+            mock_get_bil_info.assert_called_once_with('swath',
+                                                      self.mock_target_area,
                                                       radius=50000,
                                                       neighbours=16)
             mock_get_sample.assert_called_once_with('ravel data',
@@ -173,10 +204,12 @@ class TestInterpolation(TestBase):
                                                     'input_indices',
                                                     'point_mapping',
                                                     output_shape='ta_shape')
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
 
         with self.subTest('Pre-existing bilinear information'):
             mock_get_bil_info.reset_mock()
@@ -189,11 +222,13 @@ class TestInterpolation(TestBase):
                     'horizontal_distances': 'horizontal_old',
                     'valid_input_indices': 'input_indices_old',
                     'valid_point_mapping': 'point_mapping_old',
+                    'grid_transform': 'grid_transform value',
+                    'target_area': self.mock_target_area,
                 }
             }
 
             bilinear(message_parameters, 'alpha_var', bilinear_information,
-                     target_area, 'path/to/output', self.logger)
+                     'path/to/output', self.logger)
 
             mock_get_bil_info.assert_not_called()
             mock_get_sample.assert_called_once_with('ravel data',
@@ -202,18 +237,82 @@ class TestInterpolation(TestBase):
                                                     'input_indices_old',
                                                     'point_mapping_old',
                                                     output_shape='ta_shape')
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
+
+        with self.subTest('Harmony message defines target area'):
+            mock_get_target_area.reset_mock()
+            mock_get_bil_info.reset_mock()
+            mock_get_sample.reset_mock()
+            mock_write_netcdf.reset_mock()
+
+            harmony_target_area = Mock(spec=AreaDefinition,
+                                       shape='harmony_shape')
+
+            harmony_grid_transform = 'grid_transform'
+
+            cache = {
+                'harmony_message_target': {
+                    'target_area': harmony_target_area,
+                    'grid_transform': harmony_grid_transform
+                }
+            }
+
+            bilinear(message_parameters, 'alpha_var', cache, 'path/to/output',
+                     self.logger)
+
+            mock_get_bil_info.assert_called_once_with('swath',
+                                                      harmony_target_area,
+                                                      radius=50000,
+                                                      neighbours=16)
+            mock_get_sample.assert_called_once_with(
+                'ravel data',
+                'vertical',
+                'horizontal',
+                'input_indices',
+                'point_mapping',
+                output_shape='harmony_shape'
+            )
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                harmony_grid_transform
+            )
+            mock_get_target_area.assert_not_called()
+
+            # Check that there is a new entry in the cache, and that it only
+            # contains references to the original Harmony target area object,
+            # not copies of those objects.
+            expected_cache = {
+                'harmony_message_target': {
+                    'target_area': harmony_target_area,
+                    'grid_transform': harmony_grid_transform,
+                },
+                ('lon', 'lat'): {
+                    'vertical_distances': 'vertical',
+                    'horizontal_distances': 'horizontal',
+                    'valid_input_indices': 'input_indices',
+                    'valid_point_mapping': 'point_mapping',
+                    'grid_transform': harmony_grid_transform,
+                    'target_area': harmony_target_area,
+                }
+            }
+            self.assertDictEqual(cache, expected_cache)
 
     @patch('pymods.interpolation.write_netcdf')
     @patch('pymods.interpolation.get_swath_definition')
+    @patch('pymods.interpolation.get_target_area')
     @patch('pymods.interpolation.get_variable_values')
     @patch('pymods.interpolation.fornav')
     @patch('pymods.interpolation.ll2cr')
     def test_resample_ewa(self, mock_ll2cr, mock_fornav, mock_get_values,
-                          mock_get_swath, mock_write_netcdf):
+                          mock_get_target_area, mock_get_swath,
+                          mock_write_netcdf):
         """ EWA interpolation should call both ll2cr and fornav if there are
             no matching entries for the coordinates in the reprojection
             information. If there is an entry, then only fornav should be
@@ -224,112 +323,183 @@ class TestInterpolation(TestBase):
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
+        mock_get_target_area.return_value = {
+            'grid_transform': 'grid_transform value',
+            'target_area': self.mock_target_area,
+        }
 
-        projection = Proj('+proj=longlat +ellps=WGS84')
-
-        message_parameters = {'input_file': 'test/data/africa.nc',
-                              'projection': projection,
-                              'grid_transform': 'grid_transform value'}
-        target_area = Mock(spec=AreaDefinition)
+        message_parameters = self.message_parameters
+        message_parameters['interpolation'] = 'ewa'
 
         with self.subTest('No pre-existing EWA information'):
-            ewa(message_parameters, 'alpha_var', {}, target_area,
+            ewa(message_parameters, 'alpha_var', {},  # target_area,
                 'path/to/output', self.logger)
 
-            mock_ll2cr.assert_called_once_with('swath', target_area)
-            mock_fornav.assert_called_once_with('columns', 'rows', target_area,
-                                                mock_values, maximum_weight_mode=False)
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+            mock_ll2cr.assert_called_once_with('swath', self.mock_target_area)
+            mock_fornav.assert_called_once_with('columns', 'rows',
+                                                self.mock_target_area,
+                                                mock_values,
+                                                maximum_weight_mode=False)
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
 
         with self.subTest('Pre-existing EWA information'):
             mock_ll2cr.reset_mock()
             mock_fornav.reset_mock()
             mock_write_netcdf.reset_mock()
 
-            ewa_information = {('lon', 'lat'): {'columns': 'old_columns',
-                                                'rows': 'old_rows'}}
+            ewa_information = {
+                ('lon', 'lat'): {'columns': 'old_columns',
+                                 'rows': 'old_rows',
+                                 'grid_transform': 'grid_transform value',
+                                 'target_area': self.mock_target_area}}
 
-            ewa(message_parameters, 'alpha_var', ewa_information, target_area,
+            ewa(message_parameters, 'alpha_var', ewa_information,
                 'path/to/output', self.logger)
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
-                                                target_area, mock_values, maximum_weight_mode=False)
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+                                                self.mock_target_area,
+                                                mock_values,
+                                                maximum_weight_mode=False)
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
 
     @patch('pymods.interpolation.write_netcdf')
     @patch('pymods.interpolation.get_swath_definition')
+    @patch('pymods.interpolation.get_target_area')
     @patch('pymods.interpolation.get_variable_values')
     @patch('pymods.interpolation.fornav')
     @patch('pymods.interpolation.ll2cr')
     def test_resample_ewa_nn(self, mock_ll2cr, mock_fornav, mock_get_values,
-                             mock_get_swath, mock_write_netcdf):
+                             mock_get_target_area, mock_get_swath,
+                             mock_write_netcdf):
         """ EWA-NN interpolation should call both ll2cr and fornav if there are
                     no matching entries for the coordinates in the reprojection
                     information. If there is an entry, then only fornav should be
                     called.
         """
-
         mock_ll2cr.return_value = ['swath_points_in_grid', 'columns', 'rows']
         mock_fornav.return_value = ('', 'results')
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
+        mock_get_target_area.return_value = {
+            'grid_transform': 'grid_transform value',
+            'target_area': self.mock_target_area,
+        }
 
-        projection = Proj('+proj=longlat +ellps=WGS84')
-
-        message_parameters = {'input_file': 'test/data/africa.nc',
-                              'projection': projection,
-                              'grid_transform': 'grid_transform value'}
-        target_area = Mock(spec=AreaDefinition)
+        message_parameters = self.message_parameters
+        message_parameters['interpolation'] = 'ewa_nn'
 
         with self.subTest('No pre-existing EWA-NN information'):
-            ewa_nn(message_parameters, 'alpha_var', {}, target_area,
+            ewa_nn(message_parameters, 'alpha_var', {},
                    'path/to/output', self.logger)
 
-            mock_ll2cr.assert_called_once_with('swath', target_area)
-            mock_fornav.assert_called_once_with('columns', 'rows', target_area,
+            mock_ll2cr.assert_called_once_with('swath', self.mock_target_area)
+            mock_fornav.assert_called_once_with('columns', 'rows',
+                                                self.mock_target_area,
                                                 mock_values,
                                                 maximum_weight_mode=True)
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
 
         with self.subTest('Pre-existing EWA-NN information'):
             mock_ll2cr.reset_mock()
             mock_fornav.reset_mock()
             mock_write_netcdf.reset_mock()
 
-            ewa_nn_information = {('lon', 'lat'): {'columns': 'old_columns',
-                                                   'rows': 'old_rows'}}
+            ewa_nn_information = {
+                ('lon', 'lat'): {'columns': 'old_columns',
+                                 'rows': 'old_rows',
+                                 'grid_transform': 'grid_transform value',
+                                 'target_area': self.mock_target_area}}
 
             ewa_nn(message_parameters, 'alpha_var', ewa_nn_information,
-                   target_area, 'path/to/output', self.logger)
+                   'path/to/output', self.logger)
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
-                                                target_area, mock_values,
+                                                self.mock_target_area,
+                                                mock_values,
                                                 maximum_weight_mode=True)
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
+
+        with self.subTest('Harmony message defines target area'):
+            mock_get_target_area.reset_mock()
+            mock_ll2cr.reset_mock()
+            mock_fornav.reset_mock()
+            mock_write_netcdf.reset_mock()
+
+            harmony_target_area = Mock(spec=AreaDefinition,
+                                       shape='harmony_shape')
+
+            harmony_grid_transform = 'grid_transform'
+
+            cache = {
+                'harmony_message_target': {
+                    'target_area': harmony_target_area,
+                    'grid_transform': harmony_grid_transform,
+                }
+            }
+
+            ewa_nn(message_parameters, 'alpha_var', cache, 'path/to/output',
+                   self.logger)
+
+            mock_ll2cr.assert_called_once_with('swath', harmony_target_area)
+            mock_fornav.assert_called_once_with('columns', 'rows',
+                                                harmony_target_area,
+                                                mock_values,
+                                                maximum_weight_mode=True)
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                harmony_grid_transform
+            )
+            mock_get_target_area.assert_not_called()
+
+            # Check that there is a new entry in the cache, and that it only
+            # contains references to the original Harmony target area object,
+            # not copies of those objects.
+            expected_cache = {
+                'harmony_message_target': {
+                    'target_area': harmony_target_area,
+                    'grid_transform': harmony_grid_transform,
+                },
+                ('lon', 'lat'): {'columns': 'columns',
+                                 'rows': 'rows',
+                                 'grid_transform': harmony_grid_transform,
+                                 'target_area': harmony_target_area}
+            }
+            self.assertDictEqual(cache, expected_cache)
 
     @patch('pymods.interpolation.write_netcdf')
     @patch('pymods.interpolation.get_swath_definition')
+    @patch('pymods.interpolation.get_target_area')
     @patch('pymods.interpolation.get_variable_values')
     @patch('pymods.interpolation.get_sample_from_neighbour_info')
     @patch('pymods.interpolation.get_neighbour_info')
     def test_resample_nearest(self, mock_get_info, mock_get_sample,
-                              mock_get_values, mock_get_swath,
-                              mock_write_netcdf):
+                              mock_get_values, mock_get_target_area,
+                              mock_get_swath, mock_write_netcdf):
         """ Nearest neighbour interpolation should call both get_neighbour_info
             and get_sample_from_neighbour_info if there are no matching entries
             for the coordinates in the reprojection information. If there is an
@@ -342,20 +512,21 @@ class TestInterpolation(TestBase):
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
+        mock_get_target_area.return_value = {
+            'grid_transform': 'grid_transform value',
+            'target_area': self.mock_target_area,
+        }
 
-        projection = Proj('+proj=longlat +ellps=WGS84')
-
-        message_parameters = {'input_file': 'test/data/africa.nc',
-                              'projection': projection,
-                              'grid_transform': 'grid_transform value'}
-        target_area = Mock(spec=AreaDefinition, shape='ta_shape')
+        message_parameters = self.message_parameters
+        message_parameters['interpolation'] = 'near'
         alpha_var_fill = 0.0
 
         with self.subTest('No pre-existing nearest neighbour information'):
             nearest_neighbour(message_parameters, 'alpha_var', {},
-                              target_area, 'path/to/output', self.logger)
+                              'path/to/output', self.logger)
 
-            mock_get_info.assert_called_once_with('swath', target_area,
+            mock_get_info.assert_called_once_with('swath',
+                                                  self.mock_target_area,
                                                   RADIUS_OF_INFLUENCE,
                                                   epsilon=EPSILON,
                                                   neighbours=1)
@@ -366,10 +537,12 @@ class TestInterpolation(TestBase):
                                                     'index_array',
                                                     distance_array='distance_array',
                                                     fill_value=alpha_var_fill)
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
 
         with self.subTest('Pre-existing nearest neighbour information'):
             mock_get_info.reset_mock()
@@ -382,11 +555,13 @@ class TestInterpolation(TestBase):
                     'valid_output_index': 'old_valid_output',
                     'index_array': 'old_index_array',
                     'distance_array': 'old_distance',
+                    'grid_transform': 'grid_transform value',
+                    'target_area': self.mock_target_area,
                 }
             }
 
             nearest_neighbour(message_parameters, 'alpha_var',
-                              nearest_information, target_area,
+                              nearest_information,  # target_area,
                               'path/to/output', self.logger)
 
             mock_get_info.assert_not_called()
@@ -397,10 +572,72 @@ class TestInterpolation(TestBase):
                                                     'old_index_array',
                                                     distance_array='old_distance',
                                                     fill_value=alpha_var_fill)
-            mock_write_netcdf.assert_called_once_with('path/to/output',
-                                                      'results',
-                                                      projection,
-                                                      'grid_transform value')
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                'grid_transform value'
+            )
+
+        with self.subTest('Harmony message defines target area'):
+            mock_get_target_area.reset_mock()
+            mock_get_info.reset_mock()
+            mock_get_sample.reset_mock()
+            mock_write_netcdf.reset_mock()
+
+            harmony_target_area = Mock(spec=AreaDefinition,
+                                       shape='harmony_shape')
+
+            harmony_grid_transform = 'grid_transform'
+
+            cache = {
+                'harmony_message_target': {
+                    'target_area': harmony_target_area,
+                    'grid_transform': harmony_grid_transform,
+                }
+            }
+
+            nearest_neighbour(message_parameters, 'alpha_var', cache,
+                              'path/to/output', self.logger)
+
+            mock_get_target_area.assert_not_called()
+            mock_get_info.assert_called_once_with('swath',
+                                                  harmony_target_area,
+                                                  RADIUS_OF_INFLUENCE,
+                                                  epsilon=EPSILON,
+                                                  neighbours=1)
+            mock_get_sample.assert_called_once_with('nn', 'harmony_shape',
+                                                    mock_values,
+                                                    'valid_input_index',
+                                                    'valid_output_index',
+                                                    'index_array',
+                                                    distance_array='distance_array',
+                                                    fill_value=alpha_var_fill)
+            mock_write_netcdf.assert_called_once_with(
+                'path/to/output',
+                'results',
+                self.message_parameters['projection'],
+                harmony_grid_transform
+            )
+
+            # Check that there is a new entry in the cache, and that it only
+            # contains references to the original Harmony target area object,
+            # not copies of those objects.
+            expected_cache = {
+                'harmony_message_target': {
+                    'target_area': harmony_target_area,
+                    'grid_transform': harmony_grid_transform,
+                },
+                ('lon', 'lat'): {
+                    'valid_input_index': 'valid_input_index',
+                    'valid_output_index': 'valid_output_index',
+                    'index_array': 'index_array',
+                    'distance_array': 'distance_array',
+                    'target_area': harmony_target_area,
+                    'grid_transform': harmony_grid_transform,
+                }
+            }
+            self.assertDictEqual(cache, expected_cache)
 
     def test_check_for_valid_interpolation(self):
         """ Ensure all valid interpolations don't raise an exception. """
@@ -433,34 +670,427 @@ class TestInterpolation(TestBase):
         np.testing.assert_array_equal(longitudes, swath_definition.lons)
         np.testing.assert_array_equal(latitudes, swath_definition.lats)
 
-    def test_get_target_area(self):
-        """ Ensure a valid AreaDefinition object can be created from a
-            processed SwotRepr message. The object should contain a grid that
-            is linearly spaced in both projected coordinates, with the
-            specified number of rows and columns.
+    def test_get_reprojection_cache_minimal(self):
+        """ If a Harmony message does not contain any target area information,
+            then an empty cache should be retrieved.
 
         """
-        parameters = {'height': 3,
-                      'width': 6,
-                      'projection': Proj('+proj=longlat'),
-                      'x_min': -20,
-                      'x_max': 40,
-                      'y_min': 20,
-                      'y_max': 50}
+        self.assertDictEqual(get_reprojection_cache(self.message_parameters),
+                             {})
 
-        # The expected coordinates are to the cell centres, where as the
-        # extents are to the edges of the grids.
-        expected_x_coord = np.array([-15, -5, 5, 15, 25, 35])
-        expected_y_coord = np.array([45, 35, 25])
+    def test_get_cache_information_extents(self):
+        """ If a Harmony message defines the extents of a target area, but
+            neither dimensions nor resolutions, then an empty cache should be
+            retrieved.
 
-        area_definition = get_target_area(parameters)
+        """
+        message_parameters = self.message_parameters
+        message_parameters['x_min'] = -10
+        message_parameters['x_max'] = 10
+        message_parameters['y_min'] = -5
+        message_parameters['y_max'] = 5
 
-        self.assertEqual(area_definition.shape, (3, 6))
+        self.assertDictEqual(get_reprojection_cache(message_parameters), {})
 
-        self.assertEqual(area_definition.projection_x_coords.shape, (6, ))
-        np.testing.assert_array_equal(area_definition.projection_x_coords,
-                                      expected_x_coord)
+    def test_get_reprojection_cache_extents_resolutions(self):
+        """ If a Harmony message defines the target area extents and
+            resolutions, the returned cache should contain an entry that will
+            be used for all variables.
 
-        self.assertEqual(area_definition.projection_y_coords.shape, (3, ))
-        np.testing.assert_array_equal(area_definition.projection_y_coords,
-                                      expected_y_coord)
+        """
+        message_parameters = self.message_parameters
+        message_parameters['x_min'] = -10
+        message_parameters['x_max'] = 10
+        message_parameters['y_min'] = -5
+        message_parameters['y_max'] = 5
+        message_parameters['xres'] = 1
+        message_parameters['yres'] = -1
+
+        expected_grid_transform = Affine.from_gdal(-10, 1, 0.0, 5, 0.0, -1)
+        expected_target_area = AreaDefinition.from_extent(
+            'target_grid',
+            message_parameters['projection'].definition_string(),
+            (10, 20),
+            (-10, -5, 10, 5)
+        )
+
+        cache = get_reprojection_cache(message_parameters)
+
+        self.assertIn('harmony_message_target', cache)
+        self.assertSetEqual(set(cache['harmony_message_target'].keys()),
+                            {'grid_transform', 'target_area'})
+
+        self.assert_grid_transforms_equal(
+            cache['harmony_message_target']['grid_transform'],
+            expected_grid_transform
+        )
+        self.assert_areadefinitions_equal(
+            cache['harmony_message_target']['target_area'],
+            expected_target_area
+        )
+
+    def test_get_reprojection_cache_extents_dimensions(self):
+        """ If the Harmony message defines the target area extents and
+            dimensions, the returned cache should contain an entry that will be
+            used for all variables.
+
+        """
+        message_parameters = self.message_parameters
+        message_parameters['x_min'] = -10
+        message_parameters['x_max'] = 10
+        message_parameters['y_min'] = -5
+        message_parameters['y_max'] = 5
+        message_parameters['height'] = 10
+        message_parameters['width'] = 20
+
+        expected_grid_transform = Affine.from_gdal(-10, 1, 0.0, 5, 0.0, -1)
+        expected_target_area = AreaDefinition.from_extent(
+            'target_grid',
+            message_parameters['projection'].definition_string(),
+            (10, 20),
+            (-10, -5, 10, 5)
+        )
+
+        cache = get_reprojection_cache(message_parameters)
+
+        self.assertIn('harmony_message_target', cache)
+        self.assertSetEqual(set(cache['harmony_message_target'].keys()),
+                            {'grid_transform', 'target_area'})
+
+        self.assert_grid_transforms_equal(
+            cache['harmony_message_target']['grid_transform'],
+            expected_grid_transform
+        )
+        self.assert_areadefinitions_equal(
+            cache['harmony_message_target']['target_area'],
+            expected_target_area
+        )
+
+    def test_get_reprojection_cache_dimensions(self):
+        """ If the Harmony message defines the target area dimensions, but not
+            the extents, then the retrieved cache should be empty.
+
+        """
+        message_parameters = self.message_parameters
+        message_parameters['height'] = 10
+        message_parameters['width'] = 20
+
+        self.assertDictEqual(get_reprojection_cache(message_parameters), {})
+
+    def test_get_reprojection_cache_resolutions(self):
+        """ If the Harmony message defines the target area resolutions, but not
+            the extents, then the retrieved cache should be empty.
+
+        """
+        message_parameters = self.message_parameters
+        message_parameters['xres'] = 1
+        message_parameters['yres'] = -1
+
+        self.assertDictEqual(get_reprojection_cache(message_parameters), {})
+
+    @patch('pymods.interpolation.get_projected_resolution')
+    @patch('pymods.interpolation.get_extents_from_perimeter')
+    @patch('pymods.interpolation.get_coordinate_variable')
+    def test_get_target_area_minimal(self, mock_get_coordinates,
+                                     mock_get_extents, mock_get_resolution):
+        """ If the Harmony message does not define a target area, then that
+            information should be derived from the coordinate variables
+            referred to in the variable metadata.
+
+            Note: These unit tests are primarily to make sure the correct
+            combinations of message and variable-specific parameters are being
+            used. The full functional test comes from those in the main `test`
+            directory.
+
+        """
+        latitudes = 'lats'
+        longitudes = 'lons'
+        mock_get_coordinates.side_effect = [latitudes, longitudes]
+        mock_get_extents.return_value = (-20, 20, 0, 40)
+        mock_get_resolution.return_value = 2.0
+
+        # The dimensions are (20 - -20) / 2 = (40 - 0) / 2 = 20.
+        expected_target_area = AreaDefinition.from_extent(
+            'target_grid',
+            self.message_parameters['projection'].definition_string(),
+            (20, 20),
+            (-20, 0, 20, 40)
+        )
+        expected_grid_transform = Affine.from_gdal(-20, 2, 0.0, 40, 0.0, -2)
+
+        output = get_target_area(self.message_parameters, 'coordinate_group',
+                                 ('lat', 'lon'), self.logger)
+
+        self.assertEqual(mock_get_coordinates.call_count, 2)
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lat')
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lon')
+        mock_get_extents.assert_called_once_with(
+            self.message_parameters['projection'], longitudes, latitudes
+        )
+        mock_get_resolution.assert_called_once_with(
+            self.message_parameters['projection'], longitudes, latitudes
+        )
+
+        self.assert_grid_transforms_equal(output['grid_transform'],
+                                          expected_grid_transform)
+
+        self.assert_areadefinitions_equal(output['target_area'],
+                                          expected_target_area)
+
+    @patch('pymods.interpolation.get_projected_resolution')
+    @patch('pymods.interpolation.get_extents_from_perimeter')
+    @patch('pymods.interpolation.get_coordinate_variable')
+    def test_get_target_area_extents(self, mock_get_coordinates,
+                                     mock_get_extents, mock_get_resolution):
+        """ If the Harmony message defines the target area extents, these
+            should be used, with the dimensions and resolution of the output
+            being defined by the coordinate data from the variable.
+
+        """
+        latitudes = 'lats'
+        longitudes = 'lons'
+        mock_get_coordinates.side_effect = [latitudes, longitudes]
+        mock_get_extents.return_value = (-20, 20, 0, 40)
+        mock_get_resolution.return_value = 2.0
+
+        message_parameters = self.message_parameters
+        message_parameters['x_min'] = -10
+        message_parameters['x_max'] = 10
+        message_parameters['y_min'] = -5
+        message_parameters['y_max'] = 5
+
+        # The dimensions are x = (10 - -10) / 2 = 10, y = (5 - -5) / 2 = 5
+        expected_target_area = AreaDefinition.from_extent(
+            'target_grid',
+            self.message_parameters['projection'].definition_string(),
+            (5, 10),
+            (-10, -5, 10, 5)
+        )
+        expected_grid_transform = Affine.from_gdal(-10, 2, 0.0, 5, 0.0, -2)
+
+        output = get_target_area(self.message_parameters, 'coordinate_group',
+                                 ('lat', 'lon'), self.logger)
+
+        self.assertEqual(mock_get_coordinates.call_count, 2)
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lat')
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lon')
+        mock_get_extents.assert_not_called()
+        mock_get_resolution.assert_called_once_with(
+            self.message_parameters['projection'], longitudes, latitudes
+        )
+
+        self.assert_grid_transforms_equal(output['grid_transform'],
+                                          expected_grid_transform)
+
+        self.assert_areadefinitions_equal(output['target_area'],
+                                          expected_target_area)
+
+    @patch('pymods.interpolation.get_projected_resolution')
+    @patch('pymods.interpolation.get_extents_from_perimeter')
+    @patch('pymods.interpolation.get_coordinate_variable')
+    def test_get_target_area_extents_resolutions(self, mock_get_coordinates,
+                                                 mock_get_extents,
+                                                 mock_get_resolution):
+        """ If the Harmony message defines the target area extents and
+            resolutions, these should be used for the target area definition.
+            Note, this shouldn't happen in practice, as it should result in a
+            global definition being defined when the reprojection cache is
+            instantiated.
+
+        """
+        latitudes = 'lats'
+        longitudes = 'lons'
+        mock_get_coordinates.side_effect = [latitudes, longitudes]
+        mock_get_extents.return_value = (-20, 20, 0, 40)
+        mock_get_resolution.return_value = 2.0
+
+        message_parameters = self.message_parameters
+        message_parameters['x_min'] = -10
+        message_parameters['x_max'] = 10
+        message_parameters['y_min'] = -5
+        message_parameters['y_max'] = 5
+        message_parameters['xres'] = 1
+        message_parameters['yres'] = -1
+
+        # The dimensions are x = (10 - -10) / 1 = 20, y = (5 - -5) / 1 = 10
+        expected_target_area = AreaDefinition.from_extent(
+            'target_grid',
+            self.message_parameters['projection'].definition_string(),
+            (10, 20),
+            (-10, -5, 10, 5)
+        )
+        expected_grid_transform = Affine.from_gdal(-10, 1, 0.0, 5, 0.0, -1)
+
+        output = get_target_area(self.message_parameters, 'coordinate_group',
+                                 ('lat', 'lon'), self.logger)
+
+        self.assertEqual(mock_get_coordinates.call_count, 2)
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lat')
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lon')
+        mock_get_extents.assert_not_called()
+        mock_get_resolution.assert_not_called()
+
+        self.assert_grid_transforms_equal(output['grid_transform'],
+                                          expected_grid_transform)
+
+        self.assert_areadefinitions_equal(output['target_area'],
+                                          expected_target_area)
+
+    @patch('pymods.interpolation.get_projected_resolution')
+    @patch('pymods.interpolation.get_extents_from_perimeter')
+    @patch('pymods.interpolation.get_coordinate_variable')
+    def test_get_target_area_extents_dimensions(self, mock_get_coordinates,
+                                                mock_get_extents,
+                                                mock_get_resolution):
+        """ If the Harmony message defines the target area extents and
+            dimensions, these should be used for the target area definition.
+            Note, this shouldn't happen in practice, as it should result in a
+            global definition being defined when the reprojection cache is
+            instantiated.
+
+        """
+        latitudes = 'lats'
+        longitudes = 'lons'
+        mock_get_coordinates.side_effect = [latitudes, longitudes]
+        mock_get_extents.return_value = (-20, 20, 0, 40)
+        mock_get_resolution.return_value = 2.0
+
+        message_parameters = self.message_parameters
+        message_parameters['x_min'] = -10
+        message_parameters['x_max'] = 10
+        message_parameters['y_min'] = -5
+        message_parameters['y_max'] = 5
+        message_parameters['height'] = 10
+        message_parameters['width'] = 10
+
+    @patch('pymods.interpolation.get_projected_resolution')
+    @patch('pymods.interpolation.get_extents_from_perimeter')
+    @patch('pymods.interpolation.get_coordinate_variable')
+    def test_get_target_area_dimensions(self, mock_get_coordinates,
+                                        mock_get_extents, mock_get_resolution):
+        """ If the Harmony message defines the target area dimensions, then
+            that information should be used, along with the extents as
+            defined by the variables associated coordinates.
+
+        """
+        latitudes = 'lats'
+        longitudes = 'lons'
+        mock_get_coordinates.side_effect = [latitudes, longitudes]
+        mock_get_extents.return_value = (-20, 20, 0, 40)
+        mock_get_resolution.return_value = 4.0
+
+        message_parameters = self.message_parameters
+        message_parameters['height'] = 10
+        message_parameters['width'] = 10
+
+        expected_target_area = AreaDefinition.from_extent(
+            'target_grid',
+            self.message_parameters['projection'].definition_string(),
+            (10, 10),
+            (-20, 0, 20, 40)
+        )
+        expected_grid_transform = Affine.from_gdal(-20, 4, 0.0, 40, 0.0, -4)
+
+        output = get_target_area(self.message_parameters, 'coordinate_group',
+                                 ('lat', 'lon'), self.logger)
+
+        self.assertEqual(mock_get_coordinates.call_count, 2)
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lat')
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lon')
+        mock_get_extents.assert_called_once_with(
+            message_parameters['projection'], longitudes, latitudes
+        )
+        mock_get_resolution.assert_not_called()
+
+        self.assert_grid_transforms_equal(output['grid_transform'],
+                                          expected_grid_transform)
+
+        self.assert_areadefinitions_equal(output['target_area'],
+                                          expected_target_area)
+
+    @patch('pymods.interpolation.get_projected_resolution')
+    @patch('pymods.interpolation.get_extents_from_perimeter')
+    @patch('pymods.interpolation.get_coordinate_variable')
+    def test_get_target_area_resolutions(self, mock_get_coordinates,
+                                         mock_get_extents,
+                                         mock_get_resolution):
+        """ If the Harmony message defines the target area resolutions, then
+            that information should be used, along with the extents as
+            defined by the variables associated coordinates.
+
+        """
+        latitudes = 'lats'
+        longitudes = 'lons'
+        mock_get_coordinates.side_effect = [latitudes, longitudes]
+        mock_get_extents.return_value = (-20, 20, 0, 40)
+        mock_get_resolution.return_value = 2.0
+
+        message_parameters = self.message_parameters
+        message_parameters['xres'] = 4
+        message_parameters['yres'] = -5
+
+        # The dimensions are (20 - -20) / 4 = (40 - 0) / 5 = 8
+        expected_target_area = AreaDefinition.from_extent(
+            'target_grid',
+            self.message_parameters['projection'].definition_string(),
+            (8, 10),
+            (-20, 0, 20, 40)
+        )
+        expected_grid_transform = Affine.from_gdal(-20, 4, 0.0, 40, 0.0, -5)
+
+        output = get_target_area(self.message_parameters, 'coordinate_group',
+                                 ('lat', 'lon'), self.logger)
+
+        self.assertEqual(mock_get_coordinates.call_count, 2)
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lat')
+        mock_get_coordinates.assert_any_call('coordinate_group',
+                                             ('lat', 'lon'),
+                                             'lon')
+        mock_get_extents.assert_called_once_with(
+            message_parameters['projection'], longitudes, latitudes
+        )
+        mock_get_resolution.assert_not_called()
+
+        self.assert_grid_transforms_equal(output['grid_transform'],
+                                          expected_grid_transform)
+
+        self.assert_areadefinitions_equal(output['target_area'],
+                                          expected_target_area)
+
+    def test_get_parameters_tuple(self):
+        """ Ensure that the function behaves correctly when all, some or none
+            of the requested parameters are not `None` in the input dictionary.
+
+            If any of the requested parameters are `None`, then the function
+            should return `None`. Otherwise a tuple of the corresponding values
+            will be returned, in the requested order.
+
+        """
+        input_parameters = {'a': 1, 'b': 2, 'c': None}
+
+        test_args = [['All valid', ['a', 'b'], (1, 2)],
+                     ['Some valid', ['a', 'b', 'c'], None],
+                     ['None valid', ['c'], None]]
+
+        for description, keys, expected_output in test_args:
+            with self.subTest(description):
+                self.assertEqual(get_parameters_tuple(input_parameters, keys),
+                                 expected_output)

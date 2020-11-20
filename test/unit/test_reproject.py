@@ -1,14 +1,10 @@
 from logging import Logger
-from unittest.mock import patch
-
-from numpy.testing import assert_array_equal
-from pyproj import Proj
-from xarray import Variable
 
 from harmony.message import Message
+from numpy.testing import assert_array_equal
+from pyproj import Proj
 
-from pymods.reproject import (CRS_DEFAULT, get_input_file_data,
-                              get_params_from_msg, rgetattr)
+from pymods.reproject import CRS_DEFAULT, get_parameters_from_message, rgetattr
 from test.test_utils import TestBase
 
 
@@ -20,7 +16,6 @@ class TestReproject(TestBase):
         cls.logger = Logger('Reproject test')
         cls.granule = 'test/data/africa.nc'
         cls.granules = [{'local_filename': cls.granule}]
-        cls.file_data = get_input_file_data(cls.granule, '')
         cls.default_interpolation = 'ewa-nn'
         cls.height = 1200
         cls.width = 1200
@@ -28,6 +23,23 @@ class TestReproject(TestBase):
         cls.y_extent = {'min': -90.0, 'max': 90.0}
         cls.x_res = 1.0
         cls.y_res = -1.0
+
+    def setUp(self):
+        """ Define properties that should be refreshed on each test. """
+        self.default_parameters = {
+            'crs': CRS_DEFAULT,
+            'height': None,
+            'input_file': self.granule,
+            'interpolation': self.default_interpolation,
+            'projection': Proj(CRS_DEFAULT),
+            'width': None,
+            'x_min': None,
+            'x_max': None,
+            'xres': None,
+            'y_min': None,
+            'y_max': None,
+            'yres': None
+        }
 
     def assert_parameters_equal(self, parameters, expected_parameters):
         """ A helper method to check that the parameters retrieved from the
@@ -39,12 +51,10 @@ class TestReproject(TestBase):
 
         """
         for key, expected_value in expected_parameters.items():
-            if not isinstance(expected_value, Variable):
-                self.assertEqual(parameters[key], expected_value)
-            else:
-                assert_array_equal(parameters[key][:], expected_value[:])
+            self.assertEqual(parameters[key], expected_value,
+                             f'Failing parameter: {key}')
 
-    def test_get_params_from_msg_interpolation(self):
+    def test_get_parameters_from_message_interpolation(self):
         """ Ensure that various input messages can be correctly parsed, and
             that those missing raise the expected exceptions.
 
@@ -55,17 +65,18 @@ class TestReproject(TestBase):
                      ['String None', {'interpolation': 'None'}, 'ewa-nn'],
                      ['Empty string', {'interpolation': ''}, 'ewa-nn']]
 
+
         for description, format_attribute, expected_interpolation in test_args:
             with self.subTest(description):
                 message_content = {'format': format_attribute,
                                    'granules': self.granules}
                 message = Message(message_content)
-                parameters = get_params_from_msg(message, self.granule, self.logger)
+                parameters = get_parameters_from_message(message, self.granule)
 
                 self.assertEqual(parameters['interpolation'],
                                  expected_interpolation)
 
-    def test_get_params_error_5(self):
+    def test_get_parameters_error_5(self):
         """ Ensure that, if parameters are set for the resolution and the
             dimensions, an exception is raised.
 
@@ -100,11 +111,11 @@ class TestReproject(TestBase):
                             message_content['scaleSize']['y'] = self.y_res
 
                     message = Message(message_content)
-                    get_params_from_msg(message, self.granule, self.logger)
+                    get_parameters_from_message(message, self.granules)
                     self.assertTrue(exception_snippet in str(exception))
 
-    def test_get_params_missing_extents_or_dimensions(self):
-        """ Ensure that an exception is raised if there is only on of either
+    def test_get_parameters_missing_extents_or_dimensions(self):
+        """ Ensure that an exception is raised if there is only one of either
             x_extent and y_extent or height and width set.
 
         """
@@ -122,63 +133,71 @@ class TestReproject(TestBase):
                                        'format': format_content}
 
                     message = Message(message_content)
-                    get_params_from_msg(message, self.granule, self.logger)
+                    get_parameters_from_message(message, self.granule)
                     self.assertTrue('Missing' in str(exception))
 
-    @patch('pymods.reproject.get_projected_resolution')
-    @patch('pymods.reproject.get_extents_from_perimeter')
-    def test_get_params_from_msg(self, mock_get_extents, mock_get_resolution):
-        """ Ensure that default parameters are set, when things are largely
-            unspecified for resampling to use pyresample.
+    def test_get_parameters_from_message_defaults(self):
+        """ Ensure that if the most minimal Harmony message is supplied to the
+            SWOT Reprojection tool, sensible defaults are assigned for the
+            extracted message parameters.
 
         """
-        mock_get_extents.return_value = (self.x_extent['min'],
-                                         self.x_extent['max'],
-                                         self.y_extent['min'],
-                                         self.y_extent['max'])
-        mock_get_resolution.return_value = self.x_res
-        height = 180  # (90 - -90) / 1
-        width = 360  # (180 - -180) / 1
+        expected_parameters = self.default_parameters
 
-        expected_parameters = {'crs': CRS_DEFAULT,
-                               'data_group': '',
-                               'height': height,
-                               'input_file': self.granule,
-                               'interpolation': self.default_interpolation,
-                               'latlon_group': '',
-                               'latitudes': self.file_data['latitudes'],
-                               'lat_res': self.file_data['lat_res'],
-                               'logger': self.logger,
-                               'longitudes': self.file_data['longitudes'],
-                               'lon_res': self.file_data['lon_res'],
-                               'projection': Proj(CRS_DEFAULT),
-                               'width': width,
-                               'x_min': self.x_extent['min'],
-                               'x_max': self.x_extent['max'],
-                               'xres': self.x_res,
-                               'y_min': self.y_extent['min'],
-                               'y_max': self.y_extent['max'],
-                               'yres': self.y_res}
+        message = Message({'granules': self.granules, 'format': {}})
+        parameters = get_parameters_from_message(message, self.granule)
+        self.assert_parameters_equal(parameters, expected_parameters)
 
-        empty_format = {}
+    def test_get_parameters_from_message_extents(self):
+        """ Ensure that if the `scaleExtent` is specified in the input
+            Harmony message, the non-default extents are used.
+
+        """
+        expected_parameters = self.default_parameters
+        expected_parameters['x_min'] = self.x_extent['min']
+        expected_parameters['x_max'] = self.x_extent['max']
+        expected_parameters['y_min'] = self.y_extent['min']
+        expected_parameters['y_max'] = self.y_extent['max']
+
         extents_format = {'scaleExtent': {'x': self.x_extent,
                                           'y': self.y_extent}}
+        message = Message({'granules': self.granules,
+                           'format': extents_format})
+        expected_parameters['x_extent'] = message.format.scaleExtent.x
+        expected_parameters['y_extent'] = message.format.scaleExtent.y
+
+        parameters = get_parameters_from_message(message, self.granule)
+        self.assert_parameters_equal(parameters, expected_parameters)
+
+    def test_get_parameters_from_message_resolutions(self):
+        """ Ensure that if the `scaleSize` is specified in the input Harmony
+            message, the non-default resolutions are used.
+
+        """
+        expected_parameters = self.default_parameters
+        expected_parameters['xres'] = self.x_res
+        expected_parameters['yres'] = self.y_res
+
         resolutions_format = {'scaleSize': {'x': self.x_res, 'y': self.y_res}}
-        dimensions_format = {'height': height, 'width': width}
+        message = Message({'granules': self.granules,
+                           'format': resolutions_format})
+        parameters = get_parameters_from_message(message, self.granule)
+        self.assert_parameters_equal(parameters, expected_parameters)
 
-        test_args = [['Message relying on defaults', empty_format],
-                     ['Message contains extents', extents_format],
-                     ['Message contains resolutions', resolutions_format],
-                     ['Message contains dimensions', dimensions_format]]
+    def test_get_parameters_from_message_dimensions(self):
+        """ Ensure that if the `height` and `width` are specified in the input
+            Harmony message, the non-default dimensions are used.
 
-        for description, format_contents in test_args:
-            with self.subTest(description):
-                message_content = {'granules': self.granules,
-                                   'format': format_contents}
-                message = Message(message_content)
+        """
+        expected_parameters = self.default_parameters
+        expected_parameters['height'] = self.height
+        expected_parameters['width'] = self.height
 
-                parameters = get_params_from_msg(message, self.granule, self.logger)
-                self.assert_parameters_equal(parameters, expected_parameters)
+        extents_format = {'height': self.height, 'width': self.width}
+        message = Message({'granules': self.granules,
+                           'format': extents_format})
+        parameters = get_parameters_from_message(message, self.granule)
+        self.assert_parameters_equal(parameters, expected_parameters)
 
     def test_rgetattr(self):
         """ Ensure the utility function to recursively retrieve a class
@@ -193,12 +212,14 @@ class TestReproject(TestBase):
             def __init__(self):
                 self.user = 'jglenn'
                 self.inner = ExampleInnerClass()
+                self.none = None
 
         example_object = ExampleOuterClass()
         default = 'default'
 
         test_args = [['Single depth property', 'user', 'jglenn'],
                      ['Nested property', 'inner.interpolation', 'bilinear'],
+                     ['Property is None, default', 'none', default],
                      ['Absent attribute uses default', 'absent', default],
                      ['Absent nested attribute uses default', 'inner.absent', default],
                      ['Absent outer for nested uses default', 'absent.interpolation', default],

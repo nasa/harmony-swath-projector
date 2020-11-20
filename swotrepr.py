@@ -122,11 +122,11 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             has_items = False
 
         if not has_granules and not has_items:
-            print(has_granules, has_items, self.message.granules)
             raise HarmonyException("No granules specified for reprojection")
 
         if not isinstance(self.message.granules, list):
             raise Exception("Invalid granule list")
+
 
 # Main program start
 #
