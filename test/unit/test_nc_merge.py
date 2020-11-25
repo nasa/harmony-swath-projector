@@ -1,12 +1,16 @@
+from unittest.mock import patch
+import logging
 import os
 
-import netCDF4
+from netCDF4 import Dataset
+import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
 from pymods.nc_info import NCInfo
-from pymods.nc_merge import (check_coor_valid, create_output, get_dataset_meta,
-                             get_dimensions, get_fill_value_from_attributes,
-                             read_attrs)
+from pymods.nc_merge import (check_coor_valid, create_output,
+                             get_fill_value_from_attributes,
+                             get_science_variable_attributes,
+                             get_science_variable_dimensions, read_attrs)
 from test.test_utils import TestBase
 
 
@@ -14,6 +18,7 @@ class TestNCMerge(TestBase):
 
     @classmethod
     def setUpClass(cls):
+        cls.logger = logging.getLogger('nc_merge test')
         cls.input_file = 'test/data/VNL2_test_data.nc'
         cls.tmp_dir = 'test/data/test_tmp/'
         cls.output_file = 'test/data/VNL2_test_data_repr.nc'
@@ -22,7 +27,8 @@ class TestNCMerge(TestBase):
                                  'sea_surface_temperature', 'wind_speed'}
         cls.metadata_variables = set()
         create_output(cls.input_file, cls.output_file, cls.tmp_dir,
-                      cls.science_variables, cls.metadata_variables)
+                      cls.science_variables, cls.metadata_variables,
+                      cls.logger)
 
     @classmethod
     def tearDownClass(cls):
@@ -35,7 +41,7 @@ class TestNCMerge(TestBase):
         output_science_variables = output_info.get_science_variables()
         self.assertSetEqual(output_science_variables, self.science_variables)
 
-        # Output also has a CRS variable, and three dimensions:
+        # Output also has a CRS grid_mapping variable, and three dimensions:
         self.assertEqual(output_info.ancillary_data, {'latitude_longitude'})
         self.assertEqual(output_info.dims, {'lat', 'lon', 'time'})
 
@@ -45,8 +51,8 @@ class TestNCMerge(TestBase):
 
         """
         test_dataset = 'sea_surface_temperature'
-        in_dataset = netCDF4.Dataset(self.input_file)
-        out_dataset = netCDF4.Dataset(self.output_file)
+        in_dataset = Dataset(self.input_file)
+        out_dataset = Dataset(self.output_file)
         self.assertEqual(len(in_dataset[test_dataset].dimensions),
                          len(out_dataset[test_dataset].dimensions))
 
@@ -55,8 +61,8 @@ class TestNCMerge(TestBase):
             global attributes.
 
         """
-        in_dataset = netCDF4.Dataset(self.input_file)
-        out_dataset = netCDF4.Dataset(self.output_file)
+        in_dataset = Dataset(self.input_file)
+        out_dataset = Dataset(self.output_file)
         input_attrs = read_attrs(in_dataset)
         output_attrs = read_attrs(out_dataset)
         self.assertDictEqual(input_attrs, output_attrs)
@@ -64,8 +70,8 @@ class TestNCMerge(TestBase):
     def test_same_num_of_dataset_attributes(self):
         """ Variables in input should have the same number of attributes. """
         test_variable = 'sea_surface_temperature'
-        in_dataset = netCDF4.Dataset(self.input_file)
-        out_dataset = netCDF4.Dataset(self.output_file)
+        in_dataset = Dataset(self.input_file)
+        out_dataset = Dataset(self.output_file)
         inf_data = in_dataset[test_variable]
         out_data = out_dataset[test_variable]
         input_attrs = read_attrs(inf_data)
@@ -75,8 +81,8 @@ class TestNCMerge(TestBase):
     def test_same_data_type(self):
         """ Variables in input and output should have same data type. """
         test_variable = 'sea_surface_temperature'
-        in_dataset = netCDF4.Dataset(self.input_file)
-        out_dataset = netCDF4.Dataset(self.output_file)
+        in_dataset = Dataset(self.input_file)
+        out_dataset = Dataset(self.output_file)
         input_data_type = in_dataset[test_variable].datatype
         output_data_type = out_dataset[test_variable].datatype
         self.assertEqual(input_data_type, output_data_type, 'Should be equal')
@@ -91,7 +97,7 @@ class TestNCMerge(TestBase):
 
         with self.assertRaises(MissingReprojectedDataError):
             create_output(self.input_file, temporary_output_file, self.tmp_dir,
-                          test_variables, self.metadata_variables)
+                          test_variables, self.metadata_variables, self.logger)
 
         if os.path.exists(temporary_output_file):
             os.remove(temporary_output_file)
@@ -122,9 +128,8 @@ class TestNCMerge(TestBase):
 
         """
         test_dataset_name = 'sea_surface_temperature.nc'
-        single_band_dataset = netCDF4.Dataset(f'{self.tmp_dir}'
-                                              f'{test_dataset_name}')
-        input_dataset = netCDF4.Dataset(self.input_file)
+        single_band_dataset = Dataset(f'{self.tmp_dir}{test_dataset_name}')
+        input_dataset = Dataset(self.input_file)
 
         with self.subTest('No coordinate data returns True'):
             self.assertTrue(check_coor_valid({}, input_dataset,
@@ -143,69 +148,83 @@ class TestNCMerge(TestBase):
         with self.subTest('Reprojected data with preserved coordinates returns True'):
             # To ensure a match, this uses two different reprojected output
             # files, as these are guaranteed to match coordinate shapes.
-            second_dataset = netCDF4.Dataset(f'{self.tmp_dir}wind_speed.nc')
+            second_dataset = Dataset(f'{self.tmp_dir}wind_speed.nc')
             attributes = {'coordinates': 'lat lon'}
 
             self.assertTrue(check_coor_valid(attributes, second_dataset,
                                              single_band_dataset))
 
-    def test_get_dimensions(self):
-        """ Check the input dataset takes priority, and that a 'time' dimension
-            is correctly identified. Otherwise determine the dimensions from
-            the single band dataset, or return an empty tuple.
+    def test_get_science_variable_dimensions(self):
+        """ Ensure that the retrieved dimensions match those in the single band
+            dataset. If the input dataset includes a time dimension, that
+            should be included in the returned tuple.
 
         """
-        test_dataset_name = 'sea_surface_temperature.nc'
-        single_band_dataset = netCDF4.Dataset(f'{self.tmp_dir}'
-                                              f'{test_dataset_name}')
-        input_dataset = netCDF4.Dataset(self.input_file)
+        variable_name = 'sea_surface_temperature'
+        single_band_dataset = Dataset(f'{self.tmp_dir}{variable_name}.nc')
+        input_dataset = Dataset(self.input_file)
 
-        with self.subTest('No input_dataset, single band is array'):
-            self.assertTupleEqual(get_dimensions(single_band_dataset, 'Band1'),
-                                  ('lat', 'lon'))
+        with self.subTest('Input dataset has time dimension.'):
+            dimensions = get_science_variable_dimensions(input_dataset,
+                                                         single_band_dataset,
+                                                         variable_name)
+            self.assertTupleEqual(dimensions, ('time', 'lat', 'lon'))
 
-        with self.subTest('No input_dataset, single band is scalar'):
-            self.assertTupleEqual(get_dimensions(single_band_dataset, 'crs'),
-                                  ())
+        with self.subTest('Input dataset has no time dimension.'):
+            # Using the single_band_dataset as input ensure no time dimension
+            dimensions = get_science_variable_dimensions(single_band_dataset,
+                                                         single_band_dataset,
+                                                         'lat')
+            self.assertTupleEqual(dimensions, ('lat',))
 
-        with self.subTest('input_dataset has time dimension'):
-            self.assertTupleEqual(get_dimensions(single_band_dataset, 'Band1',
-                                                 input_dataset),
-                                  ('time', 'lat', 'lon'))
-
-        with self.subTest('Dimension variable refers to itself'):
-            self.assertTupleEqual(get_dimensions(single_band_dataset, 'lat'),
-                                  ('lat',))
-
-    def test_get_dataset_meta(self):
-        """ Check the dimensions, datatype and attributes are correctly
-            retrieved.
+    @patch('pymods.nc_merge.check_coor_valid')
+    def test_get_science_variable_attributes(self, mock_check_coord_valid):
+        """ The original input metadata should be mostly present. The
+            `grid_mapping` metadata attribute should be added from the single
+            band output. If the shapes of the variables listed as coordinates
+            have changed in reprojection, then the `coordinates` metadata
+            attribute not be present in the returned attributes.
 
         """
-        test_dataset_name = 'sea_surface_temperature'
-        single_band_dataset = netCDF4.Dataset(f'{self.tmp_dir}'
-                                              f'{test_dataset_name}.nc')
-        input_dataset = netCDF4.Dataset(self.input_file)
+        variable_name = 'sea_surface_temperature'
+        single_band_dataset = Dataset(f'{self.tmp_dir}{variable_name}.nc')
+        input_dataset = Dataset(self.input_file)
 
-        with self.subTest('Variable name in single band output'):
-            metadata = get_dataset_meta(input_dataset, single_band_dataset,
-                                        'Band1')
+        with self.subTest('Coordinates remain valid.'):
+            mock_check_coord_valid.return_value = True
+            attributes = get_science_variable_attributes(input_dataset,
+                                                         single_band_dataset,
+                                                         variable_name)
 
-            self.assertTupleEqual(metadata[0], ('lat', 'lon'))
-            self.assertEqual(metadata[1],
-                             single_band_dataset['Band1'].datatype)
-            self.assertDictEqual(metadata[2],
-                                 single_band_dataset['Band1'].__dict__)
+            input_attributes = input_dataset[variable_name].__dict__
+            single_band_attributes = single_band_dataset[variable_name].__dict__
 
-        with self.subTest('Variable name not in single band output'):
-            metadata = get_dataset_meta(input_dataset, single_band_dataset,
-                                        test_dataset_name)
+            # This will include the `coordinates` attribute from the input.
+            for attribute_name, attribute_value in input_attributes.items():
+                self.assertIn(attribute_name, attributes)
+                self.assertEqual(attributes[attribute_name], attribute_value)
 
-            expected_attrs = input_dataset[test_dataset_name].__dict__.copy()
-            del expected_attrs['coordinates']
-            expected_attrs['grid_mapping'] = 'crs'
+            self.assertIn('grid_mapping', attributes)
+            self.assertEqual(attributes['grid_mapping'],
+                             single_band_attributes['grid_mapping'])
 
-            self.assertTupleEqual(metadata[0], ('time', 'lat', 'lon'))
-            self.assertEqual(metadata[1],
-                             input_dataset[test_dataset_name].datatype)
-            self.assertDictEqual(metadata[2], expected_attrs)
+        with self.subTest('Coordinates are no longer valid.'):
+            mock_check_coord_valid.return_value = False
+            attributes = get_science_variable_attributes(input_dataset,
+                                                         single_band_dataset,
+                                                         variable_name)
+
+            input_attributes = input_dataset[variable_name].__dict__
+            single_band_attributes = single_band_dataset[variable_name].__dict__
+
+            self.assertNotIn('coordinates', attributes)
+
+            for attribute_name, attribute_value in input_attributes.items():
+                if attribute_name != 'coordinates':
+                    self.assertIn(attribute_name, attributes)
+                    self.assertEqual(attributes[attribute_name],
+                                     attribute_value)
+
+            self.assertIn('grid_mapping', attributes)
+            self.assertEqual(attributes['grid_mapping'],
+                             single_band_attributes['grid_mapping'])

@@ -2,8 +2,7 @@ from typing import Optional, Tuple, Union
 import os
 import re
 
-from xarray.core.dataset import Dataset
-from xarray.core.variable import Variable
+from netCDF4 import Dataset, Variable
 import numpy as np
 
 
@@ -15,6 +14,7 @@ def create_coordinates_key(coordinates: str) -> Tuple[str]:
         Net-CDF4 file.
 
     """
+    # TODO: DAS-900 Fully qualify coordinate string
     return tuple(re.split(r'\s+|,\s*', coordinates))
 
 
@@ -29,12 +29,12 @@ def get_variable_values(input_file: Dataset, variable: Variable) -> np.ndarray:
     #       in the longitude-latitude plane should be used to determine 2-D
     #       reprojection information. This information should then also be
     #       applied across the other preceding or following dimensions.
-    if input_file.variables.get('time') is not None:
+    if 'time' in input_file.variables:
         # Assumption: Array = (1, y, x)
-        return variable[0].values
+        return variable[0][:]
     else:
         # Assumption: Array = (y, x)
-        return variable.values
+        return variable[:]
 
 
 def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
@@ -51,18 +51,6 @@ def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
     return None
 
 
-def get_variable_group_and_name(variable: str) -> Tuple[str, str]:
-    """ Extract variable name and group from its full path.
-
-        Returns:
-            group: String showing location of variable within the NetCDF file.
-            name: String name of the variable.
-
-    """
-    split_variable = variable.split('/')
-    return '/'.join(split_variable[:-1]), split_variable[-1]
-
-
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
     """ Retrieve the _FillValue attribute for a given variable. If there is no
         _FillValue attribute, return None. The pyresample
@@ -70,7 +58,10 @@ def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
         inputs for `fill_value`. Non-numeric fill values are returned as None.
 
     """
-    fill_value = variable.attrs.get('_FillValue')
+    if '_FillValue' in variable.ncattrs():
+        fill_value = variable.getncattr('_FillValue')
+    else:
+        fill_value = None
 
     if not isinstance(fill_value,
                       (np.integer, np.long, np.floating, int, float)):

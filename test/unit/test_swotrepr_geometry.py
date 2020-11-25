@@ -1,8 +1,11 @@
 from random import shuffle
+from shutil import rmtree
+from tempfile import mkdtemp
 from unittest.mock import patch
+from uuid import uuid4
 
+from netCDF4 import Dataset, Variable
 from pyproj import Proj
-from xarray import Variable
 import numpy as np
 
 from pymods.swotrepr_geometry import (clockwise_point_sort,
@@ -25,14 +28,37 @@ class TestSwotReprGeometry(TestBase):
     def setUpClass(cls):
         cls.ease_projection = Proj('EPSG:6933')
         cls.geographic_coordinates = Proj('EPSG:4326')
+
+        cls.test_dir = mkdtemp()
+        cls.test_path = f'{cls.test_dir}/geometry.nc'
+
         cls.lat_data = np.array([[25.0, 25.0, 25.0, 25.0],
                                  [20.0, 20.0, 20.0, 20.0],
                                  [15.0, 15.0, 15.0, 15.0]])
         cls.lon_data = np.array([[40.0, 45.0, 50.0, 55.0],
                                  [40.0, 45.0, 50.0, 55.0],
                                  [40.0, 45.0, 50.0, 55.0]])
-        cls.latitudes = Variable(dims=('ni', 'nj'), data=cls.lat_data)
-        cls.longitudes = Variable(dims=('ni', 'nj'), data=cls.lon_data)
+
+        cls.test_file = Dataset(cls.test_path, 'w')
+        cls.test_file.createDimension('nj', size=3)
+        cls.test_file.createDimension('ni', size=4)
+        cls.test_file.createVariable('lat', np.float, dimensions=('nj', 'ni'))
+        cls.test_file.createVariable('lon', np.float, dimensions=('nj', 'ni'))
+        cls.test_file['lat'][:] = cls.lat_data
+        cls.test_file['lon'][:] = cls.lon_data
+        cls.test_file.close()
+
+    def setUp(self):
+        self.test_dataset = Dataset(self.test_path)
+        self.longitudes = self.test_dataset['lon']
+        self.latitudes = self.test_dataset['lat']
+
+    def tearDown(self):
+        self.test_dataset.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        rmtree(cls.test_dir, ignore_errors=True)
 
     def test_get_projected_resolution(self):
         """ Ensure the calculated resolution from the input longitudes and
@@ -94,8 +120,8 @@ class TestSwotReprGeometry(TestBase):
         mask = np.ma.masked_where(np.logical_not(valid_pixels),
                                   np.ones(self.longitudes.shape))
 
-        coordinates = get_perimeter_coordinates(self.longitudes,
-                                                self.latitudes,
+        coordinates = get_perimeter_coordinates(self.longitudes[:],
+                                                self.latitudes[:],
                                                 mask)
 
         self.assertCountEqual(coordinates, expected_points)
@@ -192,11 +218,9 @@ class TestSwotReprGeometry(TestBase):
                 self.assertEqual(ordered_x, expected_x)
                 self.assertEqual(ordered_y, expected_y)
 
-    @patch('pymods.swotrepr_geometry.get_variable_numeric_fill_value')
-    def test_get_valid_coordinates_mask(self, mock_get_fill_value):
+    def test_get_valid_coordinates_mask(self):
         """ Ensure all logical conditions are respected. """
         fill_value = -9999.0
-        mock_get_fill_value.return_value = fill_value
 
         valid_lon = np.array([[1.0, 2.0], [3.0, 4.0]])
         valid_lat = np.array([[5.0, 6.0], [7.0, 8.0]])
@@ -221,13 +245,26 @@ class TestSwotReprGeometry(TestBase):
 
         for description, lon_data, lat_data, expected_mask in test_args:
             with self.subTest(description):
-                latitudes = Variable(dims=('ni', 'nj'), data=lat_data)
-                longitudes = Variable(dims=('ni', 'nj'), data=lon_data)
+                test_path = f'{self.test_dir}/test_mask_{uuid4()}.nc'
+                test_file = Dataset(test_path, 'w')
+                test_file.createDimension('nj', size=2)
+                test_file.createDimension('ni', size=2)
+                test_file.createVariable('lat', np.float, dimensions=('nj', 'ni'),
+                                         fill_value=fill_value)
+                test_file.createVariable('lon', np.float, dimensions=('nj', 'ni'),
+                                         fill_value=fill_value)
+                test_file['lat'][:] = lat_data
+                test_file['lon'][:] = lon_data
+                test_file.close()
 
+                dataset = Dataset(test_path)
                 np.testing.assert_array_equal(
-                    get_valid_coordinates_mask(longitudes, latitudes),
+                    get_valid_coordinates_mask(dataset['lon'], dataset['lat']),
                     expected_mask
                 )
+                dataset.close()
+
+
 
     def test_get_slice_edges(self):
         """ Ensure the pixel coordinates for exterior points are returned,

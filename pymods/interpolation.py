@@ -2,32 +2,38 @@
     datasets within a file, using the pyresample Python package.
 
 """
+from functools import partial
 from logging import Logger
 from typing import Dict, List, Optional, Tuple
 import os
 
-from pyproj import Proj
+from netCDF4 import Dataset, Variable
 from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
 from pyresample.geometry import AreaDefinition, SwathDefinition
 from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_info
-from rasterio.transform import Affine
-from xarray.core.dataset import Dataset
 import numpy as np
-import rasterio
-import xarray
 
+from pymods.nc_single_band import HARMONY_TARGET, write_single_band_output
 from pymods.swotrepr_geometry import (get_extents_from_perimeter,
                                       get_projected_resolution)
 from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
                               get_variable_file_path,
-                              get_variable_group_and_name,
                               get_variable_numeric_fill_value,
                               get_variable_values)
 
 
+# In nearest neighbour interpolation, the distance to a found value is
+# guaranteed to be no further than (1 + EPSILON) times the distance to the
+# correct neighbour.
 EPSILON = 0.5
+# The number of closest locations considered when selecting the four data
+# points around the target location. A smaller number reduces runtime, but this
+# value needs to be large enough to ensure the target is surrounded.
 NEIGHBOURS = 16
+# The radius, in metres, around each grid pixel to search for swath neighbours.
+# This is used in both the bilinear and nearest-neighbour interpolation
+# methods, and is set to the default value from `pyresample`.
 RADIUS_OF_INFLUENCE = 50000
 
 
@@ -74,79 +80,101 @@ def resample_all_variables(message_parameters: Dict,
 def resample_variable(message_parameters: Dict, full_variable: str,
                       reprojection_cache: Dict, variable_output_path: str,
                       logger: Logger) -> None:
-    """ A wrapper function to redirect the variable being reprojected to a
-        function specific to the interpolation option.
+    """ A function to perform the reprojection of a single variable. The
+        reprojection information for each will be derived using interpolation
+        method specific functions, as will the calculation of reprojected
+        results.
+
+        Reprojection information will be stored in a cache, enabling it to be
+        recalled, rather than rederived for subsequent science variables that
+        share the same coordinate variables.
 
     """
-    resampling_functions = get_resampling_functions()
-    resampling_functions[message_parameters['interpolation']](
-        message_parameters,
-        full_variable,
-        reprojection_cache,
-        variable_output_path,
-        logger
+    interpolation_functions = (
+        get_resampling_functions()[message_parameters['interpolation']]
     )
-
-
-def bilinear(message_parameters: Dict, full_variable: str,
-             reprojection_cache: Dict, variable_output_path: str,
-             logger: Logger) -> None:
-    """ Use bilinear interpolation to produce the target output. If the same
-        source coordinates have been processed for a previous variable, use
-        applicable information (from get_bil_info) rather than recreating it.
-
-        Once the variable has been interpolated, it is saved to a new NetCDF
-        file, which will be merged with others after all variables have been
-        interpolated.
-
-    """
-    # NOTE: DAS-599 will replace xarray with netCDF4. At that point some of
-    # these lines of code can be extracted out into a new function to remove
-    # repetition.
-    variable_group, variable_name = get_variable_group_and_name(full_variable)
-    dataset = xarray.open_dataset(message_parameters['input_file'],
-                                  decode_cf=False,
-                                  group=variable_group)
-
-    variable = dataset.variables.get(variable_name)
-    variable_values = get_variable_values(dataset, variable)
-    coordinates_key = create_coordinates_key(variable.attrs.get('coordinates'))
+    dataset = Dataset(message_parameters['input_file'])
+    variable = dataset[full_variable]
+    coordinates_key = create_coordinates_key(variable.getncattr('coordinates'))
 
     if coordinates_key in reprojection_cache:
-        logger.debug(f'Retrieving previous bilinear information for {variable_name}')
-        bilinear_information = reprojection_cache[coordinates_key]
+        logger.debug('Retrieving previous interpolation information for '
+                     f'{full_variable}')
+        reprojection_information = reprojection_cache[coordinates_key]
     else:
-        logger.debug(f'Calculating bilinear information for {variable_name}')
+        logger.debug(f'Deriving interpolation information for {full_variable}')
 
-        if 'harmony_message_target' in reprojection_cache:
+        if HARMONY_TARGET in reprojection_cache:
             logger.debug('Using target area defined in Harmony message.')
-            target_info = reprojection_cache['harmony_message_target']
+            target_area = reprojection_cache[HARMONY_TARGET]['target_area']
         else:
             logger.debug('Deriving target area from associated coordinates.')
-            target_info = get_target_area(message_parameters, dataset,
+            target_area = get_target_area(message_parameters, dataset,
                                           coordinates_key, logger)
 
         swath_definition = get_swath_definition(dataset, coordinates_key)
-        bilinear_info = get_bil_info(swath_definition,
-                                     target_info['target_area'],
-                                     radius=RADIUS_OF_INFLUENCE,
-                                     neighbours=NEIGHBOURS)
 
-        bilinear_information = {'vertical_distances': bilinear_info[0],
-                                'horizontal_distances': bilinear_info[1],
-                                'valid_input_indices': bilinear_info[2],
-                                'valid_point_mapping': bilinear_info[3]}
+        reprojection_information = interpolation_functions['get_information'](
+            swath_definition, target_area
+        )
 
-        # Store target area information, too. If the Harmony message has a
-        # fully defined target area, the target area information cached within
-        # the coordinate key entry will only be a reference to the Harmony
-        # message target area objects, not copies of the objects themselves.
-        bilinear_information.update(target_info)
+        # This entry stores target area information, too. If the Harmony
+        # message has a fully defined target area, the target area information
+        # cached within the coordinate key entry will only be a reference to
+        # the Harmony message target area objects, not copies of the objects
+        # themselves.
+        reprojection_cache[coordinates_key] = reprojection_information
 
-        reprojection_cache[coordinates_key] = bilinear_information
+    # Use a dictionary to store input variable values and fill value. This
+    # allows the same function signature to retrieve results from all
+    # interpolation methods.
+    variable_information = {
+        'values': get_variable_values(dataset, variable),
+        'fill_value': get_variable_numeric_fill_value(variable)
+    }
 
-    results = get_sample_from_bil_info(
-        variable_values.ravel(),
+    results = interpolation_functions['get_results'](variable_information,
+                                                     reprojection_information)
+
+    attributes = get_scale_and_offset(variable)
+    write_single_band_output(reprojection_information['target_area'], results,
+                             full_variable, variable_output_path,
+                             reprojection_cache, attributes)
+
+    dataset.close()
+
+    logger.debug(f'Saved {full_variable} output to temporary file: '
+                 f'{variable_output_path}')
+
+
+def get_bilinear_information(swath_definition: SwathDefinition,
+                             target_area: AreaDefinition) -> Dict:
+    """ Return the necessary information to reproject a swath using the
+        bilinear interpolation method. This information will be stored in the
+        reprojection cache, for use with other science variables that share the
+        same coordinate variables.
+
+    """
+    bilinear_information = get_bil_info(swath_definition, target_area,
+                                        radius=RADIUS_OF_INFLUENCE,
+                                        neighbours=NEIGHBOURS)
+
+    return {'vertical_distances': bilinear_information[0],
+            'horizontal_distances': bilinear_information[1],
+            'valid_input_indices': bilinear_information[2],
+            'valid_point_mapping': bilinear_information[3],
+            'target_area': target_area}
+
+
+def get_bilinear_results(variable: Dict,
+                         bilinear_information: Dict) -> np.ndarray:
+    """ Use the derived information from the input swath and target area to
+        reproject variable data in the target area using the bilinear
+        interpolation method.
+
+    """
+    return get_sample_from_bil_info(
+        variable['values'].ravel(),
         bilinear_information['vertical_distances'],
         bilinear_information['horizontal_distances'],
         bilinear_information['valid_input_indices'],
@@ -154,23 +182,28 @@ def bilinear(message_parameters: Dict, full_variable: str,
         output_shape=bilinear_information['target_area'].shape
     )
 
-    write_netcdf(variable_output_path,
-                 results,
-                 message_parameters['projection'],
-                 bilinear_information['grid_transform'])
 
-    logger.debug(f'Saved {variable_name} output to temporary file: '
-                 f'{variable_output_path}')
+def get_ewa_information(swath_definition: SwathDefinition,
+                        target_area: AreaDefinition) -> Dict:
+    """ Return the necessary information to reproject a swath using the
+        Elliptically Weighted Average interpolation method. This information
+        will be stored in the reprojection cache, for use with other science
+        variables that share the same coordinate variables.
+
+    """
+    ewa_info = ll2cr(swath_definition, target_area)
+
+    return {'columns': ewa_info[1],
+            'rows': ewa_info[2],
+            'target_area': target_area}
 
 
-def ewa_helper(message_parameters: Dict, full_variable: str,
-               reprojection_cache: Dict, variable_output_path: str,
-               logger: Logger, maximum_weight_mode: bool) -> None:
-    """ Use Elliptical Weighted Average (EWA) interpolation to produce the
-        target output. The `pyresample` EWA algorithm assumes that the data are
-        presented one scan row at a time in the input array. If the same
-        source coordinates have been processed for a previous variable, use
-        applicable information (from ll2cr) rather than recreating it.
+def get_ewa_results(variable: Dict, ewa_information: Dict,
+                    maximum_weight_mode: bool) -> np.ndarray:
+    """ Use the derived information from the input swath and target area to
+        reproject variable data in the target area using the Elliptically
+        Weighted Average interpolation. This also includes the flag for whether
+        to use the maximum weight mode.
 
         If maximum_weight_mode is False, a weighted average of all swath cells
         that map to a particular grid cell is used. If True, the swath cell
@@ -180,185 +213,79 @@ def ewa_helper(message_parameters: Dict, full_variable: str,
         the same scan line being more closely related than those from different
         scans.
 
-        Once the variable has been interpolated, it is saved to a new NetCDF
-        file, which will be merged with others after all variables have been
-        interpolated.
-
     """
-    # NOTE: See note on DAS-599 in `bilinear` function.
-    variable_group, variable_name = get_variable_group_and_name(full_variable)
-    dataset = xarray.open_dataset(message_parameters['input_file'],
-                                  decode_cf=False,
-                                  group=variable_group)
-
-    variable = dataset.variables.get(variable_name)
-    variable_values = get_variable_values(dataset, variable)
-    coordinates_key = create_coordinates_key(variable.attrs.get('coordinates'))
-
-    if coordinates_key in reprojection_cache:
-        logger.debug(f'Retrieving previous EWA information for {variable_name}')
-        ewa_information = reprojection_cache[coordinates_key]
-    else:
-        logger.debug(f'Calculating EWA information for {variable_name}')
-
-        if 'harmony_message_target' in reprojection_cache:
-            logger.info('Using target area defined in Harmony message.')
-            target_info = reprojection_cache['harmony_message_target']
-        else:
-            logger.debug('Deriving target area from associated coordinates.')
-            target_info = get_target_area(message_parameters, dataset,
-                                          coordinates_key, logger)
-
-        swath_definition = get_swath_definition(dataset, coordinates_key)
-        ewa_info = ll2cr(swath_definition, target_info['target_area'])
-
-        ewa_information = {'columns': ewa_info[1], 'rows': ewa_info[2]}
-        ewa_information.update(target_info)
-
-        # Store target area information, too. If the Harmony message has a
-        # fully defined target area, the target area information cached within
-        # the coordinate key entry will only be a reference to the Harmony
-        # message target area objects, not copies of the objects themselves.
-        reprojection_cache[coordinates_key] = ewa_information
-
-    if np.issubdtype(variable_values.dtype, np.integer):
-        variable_values = variable_values.astype(float)
+    if np.issubdtype(variable['values'].dtype, np.integer):
+        variable['values'] = variable['values'].astype(float)
 
     # This call falls back on the EWA rows_per_scan default of total input rows
     # and ignores the quality status return value
     _, results = fornav(ewa_information['columns'], ewa_information['rows'],
-                        ewa_information['target_area'], variable_values,
+                        ewa_information['target_area'], variable['values'],
                         maximum_weight_mode=maximum_weight_mode)
 
-    write_netcdf(variable_output_path,
-                 results,
-                 message_parameters['projection'],
-                 ewa_information['grid_transform'])
-
-    logger.debug(f'Saved {variable_name} output to temporary file: '
-                 f'{variable_output_path}')
+    return results
 
 
-def ewa(message_parameters: Dict, full_variable: str, reprojection_cache: Dict,
-        variable_output_path: str, logger: Logger) -> None:
-    """ Use Elliptical Weighted Average (EWA) interpolation to produce the
-            target output. A weighted average of all swath cells that map
-            to a particular grid cell is used.
-    """
-    ewa_helper(message_parameters, full_variable, reprojection_cache,
-               variable_output_path, logger, maximum_weight_mode=False)
-
-
-def ewa_nn(message_parameters: Dict, full_variable: str,
-           reprojection_cache: Dict, variable_output_path: str,
-           logger: Logger) -> None:
-    """ Use Elliptical Weighted Average (EWA) interpolation to produce the
-            target output. The swath cell having the maximum weight of all
-            swath cells that map to a particular grid cell is used.
-    """
-    ewa_helper(message_parameters, full_variable, reprojection_cache,
-               variable_output_path, logger, maximum_weight_mode=True)
-
-
-def nearest_neighbour(message_parameters: Dict, full_variable: str,
-                      reprojection_cache: Dict, variable_output_path: str,
-                      logger: Logger) -> None:
-    """ Use nearest neighbour interpolation to produce the target output. If
-        the same source coordinates have been processed for a previous
-        variable, use applicable information (from get_neighbour_info) rather
-        than recreating it.
-
-        Once the variable has been interpolated, it is saved to a new NetCDF
-        file, which will be merged with others after all variables have been
-        interpolated.
+def get_near_information(swath_definition: SwathDefinition,
+                         target_area: AreaDefinition) -> Dict:
+    """ Return the necessary information to reproject a swath using the
+        nearest neighbour interpolation method. This information will be stored
+        in the reprojection cache, for use with other science variables that
+        share the same coordinate variables.
 
     """
-    # NOTE: See note on DAS-599 in `bilinear` function.
-    variable_group, variable_name = get_variable_group_and_name(full_variable)
-    dataset = xarray.open_dataset(message_parameters['input_file'],
-                                  decode_cf=False, group=variable_group)
+    near_information = get_neighbour_info(swath_definition, target_area,
+                                          RADIUS_OF_INFLUENCE,
+                                          epsilon=EPSILON, neighbours=1)
 
-    variable = dataset.variables.get(variable_name)
-    variable_values = get_variable_values(dataset, variable)
-    variable_fill_value = get_variable_numeric_fill_value(variable)
-    coordinates_key = create_coordinates_key(variable.attrs.get('coordinates'))
+    return {'valid_input_index': near_information[0],
+            'valid_output_index': near_information[1],
+            'index_array': near_information[2],
+            'distance_array': near_information[3],
+            'target_area': target_area}
 
-    if coordinates_key in reprojection_cache:
-        logger.debug('Retrieving previous nearest neighbour information for '
-                     f'{variable_name}')
-        near_information = reprojection_cache[coordinates_key]
-    else:
-        logger.debug('Calculating nearest neighbour information for '
-                     f'{variable_name}')
 
-        if 'harmony_message_target' in reprojection_cache:
-            logger.debug('Using target area defined in Harmony message.')
-            target_info = reprojection_cache['harmony_message_target']
-        else:
-            logger.debug('Deriving target area from associated coordinates.')
-            target_info = get_target_area(message_parameters, dataset,
-                                          coordinates_key, logger)
+def get_near_results(variable: Dict, near_information) -> np.ndarray:
+    """ Use the derived information from the input swath and target area to
+        reproject variable data in the target area using the nearest neighbour
+        interpolation method.
 
-        swath_definition = get_swath_definition(dataset, coordinates_key)
-        near_info = get_neighbour_info(swath_definition,
-                                       target_info['target_area'],
-                                       RADIUS_OF_INFLUENCE, epsilon=EPSILON,
-                                       neighbours=1)
-
-        near_information = {'valid_input_index': near_info[0],
-                            'valid_output_index': near_info[1],
-                            'index_array': near_info[2],
-                            'distance_array': near_info[3]}
-
-        # Store target area information, too. If the Harmony message has a
-        # fully defined target area, the target area information cached within
-        # the coordinate key entry will only be a reference to the Harmony
-        # message target area objects, not copies of the objects themselves.
-        near_information.update(target_info)
-
-        reprojection_cache[coordinates_key] = near_information
-
-    results = get_sample_from_neighbour_info(
-        'nn', near_information['target_area'].shape, variable_values,
+    """
+    return get_sample_from_neighbour_info(
+        'nn', near_information['target_area'].shape, variable['values'],
         near_information['valid_input_index'],
         near_information['valid_output_index'],
         near_information['index_array'],
         distance_array=near_information['distance_array'],
-        fill_value=variable_fill_value
+        fill_value=variable['fill_value']
     )
-
-    write_netcdf(variable_output_path,
-                 results,
-                 message_parameters['projection'],
-                 near_information['grid_transform'])
-
-    logger.debug(f'Saved {variable_name} output to temporary file: '
-                 f'{variable_output_path}')
-
-
-def write_netcdf(file_name: str, data: np.ndarray, projection: Proj, transform):
-    """ Write the results from reprojecting a single variable to a NetCDF file.
-
-    """
-    target_crs_dict = projection.crs.to_dict()
-    with rasterio.open(file_name,
-                       'w',
-                       driver='NetCDF',
-                       height=data.shape[0],
-                       width=data.shape[1],
-                       count=1,
-                       dtype=data.dtype,
-                       crs=target_crs_dict,
-                       transform=transform) as netcdf_container:
-        netcdf_container.write(data, 1)  # first (and only) band
 
 
 def get_resampling_functions() -> Dict:
-    """Return a mapping of interpolation options to resampling functions."""
-    return {'bilinear': bilinear,
-            'ewa': ewa,
-            'ewa-nn': ewa_nn,
-            'near': nearest_neighbour}
+    """ Return a mapping of interpolation options to resampling functions. This
+        dictionary is an alternative to using a four branched if, elif, else
+        condition for both retrieving reprojection information and reprojected
+        data.
+
+    """
+    return {
+        'bilinear': {
+            'get_information': get_bilinear_information,
+            'get_results': get_bilinear_results
+        },
+        'ewa': {
+            'get_information': get_ewa_information,
+            'get_results': partial(get_ewa_results, maximum_weight_mode=False)
+        },
+        'ewa-nn': {
+            'get_information': get_ewa_information,
+            'get_results': partial(get_ewa_results, maximum_weight_mode=True)
+        },
+        'near': {
+            'get_information': get_near_information,
+            'get_results': get_near_results
+        }
+    }
 
 
 def check_for_valid_interpolation(message_parameters: Dict,
@@ -420,30 +347,18 @@ def get_reprojection_cache(parameters: Dict) -> Dict:
 
             dimensions = (height, width)
 
-        # Gdal GeoTransform and Affine matrices are just different ways of
-        # capturing the grid extents and resolution in single data object. Gdal
-        # GeoTransform is one way, which we can create given our capture of
-        # grid_extents and resolution) and then turn into Affine matrix. Grid
-        # Transforms are used to compute a projected coordinate set from cell
-        # x & y index values"
-        grid_transform = Affine.from_gdal(grid_extents[0], resolutions[0], 0.0,
-                                          grid_extents[3], 0.0, resolutions[1])
-
-        target_area = AreaDefinition.from_extent('target_grid',
+        target_area = AreaDefinition.from_extent(HARMONY_TARGET,
                                                  projection_string,
                                                  dimensions,
                                                  grid_extents)
 
-        reprojection_cache['harmony_message_target'] = {
-            'grid_transform': grid_transform,
-            'target_area': target_area,
-        }
+        reprojection_cache[HARMONY_TARGET] = {'target_area': target_area}
 
     return reprojection_cache
 
 
 def get_target_area(parameters: Dict, dataset: Dataset,
-                    coordinates: Tuple[str], logger: Logger) -> Dict:
+                    coordinates: Tuple[str], logger: Logger) -> AreaDefinition:
     """ Define the target area as specified by either a complete set of message
         parameters, or supplemented with coordinate variables as refered to in
         the science variable metadata.
@@ -494,13 +409,9 @@ def get_target_area(parameters: Dict, dataset: Dataset,
         logger.info(f'Calculated height: {height}')
         dimensions = (height, width)
 
-    target_area = AreaDefinition.from_extent('target_grid', projection_string,
-                                             dimensions, grid_extents)
-
-    grid_transform = Affine.from_gdal(grid_extents[0], resolutions[0], 0.0,
-                                      grid_extents[3], 0.0, resolutions[1])
-
-    return {'grid_transform': grid_transform, 'target_area': target_area}
+    return AreaDefinition.from_extent(', '.join(coordinates),
+                                      projection_string, dimensions,
+                                      grid_extents)
 
 
 def get_parameters_tuple(input_parameters: Dict,
@@ -521,3 +432,24 @@ def get_parameters_tuple(input_parameters: Dict,
         output_values = None
 
     return output_values
+
+
+def get_scale_and_offset(variable: Variable) -> Dict:
+    """ Check the input dataset for the `scale_factor` and `add_offset`
+        parameter. If those attributes are present, return a dictionary
+        containing those values, so the single band output can correctly scale
+        the data. The `netCDF4` package will automatically apply these
+        values upon reading and writing of the data.
+
+    """
+    attributes = variable.ncattrs()
+
+    if {'add_offset', 'scale_factor'}.issubset(attributes):
+        scaling_attributes = {
+            'add_offset': variable.getncattr('add_offset'),
+            'scale_factor': variable.getncattr('scale_factor')
+        }
+    else:
+        scaling_attributes = {}
+
+    return scaling_attributes
