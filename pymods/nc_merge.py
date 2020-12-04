@@ -9,7 +9,6 @@ import os
 import re
 
 from netCDF4 import Dataset, Variable
-import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
 from pymods.utilities import get_variable_file_path

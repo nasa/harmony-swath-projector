@@ -18,6 +18,7 @@ from pymods.nc_single_band import HARMONY_TARGET, write_single_band_output
 from pymods.swotrepr_geometry import (get_extents_from_perimeter,
                                       get_projected_resolution)
 from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
+                              get_scale_and_offset,
                               get_variable_file_path,
                               get_variable_numeric_fill_value,
                               get_variable_values)
@@ -128,9 +129,10 @@ def resample_variable(message_parameters: Dict, full_variable: str,
     # Use a dictionary to store input variable values and fill value. This
     # allows the same function signature to retrieve results from all
     # interpolation methods.
+    fill_value = get_variable_numeric_fill_value(variable)
     variable_information = {
-        'values': get_variable_values(dataset, variable),
-        'fill_value': get_variable_numeric_fill_value(variable)
+        'values': get_variable_values(dataset, variable, fill_value),
+        'fill_value': fill_value,
     }
 
     results = interpolation_functions['get_results'](variable_information,
@@ -432,24 +434,3 @@ def get_parameters_tuple(input_parameters: Dict,
         output_values = None
 
     return output_values
-
-
-def get_scale_and_offset(variable: Variable) -> Dict:
-    """ Check the input dataset for the `scale_factor` and `add_offset`
-        parameter. If those attributes are present, return a dictionary
-        containing those values, so the single band output can correctly scale
-        the data. The `netCDF4` package will automatically apply these
-        values upon reading and writing of the data.
-
-    """
-    attributes = variable.ncattrs()
-
-    if {'add_offset', 'scale_factor'}.issubset(attributes):
-        scaling_attributes = {
-            'add_offset': variable.getncattr('add_offset'),
-            'scale_factor': variable.getncattr('scale_factor')
-        }
-    else:
-        scaling_attributes = {}
-
-    return scaling_attributes

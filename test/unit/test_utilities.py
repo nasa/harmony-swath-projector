@@ -4,7 +4,7 @@ from netCDF4 import Dataset, Variable
 import numpy as np
 
 from pymods.utilities import (create_coordinates_key, get_variable_values,
-                              get_coordinate_variable,
+                              get_coordinate_variable, get_scale_and_offset,
                               get_variable_file_path,
                               get_variable_numeric_fill_value)
 from test.test_utils import TestBase
@@ -41,7 +41,7 @@ class TestUtilities(TestBase):
                 red_var = dataset['red_var']
                 self.assertEqual(len(red_var.shape), 3)
 
-                red_var_values = get_variable_values(dataset, red_var)
+                red_var_values = get_variable_values(dataset, red_var, None)
                 self.assertIsInstance(red_var_values, np.ndarray)
                 self.assertEqual(len(red_var_values.shape), 2)
                 self.assertEqual(red_var_values.shape, red_var.shape[-2:])
@@ -51,10 +51,32 @@ class TestUtilities(TestBase):
                 wind_speed = dataset['wind_speed']
                 self.assertEqual(len(wind_speed.shape), 2)
 
-                wind_speed_values = get_variable_values(dataset, wind_speed)
+                wind_speed_values = get_variable_values(dataset, wind_speed, None)
                 self.assertIsInstance(wind_speed_values, np.ndarray)
                 self.assertEqual(len(wind_speed_values.shape), 2)
                 self.assertEqual(wind_speed_values.shape, wind_speed.shape)
+
+        with self.subTest('Masked values are set to fill value.'):
+            fill_value = 210
+            input_data = np.array([[220, 210], [240, 234]])
+
+            with Dataset('mock_data.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('y', size=2)
+                dataset.createDimension('x', size=2)
+                dataset.createVariable('data', np.uint8, dimensions=('y', 'x'),
+                                       fill_value=fill_value)
+                dataset['data'][:] = input_data
+
+                # Ensure the raw variable data is masked in the expected cell.
+                self.assertTrue(dataset['data'][:].mask[0, 1])
+
+                returned_data = get_variable_values(dataset, dataset['data'],
+                                                    fill_value)
+
+                # Check the output is an array, not a masked array.
+                self.assertIsInstance(returned_data, np.ndarray)
+                # Check the output matches all the input data
+                np.testing.assert_array_equal(input_data, returned_data)
 
     def test_get_coordinate_variables(self):
         """ Ensure the longitude or latitude coordinate variable, is retrieved
@@ -125,6 +147,17 @@ class TestUtilities(TestBase):
             variable.ncattrs.return_value = ['other_attribute']
             self.assertEqual(get_variable_numeric_fill_value(variable), None)
 
+        with self.subTest('Variable with fill value is scaled.'):
+            raw_fill_value = 1
+            add_offset = 210
+            scale_factor = 2
+            variable.ncattrs.return_value = ['add_offset', '_FillValue',
+                                             'scale_factor']
+            variable.getncattr.side_effect = [raw_fill_value, add_offset,
+                                              scale_factor]
+
+            self.assertEqual(get_variable_numeric_fill_value(variable), 212)
+
     def test_get_variable_file_path(self):
         """ Ensure that a file path is correctly constructed from a variable
             name. This should also handle a variable within a group, not just
@@ -144,3 +177,33 @@ class TestUtilities(TestBase):
                                                        variable_name,
                                                        file_extension)
             self.assertEqual(variable_path, expected_path)
+
+    def test_get_scale_and_offset(self):
+        """ Ensure that the scaling attributes can be correctly returned from
+            the input variable attributes, or an empty dictionary if both
+            add_offset` and `scale_factor` are not present.
+
+        """
+        variable = Mock(spec=Variable)
+        false_tests = [
+            ['Neither attribute present.', {'other_key': 123}],
+            ['Only scale_factor is present.', {'scale_factor': 0.01}],
+            ['Only add_offset is present.', {'add_offset': 123.456}]
+        ]
+
+        for description, attributes in false_tests:
+            variable.ncattrs.return_value = set(attributes.keys())
+            with self.subTest(description):
+                self.assertDictEqual(get_scale_and_offset(variable), {})
+
+                variable.getncattr.assert_not_called()
+
+        with self.subTest('Contains both required attributes'):
+            attributes = {'add_offset': 123.456,
+                          'scale_factor': 0.01,
+                          'other_key': 'abc'}
+
+            variable.ncattrs.return_value = set(attributes.keys())
+            variable.getncattr.side_effect = [123.456, 0.01]
+            self.assertDictEqual(get_scale_and_offset(variable),
+                                 {'add_offset': 123.456, 'scale_factor': 0.01})
