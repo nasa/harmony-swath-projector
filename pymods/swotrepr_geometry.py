@@ -6,11 +6,9 @@
 from typing import List, Tuple
 import functools
 
+from netCDF4 import Variable
 from pyproj import Proj
-from xarray import Variable
 import numpy as np
-
-from pymods.utilities import get_variable_numeric_fill_value
 
 
 def get_projected_resolution(projection: Proj, longitudes: Variable,
@@ -23,8 +21,8 @@ def get_projected_resolution(projection: Proj, longitudes: Variable,
 
     """
     coordinates_mask = get_valid_coordinates_mask(longitudes, latitudes)
-    perimeter_coordinates = get_perimeter_coordinates(longitudes.values,
-                                                      latitudes.values,
+    perimeter_coordinates = get_perimeter_coordinates(longitudes[:],
+                                                      latitudes[:],
                                                       coordinates_mask)
 
     x_values, y_values = reproject_perimeter_points(perimeter_coordinates,
@@ -48,8 +46,8 @@ def get_extents_from_perimeter(projection: Proj, longitudes: Variable,
 
     """
     coordinates_mask = get_valid_coordinates_mask(longitudes, latitudes)
-    perimeter_coordinates = get_perimeter_coordinates(longitudes.values,
-                                                      latitudes.values,
+    perimeter_coordinates = get_perimeter_coordinates(longitudes[:],
+                                                      latitudes[:],
                                                       coordinates_mask)
     x_values, y_values = reproject_perimeter_points(perimeter_coordinates,
                                                     projection)
@@ -99,18 +97,17 @@ def get_valid_coordinates_mask(longitudes: Variable,
         a fill value, or contain a NaN. Note, a value of 1 means that the pixel
         contains valid data.
 
+        When a `netCDF4.Variable` is loaded, the data will automatically be
+        read as a `numpy.ma.core.MaskedArray`. Values matching the `_FillValue`
+        as stored in the variable metadata will be masked.
+
     """
-    latitude_fill = get_variable_numeric_fill_value(latitudes)
-    longitude_fill = get_variable_numeric_fill_value(longitudes)
+    valid_longitudes = np.logical_and(np.isfinite(longitudes),
+                                      np.logical_not(longitudes[:].mask))
+    valid_latitudes = np.logical_and(np.isfinite(latitudes),
+                                     np.logical_not(latitudes[:].mask))
 
-    condition = np.logical_and(np.isfinite(longitudes.values),
-                               np.isfinite(latitudes.values))
-
-    if longitude_fill is not None:
-        condition = np.logical_and(condition, longitudes != longitude_fill)
-
-    if latitude_fill is not None:
-        condition = np.logical_and(condition, latitudes != latitude_fill)
+    condition = np.logical_and(valid_longitudes, valid_latitudes)
 
     return np.ma.masked_where(np.logical_not(condition),
                               np.ones(longitudes.shape))
@@ -123,7 +120,6 @@ def get_perimeter_coordinates(longitudes: np.ndarray, latitudes: np.ndarray,
         be in a random order, due to the use of the Python Set class.
 
     """
-
     row_points = {point
                   for row_index, row in enumerate(mask)
                   if row.any()

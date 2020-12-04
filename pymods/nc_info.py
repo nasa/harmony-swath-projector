@@ -59,6 +59,7 @@ class NCInfo:
         return self.vars_with_coords - self.dims - self.coords - self.ancillary_data
 
     def get_metadata_variables(self) -> Set[str]:
+        # TODO: Should we still include some dimensions, e.g. ATL08 surf_type?
         return self.vars_meta - self.dims - self.coords - self.ancillary_data
 
     def _extract_coordinates(self, coordinates: str) -> List[str]:

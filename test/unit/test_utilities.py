@@ -1,13 +1,12 @@
 from unittest.mock import Mock
 
+from netCDF4 import Dataset, Variable
 import numpy as np
-import xarray
 
 from pymods.utilities import (create_coordinates_key, get_variable_values,
                               get_coordinate_variable,
                               get_variable_file_path,
-                              get_variable_numeric_fill_value,
-                              get_variable_group_and_name)
+                              get_variable_numeric_fill_value)
 from test.test_utils import TestBase
 
 
@@ -37,25 +36,32 @@ class TestUtilities(TestBase):
 
         """
 
-        with self.subTest('3-D dataset, with time'):
-            dataset_with_time = xarray.open_dataset('test/data/africa.nc',
-                                                    decode_cf=False)
-            red_var = dataset_with_time.variables.get('red_var')
-            self.assertEqual(len(red_var.shape), 3)
+        with self.subTest('3-D variable, with time.'):
+            with Dataset('test/data/africa.nc') as dataset:
+                red_var = dataset['red_var']
+                self.assertEqual(len(red_var.shape), 3)
 
-            red_var_values = get_variable_values(dataset_with_time, red_var)
-            self.assertTrue(isinstance(red_var_values, np.ndarray))
-            self.assertEqual(len(red_var_values.shape), 2)
-            self.assertEqual(red_var_values.shape, red_var.shape[-2:])
+                red_var_values = get_variable_values(dataset, red_var)
+                self.assertIsInstance(red_var_values, np.ndarray)
+                self.assertEqual(len(red_var_values.shape), 2)
+                self.assertEqual(red_var_values.shape, red_var.shape[-2:])
 
-            dataset_with_time.close()
+        with self.subTest('2-D variable, no time.'):
+            with Dataset('test/data/test_tmp/wind_speed.nc') as dataset:
+                wind_speed = dataset['wind_speed']
+                self.assertEqual(len(wind_speed.shape), 2)
+
+                wind_speed_values = get_variable_values(dataset, wind_speed)
+                self.assertIsInstance(wind_speed_values, np.ndarray)
+                self.assertEqual(len(wind_speed_values.shape), 2)
+                self.assertEqual(wind_speed_values.shape, wind_speed.shape)
 
     def test_get_coordinate_variables(self):
         """ Ensure the longitude or latitude coordinate variable, is retrieved
             when requested.
 
         """
-        dataset = xarray.open_dataset('test/data/africa.nc', decode_cf=False)
+        dataset = Dataset('test/data/africa.nc')
         coordinates_tuple = ['lat', 'lon']
 
         for coordinate in coordinates_tuple:
@@ -64,29 +70,13 @@ class TestUtilities(TestBase):
                                                       coordinates_tuple,
                                                       coordinate)
 
-                self.assertTrue(isinstance(coordinates,
-                                           xarray.core.variable.Variable))
+                self.assertIsInstance(coordinates, Variable)
 
         with self.subTest('Non existent coordinate variable returns None'):
             absent_coordinates_tuple = ['latitude']
             coordinates = get_coordinate_variable(dataset,
                                                   absent_coordinates_tuple,
                                                   absent_coordinates_tuple[0])
-
-    def test_get_variable_group_and_name(self):
-        """ Ensure a full variable name, containing the group is correctly
-            split into the group and the name.
-
-        """
-        test_args = [['no_group', '', 'no_group'],
-                     ['group_name/variable', 'group_name', 'variable'],
-                     ['/nested/group/other_variable', '/nested/group', 'other_variable']]
-
-        for variable_string, expected_group, expected_name in test_args:
-            with self.subTest(variable_string):
-                group, name = get_variable_group_and_name(variable_string)
-                self.assertEqual(expected_group, group)
-                self.assertEqual(expected_name, name)
 
     def test_get_variable_numeric_fill_value(self):
         """ Ensure a fill value is retrieved from a variable that has a vaild
@@ -97,7 +87,7 @@ class TestUtilities(TestBase):
             get_sample_from_neighbour_info.
 
         """
-        variable = Mock(spec=xarray.core.variable.Variable)
+        variable = Mock(spec=Variable)
 
         test_args = [['np.float', np.float, 4.0, 4.0],
                      ['np.float128', np.float128, 4.0, 4.0],
@@ -126,14 +116,14 @@ class TestUtilities(TestBase):
 
         for description, caster, fill_value, expected_output in test_args:
             with self.subTest(description):
-                variable.attrs.get.return_value = caster(fill_value)
+                variable.ncattrs.return_value = ['_FillValue']
+                variable.getncattr.return_value = caster(fill_value)
                 self.assertEqual(get_variable_numeric_fill_value(variable),
                                  expected_output)
 
-        with self.subTest('Missing fill value attribute'):
-            variable.attrs.get.return_value = None
-            self.assertEqual(get_variable_numeric_fill_value(variable),
-                             expected_output)
+        with self.subTest('Missing fill value attribute returns `None`.'):
+            variable.ncattrs.return_value = ['other_attribute']
+            self.assertEqual(get_variable_numeric_fill_value(variable), None)
 
     def test_get_variable_file_path(self):
         """ Ensure that a file path is correctly constructed from a variable

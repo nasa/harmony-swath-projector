@@ -16,7 +16,7 @@ RUN conda create -y --name swotrepr --file conda_requirements.txt python=3.7 -q 
 
 # Install additional Pip requirements (for SwotRepr itself)
 COPY pip_requirements.txt .
-RUN conda run --name swotrepr pip install -r pip_requirements.txt
+RUN conda run --name swotrepr pip install --no-input -r pip_requirements.txt
 
 # Install additional Pip requirements (for testing)
 COPY ./test/pip_test_requirements.txt test/pip_test_requirements.txt
@@ -30,18 +30,18 @@ COPY swotrepr.py .
 
 # Set conda environment to subsetter, as `conda run` will not stream logging.
 # Setting these environment variables is the equivalent of `conda activate`.
-ENV _CE_CONDA ''
-ENV _CE_M ''
-ENV CONDA_DEFAULT_ENV swotrepr
-ENV CONDA_EXE /opt/conda/bin/conda
-ENV CONDA_PREFIX /opt/conda/envs/swotrepr
-ENV CONDA_PREFIX_1 /opt/conda
-ENV CONDA_PROMPT_MODIFIER (swotrepr)
-ENV CONDA_PYTHON_EXE /opt/conda/bin/python
-ENV CONDA_ROOT /opt/conda
-ENV CONDA_SHLVL 2
-ENV PATH "/opt/conda/envs/swotrepr/bin:${PATH}"
-ENV SHLVL 1
+ENV _CE_CONDA='' \
+    _CE_M='' \
+    CONDA_DEFAULT_ENV=swotrepr \
+    CONDA_EXE=/opt/conda/bin/conda \
+    CONDA_PREFIX=/opt/conda/envs/swotrepr \
+    CONDA_PREFIX_1=/opt/conda \
+    CONDA_PROMPT_MODIFIER=(swotrepr) \
+    CONDA_PYTHON_EXE=/opt/conda/bin/python \
+    CONDA_ROOT=/opt/conda \
+    CONDA_SHLVL=2 \
+    PATH="/opt/conda/envs/swotrepr/bin:${PATH}" \
+    SHLVL=1
 
 # Configure a container to be executable via the `docker run` command.
 ENTRYPOINT ["/home/test/run"]
