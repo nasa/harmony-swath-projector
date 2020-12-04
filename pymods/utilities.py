@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 import os
 import re
 
@@ -18,10 +18,16 @@ def create_coordinates_key(coordinates: str) -> Tuple[str]:
     return tuple(re.split(r'\s+|,\s*', coordinates))
 
 
-def get_variable_values(input_file: Dataset, variable: Variable) -> np.ndarray:
+def get_variable_values(input_file: Dataset, variable: Variable,
+                        fill_value: Optional) -> np.ndarray:
     """ A helper function to retrieve the values of a specified dataset. This
         function accounts for 2-D and 3-D datasets based on whether the time
         variable is present in the dataset.
+
+        As the variable data are returned as a `numpy.ma.MaskedArray`, the will
+        return no data in the filled pixels. To ensure that the data are
+        correctly handled, the fill value is applied to masked pixels using the
+        `filled` method.
 
     """
     # TODO: Remove in favour of apply2D or process_subdimension.
@@ -31,10 +37,10 @@ def get_variable_values(input_file: Dataset, variable: Variable) -> np.ndarray:
     #       applied across the other preceding or following dimensions.
     if 'time' in input_file.variables:
         # Assumption: Array = (1, y, x)
-        return variable[0][:]
+        return variable[0][:].filled(fill_value=fill_value)
     else:
         # Assumption: Array = (y, x)
-        return variable[:]
+        return variable[:].filled(fill_value=fill_value)
 
 
 def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
@@ -57,6 +63,11 @@ def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
         `get_sample_from_neighbour_info` function will only accept numerical
         inputs for `fill_value`. Non-numeric fill values are returned as None.
 
+        This function also accounts for if the input variable is scaled, as the
+        fill value as stored in a NetCDF-4 file should match the nature of the
+        saved data (e.g., if the data are scaled, the fill value should also
+        be scaled).
+
     """
     if '_FillValue' in variable.ncattrs():
         fill_value = variable.getncattr('_FillValue')
@@ -66,6 +77,15 @@ def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
     if not isinstance(fill_value,
                       (np.integer, np.long, np.floating, int, float)):
         fill_value = None
+
+    if fill_value is not None:
+        scaling = get_scale_and_offset(variable)
+
+        if {'add_offset', 'scale_factor'}.issubset(scaling):
+                fill_value = (
+                    (fill_value * scaling['scale_factor'])
+                    + scaling['add_offset']
+                )
 
     return fill_value
 
@@ -84,3 +104,24 @@ def get_variable_file_path(temp_dir: str, variable_name: str,
     """
     converted_variable_name = variable_name.lstrip('/').replace('/', '_')
     return os.sep.join([temp_dir, f'{converted_variable_name}{extension}'])
+
+
+def get_scale_and_offset(variable: Variable) -> Dict:
+    """ Check the input dataset for the `scale_factor` and `add_offset`
+        parameter. If those attributes are present, return a dictionary
+        containing those values, so the single band output can correctly scale
+        the data. The `netCDF4` package will automatically apply these
+        values upon reading and writing of the data.
+
+    """
+    attributes = variable.ncattrs()
+
+    if {'add_offset', 'scale_factor'}.issubset(attributes):
+        scaling_attributes = {
+            'add_offset': variable.getncattr('add_offset'),
+            'scale_factor': variable.getncattr('scale_factor')
+        }
+    else:
+        scaling_attributes = {}
+
+    return scaling_attributes

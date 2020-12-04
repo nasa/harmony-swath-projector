@@ -12,7 +12,6 @@ from pymods.interpolation import (check_for_valid_interpolation, EPSILON,
                                   get_ewa_results, get_near_information,
                                   get_near_results, get_parameters_tuple,
                                   get_reprojection_cache,
-                                  get_scale_and_offset,
                                   get_swath_definition, get_target_area,
                                   resample_all_variables, resample_variable,
                                   RADIUS_OF_INFLUENCE)
@@ -1103,33 +1102,3 @@ class TestInterpolation(TestBase):
             with self.subTest(description):
                 self.assertEqual(get_parameters_tuple(input_parameters, keys),
                                  expected_output)
-
-    def test_get_scale_and_offset(self):
-        """ Ensure that the scaling attributes can be correctly returned from
-            the input variable attributes, or an empty dictionary if both
-            add_offset` and `scale_factor` are not present.
-
-        """
-        variable = MagicMock(spec=Variable)
-        false_tests = [
-            ['Neither attribute present.', {'other_key': 123}],
-            ['Only scale_factor is present.', {'scale_factor': 0.01}],
-            ['Only add_offset is present.', {'add_offset': 123.456}]
-        ]
-
-        for description, attributes in false_tests:
-            variable.ncattrs.return_value = set(attributes.keys())
-            with self.subTest(description):
-                self.assertDictEqual(get_scale_and_offset(variable), {})
-
-                variable.getncattr.assert_not_called()
-
-        with self.subTest('Contains both required attributes'):
-            attributes = {'add_offset': 123.456,
-                          'scale_factor': 0.01,
-                          'other_key': 'abc'}
-
-            variable.ncattrs.return_value = set(attributes.keys())
-            variable.getncattr.side_effect = [123.456, 0.01]
-            self.assertDictEqual(get_scale_and_offset(variable),
-                                 {'add_offset': 123.456, 'scale_factor': 0.01})
