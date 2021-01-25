@@ -56,6 +56,8 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+coverage
+test-reports
 
 # Translations
 *.mo
@@ -135,4 +137,3 @@ swotrepr.iml
 .idea/misc.xml
 .idea/vcs.xml
 .idea/inspectionProfiles/profiles_settings.xml
-VNL2_test_data_repr.nc
