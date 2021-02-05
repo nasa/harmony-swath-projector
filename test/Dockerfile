@@ -12,7 +12,7 @@ WORKDIR "/home"
 COPY conda_requirements.txt .
 RUN conda create -y --name swotrepr --file conda_requirements.txt python=3.7 -q \
 	--channel conda-forge \
-	--channel defaults
+	--channel defaults && conda clean --all --quiet --yes
 
 # Install additional Pip requirements (for SwotRepr itself)
 COPY pip_requirements.txt .

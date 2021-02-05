@@ -14,7 +14,7 @@ COPY pip_requirements.txt .
 # Create Conda environment
 RUN conda create -y --name swotrepr --file conda_requirements.txt python=3.7 -q \
 	--channel conda-forge \
-	--channel defaults
+	--channel defaults && conda clean --all --quiet --yes
 
 # Install additional Pip dependencies
 RUN conda run --name swotrepr pip install --no-input -r pip_requirements.txt
