@@ -4,17 +4,18 @@ from harmony.message import Message
 from harmony.util import config
 
 from swotrepr import HarmonyAdapter
-from test.test_utils import TestBase, contains
+from test.test_utils import download_side_effect, StringContains, TestBase
 
 
+@patch('harmony.util.stage', return_value='https://example.com/data')
+@patch('swotrepr.download', side_effect=download_side_effect)
 class TestPyResampleReproject(TestBase):
     """A suite of tests to test SwotRepr, using pyresample and the valid input
     interpolation options. These tests will enforce REPR_MODE = 'pyresample',
     regardless of the actual value of REPR_MODE set in pymods.reproject.py
 
     """
-    @patch('harmony.util.stage', return_value='https://example.com/data')
-    def test_pyresample_interpolation(self, mock_stage):
+    def test_pyresample_interpolation(self, mock_download, mock_stage):
         """Ensure SwotRepr will successfully complete when using pyresample and
         each specified interpolation.
 
@@ -24,6 +25,7 @@ class TestPyResampleReproject(TestBase):
         for interpolation in valid_interpolations:
             with self.subTest(f'pyresample "{interpolation}" interpolation.'):
                 test_data = Message({
+                    'accessToken': 'fake_token',
                     'callback': 'https://example.com/callback',
                     'stagingLocation': 's3://example-bucket/example-path/',
                     'sources': [{
@@ -45,12 +47,20 @@ class TestPyResampleReproject(TestBase):
                 reprojector = HarmonyAdapter(test_data, config=config(False))
                 reprojector.invoke()
 
+                mock_download.assert_called_once_with(
+                    'test/data/VOL2PSST_2017.nc',
+                    ANY,
+                    logger=ANY,
+                    access_token='fake_token',
+                    cfg=ANY
+                )
                 mock_stage.assert_called_once_with(
-                    contains('VOL2PSST_2017_repr.nc'),
+                    StringContains('VOL2PSST_2017_repr.nc'),
                     'VOL2PSST_2017_regridded.nc',
                     'application/x-netcdf',
                     location='s3://example-bucket/example-path/',
                     logger=ANY)
 
                 # Reset mock calls for next interpolation
+                mock_download.reset_mock()
                 mock_stage.reset_mock()

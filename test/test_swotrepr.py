@@ -4,9 +4,11 @@ from harmony.message import Message
 from harmony.util import config
 
 from swotrepr import HarmonyAdapter
-from test.test_utils import TestBase, contains
+from test.test_utils import download_side_effect, StringContains, TestBase
 
 
+@patch('harmony.util.stage', return_value='https://example.com/data')
+@patch('swotrepr.download', side_effect=download_side_effect)
 class TestSwotReprojectionTool(TestBase):
     """ A test class that will run the full SWOT Reprojection tool against a
         variety of input files and Harmony messages.
@@ -18,6 +20,7 @@ class TestSwotReprojectionTool(TestBase):
             between tests.
 
         """
+        cls.access_token = 'fake_token'
         cls.bounding_box = [-180, -90, 190, 90]
         cls.callback = 'http://example.com/callback'
         cls.mime_type = 'application/x-netcdf'
@@ -25,10 +28,10 @@ class TestSwotReprojectionTool(TestBase):
         cls.temporal = {'start': '2020-01-01T00:00:00.000Z',
                         'end': '2020-01-02T00:00:00.000Z'}
 
-    @patch('harmony.util.stage', return_value='https://example.com/data')
-    def test_single_band_input(self, mock_stage):
+    def test_single_band_input(self, mock_download, mock_stage):
         """ Nominal (successful) reprojection of a single band input file. """
         test_data = Message({
+            'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
@@ -41,22 +44,30 @@ class TestSwotReprojectionTool(TestBase):
             'format': {'height': 500, 'width': 1000}
         })
 
+        print('mock_download')
+        print(mock_download)
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
-        mock_stage.assert_called_once_with(contains('VNL2_oneBand_repr.nc'),
+
+        mock_download.assert_called_once_with('test/data/VNL2_oneBand.nc',
+                                              ANY,
+                                              logger=ANY,
+                                              access_token=self.access_token,
+                                              cfg=ANY)
+        mock_stage.assert_called_once_with(StringContains('VNL2_oneBand_repr.nc'),
                                            'VNL2_oneBand_regridded.nc',
                                            self.mime_type,
                                            location=self.staging_location,
                                            logger=ANY)
 
-    @patch('harmony.util.stage', return_value='https://example.com/data')
-    def test_africa_input(self, mock_stage):
+    def test_africa_input(self, mock_download, mock_stage):
         """ Nominal (successful) reprojection of test/data/africa.nc, using
             geographic coordinates, bilinear interpolation and specifying the
             extent of the target area grid.
 
         """
         test_data = Message({
+            'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
@@ -74,14 +85,19 @@ class TestSwotReprojectionTool(TestBase):
 
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
-        mock_stage.assert_called_once_with(contains('africa_repr.nc'),
+
+        mock_download.assert_called_once_with('test/data/africa.nc',
+                                              ANY,
+                                              logger=ANY,
+                                              access_token=self.access_token,
+                                              cfg=ANY)
+        mock_stage.assert_called_once_with(StringContains('africa_repr.nc'),
                                            'africa_regridded.nc',
                                            self.mime_type,
                                            location=self.staging_location,
                                            logger=ANY)
 
-    @patch('harmony.util.stage', return_value='https://example.com/data')
-    def test_single_band_input_default_crs(self, mock_stage):
+    def test_single_band_input_default_crs(self, mock_download, mock_stage):
         """ Nominal (successful) reprojection of a single band input. This
             will default to using a geographic coordinate system, and use the
             Elliptically Weighted Average (EWA) interpolation method to derive
@@ -89,6 +105,7 @@ class TestSwotReprojectionTool(TestBase):
 
         """
         test_data = Message({
+            'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
@@ -106,14 +123,18 @@ class TestSwotReprojectionTool(TestBase):
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        mock_stage.assert_called_once_with(contains('VNL2_oneBand_repr.nc'),
+        mock_download.assert_called_once_with('test/data/VNL2_oneBand.nc',
+                                              ANY,
+                                              logger=ANY,
+                                              access_token=self.access_token,
+                                              cfg=ANY)
+        mock_stage.assert_called_once_with(StringContains('VNL2_oneBand_repr.nc'),
                                            'VNL2_oneBand_regridded.nc',
                                            self.mime_type,
                                            location=self.staging_location,
                                            logger=ANY)
 
-    @patch('harmony.util.stage', return_value='https://example.com/data')
-    def test_single_band_input_reprojected_metres(self, mock_stage):
+    def test_single_band_input_reprojected_metres(self, mock_download, mock_stage):
         """ Nominal (successful) reprojection of the single band input file,
             specifying the UTM Zone 3N (EPSG:32603) target projection and the
             Elliptically Weighted Average, Nearest Neighbour (EWA-NN)
@@ -124,6 +145,7 @@ class TestSwotReprojectionTool(TestBase):
 
         """
         test_data = Message({
+            'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
@@ -143,7 +165,12 @@ class TestSwotReprojectionTool(TestBase):
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        mock_stage.assert_called_once_with(contains('VNL2_oneBand_repr.nc'),
+        mock_download.assert_called_once_with('test/data/VNL2_oneBand.nc',
+                                              ANY,
+                                              logger=ANY,
+                                              access_token=self.access_token,
+                                              cfg=ANY)
+        mock_stage.assert_called_once_with(StringContains('VNL2_oneBand_repr.nc'),
                                            'VNL2_oneBand_regridded.nc',
                                            self.mime_type,
                                            location=self.staging_location,
