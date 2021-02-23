@@ -22,9 +22,9 @@ class TestNCMerge(TestBase):
         cls.input_file = 'test/data/VNL2_test_data.nc'
         cls.tmp_dir = 'test/data/test_tmp/'
         cls.output_file = 'test/data/VNL2_test_data_repr.nc'
-        cls.science_variables = {'brightness_temperature_4um',
-                                 'satellite_zenith_angle',
-                                 'sea_surface_temperature', 'wind_speed'}
+        cls.science_variables = {'/brightness_temperature_4um',
+                                 '/satellite_zenith_angle',
+                                 '/sea_surface_temperature', '/wind_speed'}
         cls.metadata_variables = set()
         create_output(cls.input_file, cls.output_file, cls.tmp_dir,
                       cls.science_variables, cls.metadata_variables,
@@ -42,8 +42,8 @@ class TestNCMerge(TestBase):
         self.assertSetEqual(output_science_variables, self.science_variables)
 
         # Output also has a CRS grid_mapping variable, and three dimensions:
-        self.assertEqual(output_info.ancillary_data, {'latitude_longitude'})
-        self.assertEqual(output_info.dims, {'lat', 'lon', 'time'})
+        self.assertEqual(output_info.ancillary_data, {'/latitude_longitude'})
+        self.assertEqual(output_info.dims, {'/lat', '/lon', '/time'})
 
     def test_same_dimensions(self):
         """ Corresponding variables in input and output should have the same
@@ -132,17 +132,21 @@ class TestNCMerge(TestBase):
         input_dataset = Dataset(self.input_file)
 
         with self.subTest('No coordinate data returns True'):
-            self.assertTrue(check_coor_valid({}, input_dataset,
-                                             single_band_dataset))
+            self.assertTrue(check_coor_valid({}, '/brightness_temperature_4um',
+                                             input_dataset, single_band_dataset))
 
         with self.subTest('Reprojected data missing coordinates returns False'):
             attributes = {'coordinates': 'random, string, values'}
-            self.assertFalse(check_coor_valid(attributes, input_dataset,
+            self.assertFalse(check_coor_valid(attributes,
+                                              '/brightness_temperature_4um',
+                                              input_dataset,
                                               single_band_dataset))
 
         with self.subTest('Reprojected data with different shape returns False'):
             attributes = {'coordinates': 'lat lon'}
-            self.assertFalse(check_coor_valid(attributes, input_dataset,
+            self.assertFalse(check_coor_valid(attributes,
+                                              '/brightness_temperature_4um',
+                                              input_dataset,
                                               single_band_dataset))
 
         with self.subTest('Reprojected data with preserved coordinates returns True'):
@@ -151,7 +155,8 @@ class TestNCMerge(TestBase):
             second_dataset = Dataset(f'{self.tmp_dir}wind_speed.nc')
             attributes = {'coordinates': 'lat lon'}
 
-            self.assertTrue(check_coor_valid(attributes, second_dataset,
+            self.assertTrue(check_coor_valid(attributes, '/wind_speed',
+                                             second_dataset,
                                              single_band_dataset))
 
     def test_get_science_variable_dimensions(self):

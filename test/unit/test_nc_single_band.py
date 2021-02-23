@@ -39,13 +39,12 @@ class TestNCSingleBand(TestBase):
             'prime_meridian_name': 'Greenwich',
             'geographic_crs_name': 'unknown',
             'grid_mapping_name': 'latitude_longitude',
-            'towgs84': (0,0, 0.0, 0.0),
+            'towgs84': (0, 0, 0.0, 0.0),
         }
         cls.non_geographic_area = AreaDefinition.from_extent(
             'cea', '+proj=cea', (2, 4),
             (-3_000_000, 2_000_000, 3_000_000, 4_000_000)
         )
-
 
     @classmethod
     def tearDownClass(cls):
@@ -99,7 +98,6 @@ class TestNCSingleBand(TestBase):
             self.assertTupleEqual(saved_output['lon'].dimensions, ('lon',))
             np.testing.assert_array_equal(saved_output['lat'][:], self.lat_values)
             np.testing.assert_array_equal(saved_output['lon'][:], self.lon_values)
-
 
     def test_write_dimensions(self):
         """ Ensure dimensions are written with the correct names. The subtests

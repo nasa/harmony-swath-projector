@@ -163,7 +163,6 @@ def write_grid_mapping(dataset: Dataset, target_area: AreaDefinition,
     if 'grid_mapping_name' not in grid_mapping_attributes:
         grid_mapping_attributes['grid_mapping_name'] = 'crs'
 
-
     # Check if there are multiple grids and, if so, use the extended format of
     # grid mapping name.
     if dimensions not in [('lat', 'lon'), ('y', 'x')]:
