@@ -9,13 +9,15 @@ import numpy as np
 FillValueType = Optional[Union[float, int]]
 
 
-def create_coordinates_key(coordinates: str) -> Tuple[str]:
+def create_coordinates_key(variable: Variable) -> Tuple[str]:
     """ Create a unique, hashable entity from a coordinates attribute in an
         Net-CDF4 file.
 
     """
-    # TODO: DAS-900 Fully qualify coordinate string
-    return tuple(re.split(r'\s+|,\s*', coordinates))
+    coordinates = variable.getncattr('coordinates')
+    raw_coordinates = re.split(r'\s+|,\s*', coordinates)
+    return tuple(qualify_reference(raw_coordinate, variable)
+                 for raw_coordinate in raw_coordinates)
 
 
 def get_variable_values(input_file: Dataset, variable: Variable,
@@ -47,12 +49,16 @@ def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
                             coordinate_substring) -> Optional[Variable]:
     """ Search the coordinate dataset names for a match to the substring,
         which will be either "lat" or "lon". Return the corresponding variable
-        from the dataset.
+        from the dataset. Only the base variable name is used, as the group
+        path may contain either of the strings as part of other words.
 
     """
     for coordinate in coordinates_tuple:
-        if coordinate_substring in coordinate:
-            return dataset.variables.get(coordinate)
+        if (
+                coordinate_substring in coordinate.split('/')[-1] and
+                variable_in_dataset(coordinate, dataset)
+        ):
+            return dataset[coordinate]
 
     return None
 
@@ -82,10 +88,10 @@ def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
         scaling = get_scale_and_offset(variable)
 
         if {'add_offset', 'scale_factor'}.issubset(scaling):
-                fill_value = (
-                    (fill_value * scaling['scale_factor'])
-                    + scaling['add_offset']
-                )
+            fill_value = (
+                (fill_value * scaling['scale_factor'])
+                + scaling['add_offset']
+            )
 
     return fill_value
 
@@ -125,3 +131,81 @@ def get_scale_and_offset(variable: Variable) -> Dict:
         scaling_attributes = {}
 
     return scaling_attributes
+
+
+def qualify_reference(raw_reference: str, variable: Variable) -> str:
+    """ Take a reference to a variable, as stored in the metadata of another
+        variable, and construct an absolute path to it. For example:
+
+        * In '/group_one/var_one', reference: '/base_var' becomes '/base_var'
+        * In '/group_one/var_one', reference: '../base_var' becomes '/base_var'
+        * In '/group_one/var_one', reference './group_var' becomes
+          '/group_one/group_var'
+        * In '/group_one/var_one', reference: 'group_var' becomes
+          '/group_one/group_var' (if '/group_one' contains 'group_var')
+        * In '/group_one/var_one', reference: 'base_var' becomes
+          '/base_var' (if'/group_one' does not contain 'base_var')
+
+    """
+    referee_group = variable.group()
+
+    if raw_reference.startswith('../'):
+        # Reference is relative, and requires qualification
+        absolute_reference = construct_absolute_path(raw_reference,
+                                                     referee_group.path)
+    elif raw_reference.startswith('/'):
+        # Reference is already absolute
+        absolute_reference = raw_reference
+    elif raw_reference.startswith('./'):
+        # Reference is in the same group as this variable
+        absolute_reference = referee_group.path + raw_reference[1:]
+    elif raw_reference in referee_group.variables:
+        # e.g. 'variable_name' and in the referee's group
+        absolute_reference = construct_absolute_path(raw_reference,
+                                                     referee_group.path)
+    else:
+        # e.g. 'variable_name', not in referee's group, assume root group.
+        absolute_reference = construct_absolute_path(raw_reference, '')
+
+    return absolute_reference
+
+
+def construct_absolute_path(reference: str, referee_group_path: str) -> str:
+    """ Construct an absolute pth for a relative reference to another variable
+        (e.g. '../latitude'), by combining the reference with the group path of
+        the referee variable.
+
+    """
+    relative_prefix = '../'
+    group_path_pieces = referee_group_path.split('/')
+
+    while reference.startswith(relative_prefix):
+        reference = reference[len(relative_prefix):]
+        group_path_pieces.pop()
+
+    absolute_path = '/'.join(group_path_pieces + [reference])
+
+    return f'/{absolute_path.lstrip("/")}'
+
+
+def variable_in_dataset(variable_name: str, dataset: Dataset) -> bool:
+    """ Check if a nested variable exists in a NetCDF-4 dataset. This function
+        is necessary, as the `Dataset.variables` or `Group.variables` class
+        attribute only includes immediate children, not those within nested
+        groups.
+
+    """
+    variable_pieces = variable_name.lstrip('/').split('/')
+
+    group = dataset
+    group_valid = True
+
+    while len(variable_pieces) > 1 and group_valid:
+        sub_group = variable_pieces.pop(0)
+
+        if sub_group in group.groups:
+            group = group[sub_group]
+        else:
+            group_valid = False
+
+    return group_valid and variable_pieces[-1] in group.variables

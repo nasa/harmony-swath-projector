@@ -3,10 +3,11 @@ from unittest.mock import Mock
 from netCDF4 import Dataset, Variable
 import numpy as np
 
-from pymods.utilities import (create_coordinates_key, get_variable_values,
-                              get_coordinate_variable, get_scale_and_offset,
-                              get_variable_file_path,
-                              get_variable_numeric_fill_value)
+from pymods.utilities import (construct_absolute_path, create_coordinates_key,
+                              get_variable_values, get_coordinate_variable,
+                              get_scale_and_offset, get_variable_file_path,
+                              get_variable_numeric_fill_value,
+                              qualify_reference, variable_in_dataset)
 from test.test_utils import TestBase
 
 
@@ -17,18 +18,32 @@ class TestUtilities(TestBase):
             on spaces, commas and space, commas.
 
         """
+        dataset = Dataset('test.nc', 'w', diskless=True)
+        dataset.createDimension('lat', size=2)
+        dataset.createDimension('lon', size=4)
+
+        data = np.ones((2, 4))
+
+        variable = dataset.createVariable('/group/variable', data.dtype,
+                                          dimensions=('lat', 'lon'))
+        dataset.createVariable('/lat', data.dtype, dimensions=('lat', 'lon'))
+        dataset.createVariable('/lon', data.dtype, dimensions=('lat', 'lon'))
+
         test_args = [['spaces', 'lon lat'],
                      ['multiple spaces', 'lon    lat'],
                      ['comma', 'lon,lat'],
                      ['comma-space', 'lon, lat'],
                      ['comma-multiple-space', 'lon,    lat']]
 
-        expected_output = ('lon', 'lat')
+        expected_output = ('/lon', '/lat')
 
         for description, coordinates in test_args:
             with self.subTest(description):
-                self.assertEqual(create_coordinates_key(coordinates),
+                variable.setncattr('coordinates', coordinates)
+                self.assertEqual(create_coordinates_key(variable),
                                  expected_output)
+
+        dataset.close()
 
     def test_get_variable_values(self):
         """ Ensure values for a variable are retrieved, respecting the absence
@@ -207,3 +222,91 @@ class TestUtilities(TestBase):
             variable.getncattr.side_effect = [123.456, 0.01]
             self.assertDictEqual(get_scale_and_offset(variable),
                                  {'add_offset': 123.456, 'scale_factor': 0.01})
+
+    def test_construct_absolute_path(self):
+        """ Ensure that an absolute path can be constructed from a relative one
+            and the supplied group path.
+
+        """
+        test_args = [
+            ['Reference in group', 'variable', '/group', '/group/variable'],
+            ['Reference in parent', '../variable', '/group', '/variable'],
+            ['Reference in grandparent', '../../var', '/g1/g2', '/var'],
+        ]
+
+        for description, reference, group_path, abs_reference in test_args:
+            with self.subTest(description):
+                self.assertEqual(
+                    construct_absolute_path(reference, group_path),
+                    abs_reference
+                )
+
+    def test_qualify_reference(self):
+        """ Ensure that a reference within a variable's metadata is correctly
+            qualified to an absolute variable path, using the nature of the
+            reference (e.g. prefix of "../" or "./") and the group of the
+            referee variable.
+
+        """
+        dataset = Dataset('test.nc', 'w', diskless=True)
+        dataset.createDimension('lat', size=2)
+        dataset.createDimension('lon', size=4)
+
+        data = np.ones((2, 4))
+        variable = dataset.createVariable('/group/variable', data.dtype,
+                                          dimensions=('lat', 'lon'))
+
+        dataset.createVariable('/group/sibling', data.dtype,
+                               dimensions=('lat', 'lon'))
+
+        test_args = [
+            ['In /group/variable, ref /base_var', '/base_var', '/base_var'],
+            ['In /group/variable, ref ../base_var', '../base_var', '/base_var'],
+            ['In /group/variable, ref ./group_var', './group_var', '/group/group_var'],
+            ['In /group/variable, ref sibling', 'sibling', '/group/sibling'],
+            ['In /group/variable, ref non-sibling', 'non_sibling', '/non_sibling']
+        ]
+
+        for description, raw_reference, absolute_reference in test_args:
+            with self.subTest(description):
+                self.assertEqual(qualify_reference(raw_reference, variable),
+                                 absolute_reference)
+
+        dataset.close()
+
+    def test_variable_in_dataset(self):
+        """ Ensure that a variable will be correctly identified as belonging
+            to the dataset. Also, the function should successfully handle
+            absent intervening groups.
+
+        """
+        dataset = Dataset('test.nc', 'w', diskless=True)
+        dataset.createDimension('lat', size=2)
+        dataset.createDimension('lon', size=4)
+
+        data = np.ones((2, 4))
+
+        dataset.createVariable('/group/variable', data.dtype,
+                               dimensions=('lat', 'lon'))
+        dataset.createVariable('/group/group_two/variable_two', data.dtype,
+                               dimensions=('lat', 'lon'))
+        dataset.createVariable('/base_variable', data.dtype,
+                               dimensions=('lat', 'lon'))
+
+        test_args = [
+            ['Root variable', '/base_variable', True],
+            ['Root variable, no leading slash', 'base_variable', True],
+            ['Singly nested variable', '/group/variable', True],
+            ['Doubly nested variable', '/group/group_two/variable_two', True],
+            ['Non existant base variable', '/missing', False],
+            ['Non existant nested variable', '/group/missing', False],
+            ['Non existant group', '/group_three/variable', False],
+            ['Over nested variable', '/group/group_two/group_three/var', False]
+        ]
+
+        for description, variable_name, expected_result in test_args:
+            with self.subTest(description):
+                self.assertEqual(variable_in_dataset(variable_name, dataset),
+                                 expected_result)
+
+        dataset.close()

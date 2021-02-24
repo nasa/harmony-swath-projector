@@ -96,7 +96,7 @@ def resample_variable(message_parameters: Dict, full_variable: str,
     )
     dataset = Dataset(message_parameters['input_file'])
     variable = dataset[full_variable]
-    coordinates_key = create_coordinates_key(variable.getncattr('coordinates'))
+    coordinates_key = create_coordinates_key(variable)
 
     if coordinates_key in reprojection_cache:
         logger.debug('Retrieving previous interpolation information for '

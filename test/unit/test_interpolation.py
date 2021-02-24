@@ -22,8 +22,8 @@ from test.test_utils import TestBase
 class TestInterpolation(TestBase):
 
     def setUp(self):
-        self.science_variables = ('red_var', 'green_var', 'blue_var',
-                                  'alpha_var')
+        self.science_variables = ('/red_var', '/green_var', '/blue_var',
+                                  '/alpha_var')
         self.message_parameters = {
             'crs': '+proj=longlat',
             'input_file': 'test/data/africa.nc',
@@ -44,7 +44,7 @@ class TestInterpolation(TestBase):
         self.logger = Logger('test')
         self.mock_target_area = MagicMock(spec=AreaDefinition,
                                           shape='ta_shape',
-                                          area_id='lon, lat')
+                                          area_id='/lon, /lat')
 
     def assert_areadefinitions_equal(self, area_one, area_two):
         """ Compare the properties of two AreaDefinitions. """
@@ -79,12 +79,12 @@ class TestInterpolation(TestBase):
                                                   self.temp_directory,
                                                   self.logger)
 
-        expected_output = ['red_var', 'green_var', 'blue_var', 'alpha_var']
+        expected_output = ['/red_var', '/green_var', '/blue_var', '/alpha_var']
         self.assertEqual(output_variables, expected_output)
         self.assertEqual(mock_resample_variable.call_count, 4)
 
         for variable in expected_output:
-            variable_output_path = f'/tmp/01234/{variable}.nc'
+            variable_output_path = f'/tmp/01234{variable}.nc'
             mock_resample_variable.assert_any_call(parameters,
                                                    variable,
                                                    {},
@@ -107,14 +107,15 @@ class TestInterpolation(TestBase):
                                                   self.temp_directory,
                                                   self.logger)
 
-        expected_output = ['green_var', 'blue_var', 'alpha_var']
+        expected_output = ['/green_var', '/blue_var', '/alpha_var']
         self.assertEqual(output_variables, expected_output)
         self.assertEqual(mock_resample_variable.call_count, 4)
 
-        all_variables = expected_output + ['red_var']
+        all_variables = expected_output + ['/red_var']
 
         for variable in all_variables:
-            variable_output_path = f'/tmp/01234/{variable}.nc'
+            variable_output_path = f'/tmp/01234{variable}.nc'
+            print(f'\n\n\n\n{mock_resample_variable.call_args_list}\n\n\n\n')
             mock_resample_variable.assert_any_call(parameters,
                                                    variable,
                                                    {},
@@ -146,7 +147,7 @@ class TestInterpolation(TestBase):
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'bilinear'
-        variable_name = 'alpha_var'
+        variable_name = '/alpha_var'
         output_path = 'path/to/output'
 
         with self.subTest('No pre-existing bilinear information'):
@@ -154,11 +155,11 @@ class TestInterpolation(TestBase):
                               output_path, self.logger)
 
             expected_cache = {
-                ('lon', 'lat'): {'vertical_distances': 'vertical',
-                                 'horizontal_distances': 'horizontal',
-                                 'valid_input_indices': 'input_indices',
-                                 'valid_point_mapping': 'point_mapping',
-                                 'target_area': self.mock_target_area},
+                ('/lon', '/lat'): {'vertical_distances': 'vertical',
+                                   'horizontal_distances': 'horizontal',
+                                   'valid_input_indices': 'input_indices',
+                                   'valid_point_mapping': 'point_mapping',
+                                   'target_area': self.mock_target_area},
             }
 
             mock_get_bil_info.assert_called_once_with('swath',
@@ -184,7 +185,7 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             bilinear_information = {
-                ('lon', 'lat'): {
+                ('/lon', '/lat'): {
                     'vertical_distances': 'vertical_old',
                     'horizontal_distances': 'horizontal_old',
                     'valid_input_indices': 'input_indices_old',
@@ -232,7 +233,7 @@ class TestInterpolation(TestBase):
             # not copies of those objects.
             expected_cache = {
                 HARMONY_TARGET: {'target_area': harmony_target_area},
-                ('lon', 'lat'): {
+                ('/lon', '/lat'): {
                     'vertical_distances': 'vertical',
                     'horizontal_distances': 'horizontal',
                     'valid_input_indices': 'input_indices',
@@ -296,9 +297,9 @@ class TestInterpolation(TestBase):
                               output_path, self.logger)
 
             expected_cache = {
-                ('lon', 'lat'): {'columns': 'columns',
-                                 'rows': 'rows',
-                                 'target_area': self.mock_target_area}
+                ('/lon', '/lat'): {'columns': 'columns',
+                                   'rows': 'rows',
+                                   'target_area': self.mock_target_area}
             }
 
             mock_ll2cr.assert_called_once_with('swath', self.mock_target_area)
@@ -319,9 +320,9 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             ewa_information = {
-                ('lon', 'lat'): {'columns': 'old_columns',
-                                 'rows': 'old_rows',
-                                 'target_area': self.mock_target_area}
+                ('/lon', '/lat'): {'columns': 'old_columns',
+                                   'rows': 'old_rows',
+                                   'target_area': self.mock_target_area}
             }
 
             resample_variable(message_parameters, variable_name,
@@ -370,9 +371,9 @@ class TestInterpolation(TestBase):
                               output_path, self.logger)
 
             expected_cache = {
-                ('lon', 'lat'): {'columns': 'columns',
-                                 'rows': 'rows',
-                                 'target_area': self.mock_target_area}
+                ('/lon', '/lat'): {'columns': 'columns',
+                                   'rows': 'rows',
+                                   'target_area': self.mock_target_area}
             }
 
             mock_ll2cr.assert_called_once_with('swath', self.mock_target_area)
@@ -393,9 +394,9 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             ewa_nn_information = {
-                ('lon', 'lat'): {'columns': 'old_columns',
-                                 'rows': 'old_rows',
-                                 'target_area': self.mock_target_area}}
+                ('/lon', '/lat'): {'columns': 'old_columns',
+                                   'rows': 'old_rows',
+                                   'target_area': self.mock_target_area}}
 
             resample_variable(message_parameters, variable_name,
                               ewa_nn_information, output_path, self.logger)
@@ -432,9 +433,9 @@ class TestInterpolation(TestBase):
             # not copies of those objects.
             expected_cache = {
                 HARMONY_TARGET: {'target_area': harmony_target_area},
-                ('lon', 'lat'): {'columns': 'columns',
-                                 'rows': 'rows',
-                                 'target_area': harmony_target_area}
+                ('/lon', '/lat'): {'columns': 'columns',
+                                   'rows': 'rows',
+                                   'target_area': harmony_target_area}
             }
             self.assertDictEqual(cache, expected_cache)
 
@@ -478,7 +479,7 @@ class TestInterpolation(TestBase):
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'near'
-        variable_name = 'alpha_var'
+        variable_name = '/alpha_var'
         output_path = 'path/to/output'
         alpha_var_fill = 0.0
 
@@ -487,11 +488,11 @@ class TestInterpolation(TestBase):
                               output_path, self.logger)
 
             expected_cache = {
-                ('lon', 'lat'): {'valid_input_index': 'valid_input_index',
-                                 'valid_output_index': 'valid_output_index',
-                                 'index_array': 'index_array',
-                                 'distance_array': 'distance_array',
-                                 'target_area': self.mock_target_area}
+                ('/lon', '/lat'): {'valid_input_index': 'valid_input_index',
+                                   'valid_output_index': 'valid_output_index',
+                                   'index_array': 'index_array',
+                                   'distance_array': 'distance_array',
+                                   'target_area': self.mock_target_area}
             }
 
             mock_get_info.assert_called_once_with('swath',
@@ -519,7 +520,7 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             nearest_information = {
-                ('lon', 'lat'): {
+                ('/lon', '/lat'): {
                     'valid_input_index': 'old_valid_input',
                     'valid_output_index': 'old_valid_output',
                     'index_array': 'old_index_array',
@@ -566,7 +567,7 @@ class TestInterpolation(TestBase):
             # not copies of those objects.
             expected_cache = {
                 HARMONY_TARGET: {'target_area': harmony_target_area},
-                ('lon', 'lat'): {
+                ('/lon', '/lat'): {
                     'valid_input_index': 'valid_input_index',
                     'valid_output_index': 'valid_output_index',
                     'index_array': 'index_array',
@@ -623,7 +624,7 @@ class TestInterpolation(TestBase):
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'near'
-        variable_name = 'blue_var'  # blue_var has scale and offset
+        variable_name = '/blue_var'  # blue_var has scale and offset
         output_path = 'path/to/output'
         blue_var_fill = 0.0
 
@@ -631,11 +632,11 @@ class TestInterpolation(TestBase):
                           output_path, self.logger)
 
         expected_cache = {
-            ('lon', 'lat'): {'valid_input_index': 'valid_input_index',
-                             'valid_output_index': 'valid_output_index',
-                             'index_array': 'index_array',
-                             'distance_array': 'distance_array',
-                             'target_area': self.mock_target_area}
+            ('/lon', '/lat'): {'valid_input_index': 'valid_input_index',
+                               'valid_output_index': 'valid_output_index',
+                               'index_array': 'index_array',
+                               'distance_array': 'distance_array',
+                               'target_area': self.mock_target_area}
         }
         expected_scaling = {'add_offset': 0, 'scale_factor': 2}
 
@@ -680,9 +681,9 @@ class TestInterpolation(TestBase):
 
         """
         dataset = Dataset('test/data/africa.nc')
-        longitudes = dataset['lon']
-        latitudes = dataset['lat']
-        coordinates = ('lat', 'lon')
+        longitudes = dataset['/lon']
+        latitudes = dataset['/lat']
+        coordinates = ('/lat', '/lon')
         swath_definition = get_swath_definition(dataset, coordinates)
 
         self.assertEqual(swath_definition.shape, longitudes.shape)
@@ -816,22 +817,22 @@ class TestInterpolation(TestBase):
 
         # The dimensions are (20 - -20) / 2 = (40 - 0) / 2 = 20.
         expected_target_area = AreaDefinition.from_extent(
-            'lat, lon',
+            '/lat, /lon',
             self.message_parameters['projection'].definition_string(),
             (20, 20),
             (-20, 0, 20, 40)
         )
 
         target_area = get_target_area(self.message_parameters,
-                                      'coordinate_group', ('lat', 'lon'),
+                                      'coordinate_group', ('/lat', '/lon'),
                                       self.logger)
 
         self.assertEqual(mock_get_coordinates.call_count, 2)
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lat')
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lon')
         mock_get_extents.assert_called_once_with(
             self.message_parameters['projection'], longitudes, latitudes
@@ -866,22 +867,22 @@ class TestInterpolation(TestBase):
 
         # The dimensions are x = (10 - -10) / 2 = 10, y = (5 - -5) / 2 = 5
         expected_target_area = AreaDefinition.from_extent(
-            'lat, lon',
+            '/lat, /lon',
             self.message_parameters['projection'].definition_string(),
             (5, 10),
             (-10, -5, 10, 5)
         )
 
         target_area = get_target_area(self.message_parameters,
-                                      'coordinate_group', ('lat', 'lon'),
+                                      'coordinate_group', ('/lat', '/lon'),
                                       self.logger)
 
         self.assertEqual(mock_get_coordinates.call_count, 2)
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lat')
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lon')
         mock_get_extents.assert_not_called()
         mock_get_resolution.assert_called_once_with(
@@ -919,22 +920,22 @@ class TestInterpolation(TestBase):
 
         # The dimensions are x = (10 - -10) / 1 = 20, y = (5 - -5) / 1 = 10
         expected_target_area = AreaDefinition.from_extent(
-            'lat, lon',
+            '/lat, /lon',
             self.message_parameters['projection'].definition_string(),
             (10, 20),
             (-10, -5, 10, 5)
         )
 
         target_area = get_target_area(self.message_parameters,
-                                      'coordinate_group', ('lat', 'lon'),
+                                      'coordinate_group', ('/lat', '/lon'),
                                       self.logger)
 
         self.assertEqual(mock_get_coordinates.call_count, 2)
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lat')
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lon')
         mock_get_extents.assert_not_called()
         mock_get_resolution.assert_not_called()
@@ -969,22 +970,22 @@ class TestInterpolation(TestBase):
         message_parameters['width'] = 10
 
         expected_target_area = AreaDefinition.from_extent(
-            'lat, lon',
+            '/lat, /lon',
             self.message_parameters['projection'].definition_string(),
             (10, 10),
             (-10, -5, 10, 5)
         )
 
         target_area = get_target_area(self.message_parameters,
-                                      'coordinate_group', ('lat', 'lon'),
+                                      'coordinate_group', ('/lat', '/lon'),
                                       self.logger)
 
         self.assertEqual(mock_get_coordinates.call_count, 2)
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lat')
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lon')
         mock_get_extents.assert_not_called()
         mock_get_resolution.assert_not_called()
@@ -1012,22 +1013,22 @@ class TestInterpolation(TestBase):
         message_parameters['width'] = 10
 
         expected_target_area = AreaDefinition.from_extent(
-            'lat, lon',
+            '/lat, /lon',
             self.message_parameters['projection'].definition_string(),
             (10, 10),
             (-20, 0, 20, 40)
         )
 
         target_area = get_target_area(self.message_parameters,
-                                      'coordinate_group', ('lat', 'lon'),
+                                      'coordinate_group', ('/lat', '/lon'),
                                       self.logger)
 
         self.assertEqual(mock_get_coordinates.call_count, 2)
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lat')
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lon')
         mock_get_extents.assert_called_once_with(
             message_parameters['projection'], longitudes, latitudes
@@ -1059,7 +1060,7 @@ class TestInterpolation(TestBase):
 
         # The dimensions are (20 - -20) / 4 = (40 - 0) / 5 = 8
         expected_target_area = AreaDefinition.from_extent(
-            'lat, lon',
+            '/lat, /lon',
             self.message_parameters['projection'].definition_string(),
             (8, 10),
             (-20, 0, 20, 40)
@@ -1067,14 +1068,14 @@ class TestInterpolation(TestBase):
 
         target_area = get_target_area(self.message_parameters,
                                       'coordinate_group',
-                                      ('lat', 'lon'), self.logger)
+                                      ('/lat', '/lon'), self.logger)
 
         self.assertEqual(mock_get_coordinates.call_count, 2)
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lat')
         mock_get_coordinates.assert_any_call('coordinate_group',
-                                             ('lat', 'lon'),
+                                             ('/lat', '/lon'),
                                              'lon')
         mock_get_extents.assert_called_once_with(
             message_parameters['projection'], longitudes, latitudes

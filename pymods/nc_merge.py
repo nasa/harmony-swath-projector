@@ -11,7 +11,8 @@ import re
 from netCDF4 import Dataset, Variable
 
 from pymods.exceptions import MissingReprojectedDataError
-from pymods.utilities import get_variable_file_path
+from pymods.utilities import (get_variable_file_path, qualify_reference,
+                              variable_in_dataset)
 
 
 def create_output(input_file: str, output_file: str, temp_dir: str,
@@ -174,8 +175,8 @@ def get_science_variable_attributes(input_dataset: Dataset,
 
     if (
             'coordinates' in variable_attributes and
-            not check_coor_valid(variable_attributes, input_dataset,
-                                 single_band_dataset)
+            not check_coor_valid(variable_attributes, variable_name,
+                                 input_dataset, single_band_dataset)
     ):
         del variable_attributes['coordinates']
 
@@ -198,7 +199,7 @@ def get_science_variable_dimensions(input_dataset: Dataset,
     return dimensions
 
 
-def check_coor_valid(attrs: Dict, input_dataset: Dataset,
+def check_coor_valid(attrs: Dict, variable_name: str, input_dataset: Dataset,
                      single_band_dataset: Dataset) -> bool:
     """ Check if variables listed in the coordinates metadata attributes are
         still valid after reprojection. Invalid coordinate reference cases:
@@ -212,18 +213,23 @@ def check_coor_valid(attrs: Dict, input_dataset: Dataset,
     coordinates_attribute = attrs.get('coordinates')
 
     if coordinates_attribute is not None:
-        # TODO: DAS-900 Fully qualify these coordinate paths
-        coors = re.split(r'\s+|,\s*', coordinates_attribute)
+        coords = [qualify_reference(coordinate, input_dataset[variable_name])
+                  for coordinate
+                  in re.split(r'\s+|,\s*', coordinates_attribute)]
     else:
-        coors = []
+        coords = []
 
-    if not set(coors).issubset(single_band_dataset.variables):
+    all_coordinates_in_single_band = all(
+        variable_in_dataset(coord, single_band_dataset) for coord in coords
+    )
+
+    if not all_coordinates_in_single_band:
         # Coordinates from original variable aren't all present in reprojected
         # output (single band file).
         valid = False
     else:
         valid = all(single_band_dataset[coord].shape == input_dataset[coord].shape
-                    for coord in coors)
+                    for coord in coords)
 
     return valid
 

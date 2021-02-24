@@ -155,3 +155,19 @@ Coverage reports are being generate for each build in Bamboo, and saved as artif
 Following URL is an example coverage report in Bamboo:
 
 https://ci.earthdata.nasa.gov/artifact/HARMONY-SRT41/BRT/build-3/Coverage-Report/source/test/coverage/index.html
+
+The tests can also be run outside of the Docker container, for faster checks
+during development. To do so, first activate the requisite conda environment,
+which will need requirements (including the test Pip requirements). Then run:
+
+```
+export ENV=test
+python -m unittest discover test
+```
+
+Note - before opening a pull request, all tests should be run in the Docker
+container environment, to be sure that there isn't something different between
+the local development environment and the environment in which the SWOT
+Reprojection tool will actually run. Additionally, the Docker container
+invocation will provide pylint checking, to ensure linting errors have not been
+added during development.
