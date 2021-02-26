@@ -93,6 +93,22 @@ class TestUtilities(TestBase):
                 # Check the output matches all the input data
                 np.testing.assert_array_equal(input_data, returned_data)
 
+        with self.subTest('2-D variable, time in dataset, but not variable'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('time', size=1)
+                dataset.createDimension('lat', size=2)
+                dataset.createDimension('lon', size=2)
+                input_data = np.array([[1, 2], [3, 4]])
+                variable = dataset.createVariable('data', input_data.dtype,
+                                                  dimensions=('lat', 'lon'))
+                variable[:] = input_data[:]
+
+                returned_data = get_variable_values(dataset, variable, None)
+
+                self.assertIsInstance(returned_data, np.ndarray)
+                np.testing.assert_array_equal(input_data, returned_data)
+
+
     def test_get_coordinate_variables(self):
         """ Ensure the longitude or latitude coordinate variable, is retrieved
             when requested.

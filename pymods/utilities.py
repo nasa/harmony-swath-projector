@@ -37,7 +37,7 @@ def get_variable_values(input_file: Dataset, variable: Variable,
     #       in the longitude-latitude plane should be used to determine 2-D
     #       reprojection information. This information should then also be
     #       applied across the other preceding or following dimensions.
-    if 'time' in input_file.variables:
+    if 'time' in input_file.variables and 'time' in variable.dimensions:
         # Assumption: Array = (1, y, x)
         return variable[0][:].filled(fill_value=fill_value)
     else:
