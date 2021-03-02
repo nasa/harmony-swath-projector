@@ -115,7 +115,6 @@ class TestInterpolation(TestBase):
 
         for variable in all_variables:
             variable_output_path = f'/tmp/01234{variable}.nc'
-            print(f'\n\n\n\n{mock_resample_variable.call_args_list}\n\n\n\n')
             mock_resample_variable.assert_any_call(parameters,
                                                    variable,
                                                    {},
@@ -139,9 +138,11 @@ class TestInterpolation(TestBase):
         """
         mock_get_bil_info.return_value = ['vertical', 'horizontal',
                                           'input_indices', 'point_mapping']
-        mock_get_sample.return_value = 'results'
+        results = np.array([4.0])
+        mock_get_sample.return_value = results
         mock_get_swath.return_value = 'swath'
-        mock_values = MagicMock(**{'ravel.return_value': 'ravel data'})
+        ravel_data = np.ones((3, ))
+        mock_values = MagicMock(**{'ravel.return_value': ravel_data})
         mock_get_values.return_value = mock_values
         mock_get_target_area.return_value = self.mock_target_area
 
@@ -166,14 +167,14 @@ class TestInterpolation(TestBase):
                                                       self.mock_target_area,
                                                       radius=50000,
                                                       neighbours=16)
-            mock_get_sample.assert_called_once_with('ravel data',
+            mock_get_sample.assert_called_once_with(ravel_data,
                                                     'vertical',
                                                     'horizontal',
                                                     'input_indices',
                                                     'point_mapping',
                                                     output_shape='ta_shape')
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       expected_cache,
@@ -198,14 +199,14 @@ class TestInterpolation(TestBase):
                               bilinear_information, output_path, self.logger)
 
             mock_get_bil_info.assert_not_called()
-            mock_get_sample.assert_called_once_with('ravel data',
+            mock_get_sample.assert_called_once_with(ravel_data,
                                                     'vertical_old',
                                                     'horizontal_old',
                                                     'input_indices_old',
                                                     'point_mapping_old',
                                                     output_shape='ta_shape')
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       bilinear_information,
@@ -248,7 +249,7 @@ class TestInterpolation(TestBase):
                                                       radius=50000,
                                                       neighbours=16)
             mock_get_sample.assert_called_once_with(
-                'ravel data',
+                ravel_data,
                 'vertical',
                 'horizontal',
                 'input_indices',
@@ -258,7 +259,7 @@ class TestInterpolation(TestBase):
 
             # The Harmony target area should be given to the output function
             mock_write_output.assert_called_once_with(harmony_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       expected_cache,
@@ -281,7 +282,8 @@ class TestInterpolation(TestBase):
 
         """
         mock_ll2cr.return_value = ['swath_points_in_grid', 'columns', 'rows']
-        mock_fornav.return_value = ('', 'results')
+        results = np.array([6.0])
+        mock_fornav.return_value = ('', results)
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
@@ -308,7 +310,7 @@ class TestInterpolation(TestBase):
                                                 mock_values,
                                                 maximum_weight_mode=False)
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       expected_cache,
@@ -334,7 +336,7 @@ class TestInterpolation(TestBase):
                                                 mock_values,
                                                 maximum_weight_mode=False)
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       ewa_information,
@@ -355,7 +357,8 @@ class TestInterpolation(TestBase):
                     called.
         """
         mock_ll2cr.return_value = ['swath_points_in_grid', 'columns', 'rows']
-        mock_fornav.return_value = ('', 'results')
+        results = np.array([5.0])
+        mock_fornav.return_value = ('', results)
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
@@ -382,7 +385,7 @@ class TestInterpolation(TestBase):
                                                 mock_values,
                                                 maximum_weight_mode=True)
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       expected_cache,
@@ -407,7 +410,7 @@ class TestInterpolation(TestBase):
                                                 mock_values,
                                                 maximum_weight_mode=True)
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       ewa_nn_information,
@@ -447,7 +450,7 @@ class TestInterpolation(TestBase):
 
             # The Harmony target area should be given to the output function
             mock_write_output.assert_called_once_with(harmony_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       expected_cache,
@@ -471,7 +474,8 @@ class TestInterpolation(TestBase):
         """
         mock_get_info.return_value = ['valid_input_index', 'valid_output_index',
                                       'index_array', 'distance_array']
-        mock_get_sample.return_value = 'results'
+        results = np.array([4.0])
+        mock_get_sample.return_value = results
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
@@ -508,7 +512,7 @@ class TestInterpolation(TestBase):
                                                     distance_array='distance_array',
                                                     fill_value=alpha_var_fill)
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       expected_cache,
@@ -541,7 +545,7 @@ class TestInterpolation(TestBase):
                                                     distance_array='old_distance',
                                                     fill_value=alpha_var_fill)
             mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       nearest_information,
@@ -593,7 +597,7 @@ class TestInterpolation(TestBase):
 
             # The Harmony target area should be given to the output function
             mock_write_output.assert_called_once_with(harmony_target_area,
-                                                      'results',
+                                                      results,
                                                       variable_name,
                                                       output_path,
                                                       expected_cache,
@@ -616,7 +620,8 @@ class TestInterpolation(TestBase):
         """
         mock_get_info.return_value = ['valid_input_index', 'valid_output_index',
                                       'index_array', 'distance_array']
-        mock_get_sample.return_value = 'results'
+        results = np.array([4.0])
+        mock_get_sample.return_value = results
         mock_get_swath.return_value = 'swath'
         mock_values = np.ones((2, 3))
         mock_get_values.return_value = mock_values
@@ -653,7 +658,7 @@ class TestInterpolation(TestBase):
                                                 distance_array='distance_array',
                                                 fill_value=blue_var_fill)
         mock_write_output.assert_called_once_with(self.mock_target_area,
-                                                  'results',
+                                                  results,
                                                   variable_name,
                                                   output_path,
                                                   expected_cache,
@@ -689,6 +694,32 @@ class TestInterpolation(TestBase):
         self.assertEqual(swath_definition.shape, longitudes.shape)
         np.testing.assert_array_equal(longitudes, swath_definition.lons)
         np.testing.assert_array_equal(latitudes, swath_definition.lats)
+
+    def test_get_swath_defintiion_wrapping_longitudes(self):
+        """ Ensure that a dataset with coordinates that have longitude ranging
+            from 0 to 360 degrees will produce a valid SwathDefinition object,
+            with the longitudes ranging from -180 degrees to 180 degrees.
+
+        """
+        dataset = Dataset('test.nc', 'w', diskless=True)
+
+        lat_values = np.array([[20, 20], [10, 10]])
+        raw_lon_values = np.array([[180, 190], [180, 190]])
+        wrapped_lon_values = np.array([[180, -170], [180, -170]])
+
+        dataset.createDimension('lat', size=2)
+        dataset.createDimension('lon', size=2)
+        dataset.createVariable('latitude', lat_values.dtype,
+                               dimensions=('lat', 'lon'))
+        dataset.createVariable('longitude', raw_lon_values.dtype,
+                               dimensions=('lat', 'lon'))
+
+        coordinates = ('/latitude', '/longitude')
+        swath_definition = get_swath_definition(dataset, coordinates)
+
+        self.assertEqual(swath_definition.shape, lat_values.shape)
+        np.testing.assert_array_equal(lat_values, swath_definition.lats)
+        np.testing.assert_array_equal(wrapped_lon_values, swath_definition.lons)
 
     def test_get_reprojection_cache_minimal(self):
         """ If a Harmony message does not contain any target area information,

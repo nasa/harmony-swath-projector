@@ -12,6 +12,7 @@ from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
 from pyresample.geometry import AreaDefinition, SwathDefinition
 from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_info
+from pyresample.utils import check_and_wrap
 import numpy as np
 
 from pymods.nc_single_band import HARMONY_TARGET, write_single_band_output
@@ -73,7 +74,7 @@ def resample_all_variables(message_parameters: Dict,
             # Assume for now variable cannot be reprojected. TBD add checks for
             # other error conditions.
             logger.error(f'Cannot reproject {variable}')
-            logger.error(error)
+            logger.exception(error)
 
     return output_variables
 
@@ -137,6 +138,7 @@ def resample_variable(message_parameters: Dict, full_variable: str,
 
     results = interpolation_functions['get_results'](variable_information,
                                                      reprojection_information)
+    results = results.astype(variable.dtype)
 
     attributes = get_scale_and_offset(variable)
     write_single_band_output(reprojection_information['target_area'], results,
@@ -172,10 +174,11 @@ def get_bilinear_results(variable: Dict,
                          bilinear_information: Dict) -> np.ndarray:
     """ Use the derived information from the input swath and target area to
         reproject variable data in the target area using the bilinear
-        interpolation method.
+        interpolation method. Any pixels with NaN values after reprojection are
+        set to the fill value for the variable.
 
     """
-    return get_sample_from_bil_info(
+    results = get_sample_from_bil_info(
         variable['values'].ravel(),
         bilinear_information['vertical_distances'],
         bilinear_information['horizontal_distances'],
@@ -183,6 +186,11 @@ def get_bilinear_results(variable: Dict,
         bilinear_information['valid_point_mapping'],
         output_shape=bilinear_information['target_area'].shape
     )
+
+    if variable['fill_value'] is not None:
+        np.nan_to_num(results, nan=variable['fill_value'], copy=False)
+
+    return results
 
 
 def get_ewa_information(swath_definition: SwathDefinition,
@@ -224,6 +232,9 @@ def get_ewa_results(variable: Dict, ewa_information: Dict,
     _, results = fornav(ewa_information['columns'], ewa_information['rows'],
                         ewa_information['target_area'], variable['values'],
                         maximum_weight_mode=maximum_weight_mode)
+
+    if variable['fill_value'] is not None:
+        np.nan_to_num(results, nan=variable['fill_value'], copy=False)
 
     return results
 
@@ -311,13 +322,15 @@ def check_for_valid_interpolation(message_parameters: Dict,
 
 def get_swath_definition(dataset: Dataset,
                          coordinates: Tuple[str]) -> SwathDefinition:
-    """ Define the swath as specified by the root longitude and latitude
-        datasets.
+    """ Define the swath as specified by the associated longitude and latitude
+        datasets. Note, the longitudes must be wrapped to the range:
+        -180 < longitude < 180.
 
     """
     latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
     longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
-    return SwathDefinition(lons=longitudes, lats=latitudes)
+    wrapped_lons, wrapped_lats = check_and_wrap(longitudes[:], latitudes[:])
+    return SwathDefinition(lons=wrapped_lons, lats=wrapped_lats)
 
 
 def get_reprojection_cache(parameters: Dict) -> Dict:

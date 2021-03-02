@@ -9,6 +9,7 @@ import os
 import re
 
 from netCDF4 import Dataset, Variable
+import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
 from pymods.utilities import (get_variable_file_path, qualify_reference,
@@ -88,13 +89,29 @@ def copy_time_dimension(input_dataset: Dataset, output_dataset: Dataset,
 
 
 def set_dimensions(input_dataset: Dataset, output_dataset: Dataset) -> None:
-    """ Read the dimensions in the single band intermediate file. Add them to
-        the output dataset, if they are not already present.
+    """ Read the dimensions in the single band intermediate file. Add each
+        dimension to the output dataset that is not already present.
 
     """
     for name, dimension in input_dataset.dimensions.items():
         if name not in output_dataset.dimensions:
             output_dataset.createDimension(name, dimension.size)
+
+
+def set_metadata_dimensions(metadata_variable: str, source_dataset: Dataset,
+                            output_dataset: Dataset) -> None:
+    """ Iterate through the dimensions of the metadata variable, and ensure
+        that all are present in the reprojected output file. This function is
+        necessary if any of the metadata variables, that aren't to be projected
+        use the swath-based dimensions from the input granule.
+
+    """
+    for dimension in source_dataset[metadata_variable].dimensions:
+        if dimension not in output_dataset.dimensions:
+            output_dataset.createDimension(
+                dimension,
+                source_dataset.dimensions[dimension].size
+            )
 
 
 def copy_metadata_variable(source_dataset: Dataset, output_dataset: Dataset,
@@ -109,6 +126,7 @@ def copy_metadata_variable(source_dataset: Dataset, output_dataset: Dataset,
 
     """
     logger.info(f'Adding metadata variable "{variable_name}" to the output.')
+    set_metadata_dimensions(variable_name, source_dataset, output_dataset)
 
     attributes = read_attrs(source_dataset[variable_name])
     fill_value = get_fill_value_from_attributes(attributes)
@@ -151,12 +169,24 @@ def copy_science_variable(input_dataset: Dataset, output_dataset: Dataset,
         dimensions=dimensions, fill_value=fill_value, zlib=True, complevel=6
     )
 
-    variable.setncatts(attributes)
+    # Extract the data from the single band image, and ensure it is correctly
+    # scaled, so packing occurs correctly on write.
+    raw_data = single_band_dataset[variable_name][:].data
+    scale_factor = attributes.get('scale_factor', 1)
+    add_offset = attributes.get('add_offset', 0)
+
+    packed_data = (raw_data - add_offset) / scale_factor
+
+    # Make sure the fill value is still correctly scaled
+    filled_data = np.where(raw_data == fill_value)
+    packed_data[filled_data] = fill_value
 
     if 'time' in variable.dimensions:
-        variable[0, :] = single_band_dataset[variable_name][:]
+        variable[0, :] = packed_data
     else:
-        variable[:] = single_band_dataset[variable_name][:]
+        variable[:] = packed_data
+
+    variable.setncatts(attributes)
 
 
 def get_science_variable_attributes(input_dataset: Dataset,
