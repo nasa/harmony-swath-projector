@@ -208,8 +208,8 @@ class TestNCSingleBand(TestBase):
                                                        ('lat_1', 'lon_1'))
 
                 self.assertEqual(grid_mapping_name,
-                                 'latitude_longitude: lat_1 lon_1')
-                self.assertIn('latitude_longitude: lat_1 lon_1',
+                                 'latitude_longitude_lat_1_lon_1')
+                self.assertIn('latitude_longitude_lat_1_lon_1',
                               dataset.variables)
 
         with self.subTest('A custom CRS, with no name specified.'):

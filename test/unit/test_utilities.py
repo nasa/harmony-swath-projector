@@ -7,7 +7,8 @@ from pymods.utilities import (construct_absolute_path, create_coordinates_key,
                               get_variable_values, get_coordinate_variable,
                               get_scale_and_offset, get_variable_file_path,
                               get_variable_numeric_fill_value,
-                              qualify_reference, variable_in_dataset)
+                              make_array_two_dimensional, qualify_reference,
+                              variable_in_dataset)
 from test.test_utils import TestBase
 
 
@@ -326,3 +327,15 @@ class TestUtilities(TestBase):
                                  expected_result)
 
         dataset.close()
+
+    def test_make_array_two_dimensional(self):
+        """ Ensure a 1-D array is expaned to be a 2-D array with elements all
+            in the same column,
+
+        """
+        input_array = np.array([1, 2, 3])
+        expected_output = np.array([[1], [2], [3]])
+        output_array = make_array_two_dimensional(input_array)
+
+        self.assertEqual(len(output_array.shape), 2)
+        np.testing.assert_array_equal(output_array, expected_output)

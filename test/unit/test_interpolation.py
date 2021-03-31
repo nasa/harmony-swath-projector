@@ -695,7 +695,7 @@ class TestInterpolation(TestBase):
         np.testing.assert_array_equal(longitudes, swath_definition.lons)
         np.testing.assert_array_equal(latitudes, swath_definition.lats)
 
-    def test_get_swath_defintiion_wrapping_longitudes(self):
+    def test_get_swath_definition_wrapping_longitudes(self):
         """ Ensure that a dataset with coordinates that have longitude ranging
             from 0 to 360 degrees will produce a valid SwathDefinition object,
             with the longitudes ranging from -180 degrees to 180 degrees.
@@ -705,7 +705,7 @@ class TestInterpolation(TestBase):
 
         lat_values = np.array([[20, 20], [10, 10]])
         raw_lon_values = np.array([[180, 190], [180, 190]])
-        wrapped_lon_values = np.array([[180, -170], [180, -170]])
+        wrapped_lon_values = np.array([[-180, -170], [-180, -170]])
 
         dataset.createDimension('lat', size=2)
         dataset.createDimension('lon', size=2)
@@ -713,6 +713,8 @@ class TestInterpolation(TestBase):
                                dimensions=('lat', 'lon'))
         dataset.createVariable('longitude', raw_lon_values.dtype,
                                dimensions=('lat', 'lon'))
+        dataset['longitude'][:] = raw_lon_values[:]
+        dataset['latitude'][:] = lat_values[:]
 
         coordinates = ('/latitude', '/longitude')
         swath_definition = get_swath_definition(dataset, coordinates)
@@ -720,6 +722,37 @@ class TestInterpolation(TestBase):
         self.assertEqual(swath_definition.shape, lat_values.shape)
         np.testing.assert_array_equal(lat_values, swath_definition.lats)
         np.testing.assert_array_equal(wrapped_lon_values, swath_definition.lons)
+        dataset.close()
+
+    def test_get_swath_definition_one_dimensional_coordinates(self):
+        """ Ensure that if 1-D coordinate arrays are used to produce a swath,
+            they are converted to 2-D before being used to construct the
+            object.
+
+        """
+        dataset = Dataset('test_1d.nc', 'w', diskless=True)
+
+        lat_values = np.array([20, 15, 10])
+        lon_values = np.array([150, 160, 170])
+        lat_values_2d = np.array([[20], [15], [10]])
+        lon_values_2d = np.array([[150], [160], [170]])
+
+        dataset.createDimension('lat', size=3)
+        dataset.createDimension('lon', size=3)
+        dataset.createVariable('latitude', lat_values.dtype,
+                               dimensions=('lat',))
+        dataset.createVariable('longitude', lon_values.dtype,
+                               dimensions=('lon',))
+        dataset['longitude'][:] = lon_values[:]
+        dataset['latitude'][:] = lat_values[:]
+
+        coordinates = ('/latitude', '/longitude')
+        swath_definition = get_swath_definition(dataset, coordinates)
+
+        self.assertEqual(swath_definition.shape, (lat_values.size, 1))
+        np.testing.assert_array_equal(lat_values_2d, swath_definition.lats)
+        np.testing.assert_array_equal(lon_values_2d, swath_definition.lons)
+        dataset.close()
 
     def test_get_reprojection_cache_minimal(self):
         """ If a Harmony message does not contain any target area information,

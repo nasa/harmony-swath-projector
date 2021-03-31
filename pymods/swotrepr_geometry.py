@@ -21,19 +21,20 @@ def get_projected_resolution(projection: Proj, longitudes: Variable,
 
     """
     coordinates_mask = get_valid_coordinates_mask(longitudes, latitudes)
-    perimeter_coordinates = get_perimeter_coordinates(longitudes[:],
-                                                      latitudes[:],
-                                                      coordinates_mask)
+    x_values, y_values = get_projected_coordinates(coordinates_mask,
+                                                   projection, longitudes,
+                                                   latitudes)
 
-    x_values, y_values = reproject_perimeter_points(perimeter_coordinates,
-                                                    projection)
+    if len(longitudes.shape) == 1:
+        absolute_resolution = get_one_dimensional_resolution(x_values, y_values)
+    else:
+        ordered_x, ordered_y = sort_perimeter_points(x_values, y_values)
+        projected_area = get_polygon_area(ordered_x, ordered_y)
+        absolute_resolution = get_absolute_resolution(
+            projected_area,
+            coordinates_mask.count() # pylint: disable=E1101
+        )
 
-    ordered_x, ordered_y = sort_perimeter_points(x_values, y_values)
-    projected_area = get_polygon_area(ordered_x, ordered_y)
-    absolute_resolution = get_absolute_resolution(
-        projected_area,
-        coordinates_mask.count() # pylint: disable=E1101
-    )
     return absolute_resolution
 
 
@@ -46,18 +47,33 @@ def get_extents_from_perimeter(projection: Proj, longitudes: Variable,
 
     """
     coordinates_mask = get_valid_coordinates_mask(longitudes, latitudes)
-    perimeter_coordinates = get_perimeter_coordinates(longitudes[:],
-                                                      latitudes[:],
-                                                      coordinates_mask)
-    x_values, y_values = reproject_perimeter_points(perimeter_coordinates,
-                                                    projection)
+    x_values, y_values = get_projected_coordinates(coordinates_mask,
+                                                   projection, longitudes,
+                                                   latitudes)
 
     return (np.min(x_values), np.max(x_values), np.min(y_values),
             np.max(y_values))
 
 
-def reproject_perimeter_points(points: List[Tuple],
-                               projection: Proj) -> Tuple[np.ndarray]:
+def get_projected_coordinates(coordinates_mask: np.ma.core.MaskedArray,
+                              projection: Proj, longitudes: Variable,
+                              latitudes: Variable) -> Tuple[np.ndarray]:
+    """ Get the required coordinate points projected in the target Coordinate
+        Reference System (CRS).
+
+    """
+    if len(longitudes.shape) == 1:
+        coordinates = get_all_coordinates(longitudes[:], latitudes[:],
+                                          coordinates_mask)
+    else:
+        coordinates = get_perimeter_coordinates(longitudes[:], latitudes[:],
+                                                coordinates_mask)
+
+    return reproject_coordinates(coordinates, projection)
+
+
+def reproject_coordinates(points: List[Tuple],
+                          projection: Proj) -> Tuple[np.ndarray]:
     """ Reproject a list of input perimeter points, in longitude and latitude
         tuples, to the target CRS.
 
@@ -68,6 +84,26 @@ def reproject_perimeter_points(points: List[Tuple],
     """
     perimeter_longitudes, perimeter_latitudes = zip(*points)
     return projection(perimeter_longitudes, perimeter_latitudes)
+
+
+def get_one_dimensional_resolution(x_values: List[float],
+                                   y_values: List[float]) -> float:
+    """ Find the projected distance between each pair of consecutive points
+        and return the median average as the resolution.
+
+    """
+    return np.median([euclidean_distance(x_values[ind + 1], x_values[ind],
+                                         y_values[ind + 1], y_values[ind])
+                      for ind in range(len(x_values) - 2)])
+
+
+def euclidean_distance(x_one: float, x_two: float, y_one: float,
+                       y_two: float) -> float:
+    """ Find the Euclidean distance between two points, in projected coordinate
+        space.
+
+    """
+    return np.sqrt((x_one - x_two)**2.0 + (y_one - y_two)**2.0)
 
 
 def get_polygon_area(x_values: np.ndarray, y_values: np.ndarray) -> float:
@@ -146,6 +182,18 @@ def get_perimeter_coordinates(longitudes: np.ndarray, latitudes: np.ndarray,
             for point in unordered_points]
 
 
+def get_all_coordinates(longitudes: np.ndarray, latitudes: np.ndarray,
+                        mask: np.ma.core.MaskedArray) -> List[Tuple[float]]:
+    """ Return coordinates of all valid pixels in (longitude, latitude) tuples.
+        These points will have non-fill values for both the longitude and
+        latitude, and are expected to be from a 1-D variable.
+
+    """
+    return [(longitude, latitudes[array_index])
+            for array_index, longitude in enumerate(longitudes)
+            if mask[array_index]]
+
+
 def get_slice_edges(slice_valid_indices: np.ndarray, slice_index: int,
                     is_row: bool = True) -> List[Tuple[int]]:
     """ Given a list of indices for all valid data in a single row or column of
@@ -217,9 +265,11 @@ def swath_crosses_international_date_line(longitudes: np.ndarray) -> bool:
         either two adjacent longitude columns or rows.
 
     """
-    # TODO: Mask fill_value pixels
     longitudes_difference_row = np.diff(longitudes, n=1, axis=0)
-    longitudes_difference_column = np.diff(longitudes, n=1, axis=1)
-    max_column_difference = np.max(np.abs(longitudes_difference_column))
-    max_row_difference = np.max(np.abs(longitudes_difference_row))
-    return np.max([max_column_difference, max_row_difference]) > 90.0
+    dim_differences = [np.max(np.abs(longitudes_difference_row))]
+
+    if len(longitudes.shape) > 1:
+        longitudes_difference_column = np.diff(longitudes, n=1, axis=1)
+        dim_differences.append(np.max(np.abs(longitudes_difference_column)))
+
+    return np.max(dim_differences) > 90.0

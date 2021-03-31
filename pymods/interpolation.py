@@ -7,7 +7,7 @@ from logging import Logger
 from typing import Dict, List, Optional, Tuple
 import os
 
-from netCDF4 import Dataset, Variable
+from netCDF4 import Dataset
 from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
 from pyresample.geometry import AreaDefinition, SwathDefinition
@@ -22,7 +22,8 @@ from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
                               get_scale_and_offset,
                               get_variable_file_path,
                               get_variable_numeric_fill_value,
-                              get_variable_values)
+                              get_variable_values,
+                              make_array_two_dimensional)
 
 
 # In nearest neighbour interpolation, the distance to a found value is
@@ -264,7 +265,7 @@ def get_near_results(variable: Dict, near_information) -> np.ndarray:
         interpolation method.
 
     """
-    return get_sample_from_neighbour_info(
+    results = get_sample_from_neighbour_info(
         'nn', near_information['target_area'].shape, variable['values'],
         near_information['valid_input_index'],
         near_information['valid_output_index'],
@@ -272,6 +273,12 @@ def get_near_results(variable: Dict, near_information) -> np.ndarray:
         distance_array=near_information['distance_array'],
         fill_value=variable['fill_value']
     )
+
+    if len(results.shape) == 3:
+        # Occurs when pyresample thinks the results are banded.
+        results = np.squeeze(results, axis=2)
+
+    return results
 
 
 def get_resampling_functions() -> Dict:
@@ -329,7 +336,14 @@ def get_swath_definition(dataset: Dataset,
     """
     latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
     longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
+
     wrapped_lons, wrapped_lats = check_and_wrap(longitudes[:], latitudes[:])
+
+    # EWA ll2cr requires 2-dimensional arrays for the swath coordinates:
+    if len(wrapped_lons.shape) == 1:
+        wrapped_lons = make_array_two_dimensional(wrapped_lons)
+        wrapped_lats = make_array_two_dimensional(wrapped_lats)
+
     return SwathDefinition(lons=wrapped_lons, lats=wrapped_lats)
 
 

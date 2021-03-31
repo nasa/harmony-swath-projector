@@ -4,19 +4,21 @@ from tempfile import mkdtemp
 from unittest.mock import patch
 from uuid import uuid4
 
-from netCDF4 import Dataset, Variable
+from netCDF4 import Dataset
 from pyproj import Proj
 import numpy as np
 
 from pymods.swotrepr_geometry import (clockwise_point_sort,
+                                      euclidean_distance,
                                       get_absolute_resolution,
                                       get_extents_from_perimeter,
+                                      get_one_dimensional_resolution,
                                       get_perimeter_coordinates,
                                       get_polygon_area,
                                       get_projected_resolution,
                                       get_slice_edges,
                                       get_valid_coordinates_mask,
-                                      reproject_perimeter_points,
+                                      reproject_coordinates,
                                       sort_perimeter_points,
                                       swath_crosses_international_date_line)
 from test.test_utils import TestBase
@@ -27,7 +29,7 @@ class TestSwotReprGeometry(TestBase):
     @classmethod
     def setUpClass(cls):
         cls.ease_projection = Proj('EPSG:6933')
-        cls.geographic_coordinates = Proj('EPSG:4326')
+        cls.geographic_projection = Proj('EPSG:4326')
 
         cls.test_dir = mkdtemp()
         cls.test_path = f'{cls.test_dir}/geometry.nc'
@@ -44,8 +46,12 @@ class TestSwotReprGeometry(TestBase):
         cls.test_file.createDimension('ni', size=4)
         cls.test_file.createVariable('lat', np.float, dimensions=('nj', 'ni'))
         cls.test_file.createVariable('lon', np.float, dimensions=('nj', 'ni'))
+        cls.test_file.createVariable('lat_1d', np.float, dimensions=('ni',))
+        cls.test_file.createVariable('lon_1d', np.float, dimensions=('ni',))
         cls.test_file['lat'][:] = cls.lat_data
         cls.test_file['lon'][:] = cls.lon_data
+        cls.test_file['lat_1d'][:] = np.array([0.0, 3.0, 6.0, 9.0])
+        cls.test_file['lon_1d'][:] = np.array([2.0, 6.0, 10.0, 14.0])
         cls.test_file.close()
 
     def setUp(self):
@@ -60,13 +66,17 @@ class TestSwotReprGeometry(TestBase):
     def tearDownClass(cls):
         rmtree(cls.test_dir, ignore_errors=True)
 
+    def test_euclidean_distance(self):
+        """ Ensure the Euclidean distance is correctly calculated. """
+        self.assertEqual(euclidean_distance(2.3, 5.3, 6.8, 2.8), 5.0)
+
     def test_get_projected_resolution(self):
         """ Ensure the calculated resolution from the input longitudes and
             latitudes is as expected. Resolution is large for metres, because
             grid is in 5 degree increments.
 
         """
-        test_args = [['Geographic', self.geographic_coordinates, 3.536],
+        test_args = [['Geographic', self.geographic_projection, 3.536],
                      ['Projected metres', self.ease_projection, 380302.401]]
 
         for description, projection, expected_resolution in test_args:
@@ -76,6 +86,14 @@ class TestSwotReprGeometry(TestBase):
                                                       self.latitudes)
                 self.assertAlmostEqual(resolution, expected_resolution, places=3)
 
+    def test_get_projected_resolution_1d(self):
+        """ Ensure the calculated one-dimensional resolution is correct. """
+        resolution = get_projected_resolution(self.geographic_projection,
+                                              self.test_dataset['lon_1d'],
+                                              self.test_dataset['lat_1d'])
+
+        self.assertAlmostEqual(resolution, 5.0)
+
     def test_get_extents_from_perimeter(self):
         """ Get the maximum and minimum values from the perimeter data
             points.
@@ -83,7 +101,7 @@ class TestSwotReprGeometry(TestBase):
         """
         with self.subTest('Geographic coordinates'):
             x_min, x_max, y_min, y_max = get_extents_from_perimeter(
-                self.geographic_coordinates, self.longitudes, self.latitudes
+                self.geographic_projection, self.longitudes, self.latitudes
             )
             self.assertAlmostEqual(x_min, 40.0, places=7)
             self.assertAlmostEqual(x_max, 55.0, places=7)
@@ -99,6 +117,16 @@ class TestSwotReprGeometry(TestBase):
             self.assertAlmostEqual(x_max, 5306745.414, places=3)
             self.assertAlmostEqual(y_min, 1892380.583, places=3)
             self.assertAlmostEqual(y_max, 3091555.561, places=3)
+
+        with self.subTest('Geographic, 1-D'):
+            x_min, x_max, y_min, y_max = get_extents_from_perimeter(
+                self.geographic_projection, self.test_dataset['lon_1d'],
+                self.test_dataset['lat_1d']
+            )
+            self.assertAlmostEqual(x_min, 2.0, places=7)
+            self.assertAlmostEqual(x_max, 14.0, places=7)
+            self.assertAlmostEqual(y_min, 0.0, places=7)
+            self.assertAlmostEqual(y_max, 9.0, places=7)
 
     def test_get_perimeter_coordinates(self):
         """ Ensure a full list of longitude, latitude points are returned for
@@ -126,14 +154,14 @@ class TestSwotReprGeometry(TestBase):
 
         self.assertCountEqual(coordinates, expected_points)
 
-    def test_reproject_perimeter_points(self):
+    def test_reproject_coordinates(self):
         """ Ensure a set of points will be correctly projected. """
         proj = Proj('EPSG:32603')
         input_points = [(10.0, 2.5), (15.0, 3.0), (20.0, 3.5)]
         expected_x = np.array([1056557.724, 500000.000, -56049.659])
         expected_y = np.array([19718541.688, 19664336.706, 19607585.857])
 
-        x_values, y_values = reproject_perimeter_points(input_points, proj)
+        x_values, y_values = reproject_coordinates(input_points, proj)
         self.assertEqual(len(x_values), len(expected_x))
         self.assertEqual(len(y_values), len(expected_y))
         np.testing.assert_allclose(x_values, expected_x, atol=0.001, rtol=0)
@@ -158,6 +186,16 @@ class TestSwotReprGeometry(TestBase):
         resolution = get_absolute_resolution(area, n_pixels)
         self.assertIsInstance(resolution, float)
         self.assertEqual(resolution, 2.0)
+
+    def test_get_one_dimensional_resolution(self):
+        """ Ensure the 1-D resolution is calculated as expected from the input
+            data.
+
+        """
+        x_values = list(self.test_dataset['lon_1d'][:])
+        y_values = list(self.test_dataset['lat_1d'][:])
+        resolution = get_one_dimensional_resolution(x_values, y_values)
+        self.assertAlmostEqual(resolution, 5.0)
 
     def test_swath_crosses_international_date_line(self):
         """ Ensure the International Date Line is correctly identified. """
