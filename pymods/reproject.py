@@ -46,7 +46,7 @@ def reproject(message: Message, filename: str, temp_dir: str,
         nc_info = NCInfo(parameters['input_file'])
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
-        raise Exception('Unable to parse input file variables')
+        raise Exception('Unable to parse input file variables') from err
 
     science_variables = nc_info.get_science_variables()
 

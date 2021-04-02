@@ -167,7 +167,7 @@ def write_grid_mapping(dataset: Dataset, target_area: AreaDefinition,
     # grid mapping name.
     if dimensions not in [('lat', 'lon'), ('y', 'x')]:
         grid_mapping_attributes['grid_mapping_name'] += (
-            f': {dimensions[0]} {dimensions[1]}'
+            f'_{dimensions[0]}_{dimensions[1]}'
         )
 
     grid_mapping = dataset.createVariable(

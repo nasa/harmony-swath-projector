@@ -37,7 +37,9 @@ def get_variable_values(input_file: Dataset, variable: Variable,
     #       in the longitude-latitude plane should be used to determine 2-D
     #       reprojection information. This information should then also be
     #       applied across the other preceding or following dimensions.
-    if 'time' in input_file.variables and 'time' in variable.dimensions:
+    if len(variable[:].shape) == 1:
+        return make_array_two_dimensional(variable[:])
+    elif 'time' in input_file.variables and 'time' in variable.dimensions:
         # Assumption: Array = (1, y, x)
         return variable[0][:].filled(fill_value=fill_value)
     else:
@@ -209,3 +211,14 @@ def variable_in_dataset(variable_name: str, dataset: Dataset) -> bool:
             group_valid = False
 
     return group_valid and variable_pieces[-1] in group.variables
+
+
+def make_array_two_dimensional(one_dimensional_array: np.ndarray) -> np.ndarray:
+    """ Take a one dimensional array and make it a two-dimensional array, with
+        all values in the same column.
+
+        This is primarily required to allow processing of data with the EWA
+        interpolations method.
+
+    """
+    return np.expand_dims(one_dimensional_array, 1)
