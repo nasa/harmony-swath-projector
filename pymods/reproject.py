@@ -65,7 +65,9 @@ def reproject(message: Message, filename: str, temp_dir: str,
 
     # Now merge outputs (unless we only have one)
     metadata_variables = nc_info.get_metadata_variables()
-    nc_merge.create_output(parameters.get('input_file'), output_file, temp_dir,
+    # nc_merge.create_output(parameters.get('input_file'), output_file, temp_dir,
+    #                        science_variables, metadata_variables, logger)
+    nc_merge.create_output(parameters, output_file, temp_dir,
                            science_variables, metadata_variables, logger)
 
     # Return the output file back to Harmony

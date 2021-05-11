@@ -3,10 +3,13 @@
     attributes.
 """
 from argparse import ArgumentParser
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Dict, Optional, Set, Tuple, Union, Any
 import logging
 import os
 import re
+import json
+import datetime
+from jsonschema import validate
 
 from netCDF4 import Dataset, Variable
 import numpy as np
@@ -15,8 +18,34 @@ from pymods.exceptions import MissingReprojectedDataError
 from pymods.utilities import (get_variable_file_path, qualify_reference,
                               variable_in_dataset)
 
+# Values needed for history_json attribute
+HISTORY_JSON_SCHEMA = "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-0.1.0.json"
+PROGRAM = "sds/swot-reproject"
+PROGRAM_REF = "https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST"
+VERSION = "0.9.0"
 
-def create_output(input_file: str, output_file: str, temp_dir: str,
+def create_history_json(history_att: dict, properties: dict) -> Dict:
+    """ Creates json object which is used for history_json attrinute
+    in the global attributes of output NetCDF-4.
+    """
+    new_history: Dict[str, Union[str, Any]] = {}
+    new_history["$schema"] = HISTORY_JSON_SCHEMA
+    new_history["time"] = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
+    new_history["program"] = PROGRAM
+    new_history["version"] = VERSION
+    new_history["cf_history"] = history_att
+    new_history["parameters"] = properties
+    new_history["derived_from"] = properties["input_file"]
+    new_hist_att = new_history["time"] + " " + \
+                   new_history["program"] + " " + \
+                   new_history["version"] + " " + \
+                   new_history["derived_from"]
+    new_history["cf_history"].append(new_hist_att)
+    new_history["program_ref"] = PROGRAM_REF
+
+    return new_history
+
+def create_output(properties: dict, output_file: str, temp_dir: str,
                   science_variables: Set[str], metadata_variables: Set[str],
                   logger: logging.Logger) -> None:
     """ Merge the reprojected single-dataset NetCDF-4 files from `pyresample`
@@ -28,13 +57,24 @@ def create_output(input_file: str, output_file: str, temp_dir: str,
         coordinate datasets will only be copied once.
 
     """
+    input_file = properties.get("input_file")
     logger.info(f'Creating output file "{output_file}"')
 
     with Dataset(input_file) as input_dataset, \
          Dataset(output_file, 'w', format='NETCDF4') as output_dataset:
-
         logger.info('Copying input file attributes to output file.')
         output_dataset.setncatts(read_attrs(input_dataset))
+
+        # Create history_json attribute
+        props = {k: v for k, v in properties.items() if v is not None}
+        del props["projection"]
+        history_att = read_attrs(input_dataset)["history"].split("\n")
+        new_history_list = create_history_json(history_att, props)
+        json_string = json.dumps(new_history_list)
+        output_dataset.setncattr("history_json",json_string)
+        # Create history attribute
+        new_history_att = "/n".join(new_history_list["cf_history"])
+        output_dataset.setncattr("history", new_history_att)
 
         if 'time' in input_dataset.dimensions:
             copy_time_dimension(input_dataset, output_dataset, logger)

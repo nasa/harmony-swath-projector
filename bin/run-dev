@@ -3,7 +3,7 @@
 #
 # This script must be run after bin/build-env. This will use the base environment
 # image created by that script as a base, and then apply the current version of
-# the source code and tests on top of it, using dev-Dockerfile. The tests will
+# the source code and tests on top of it, using dev.Dockerfile. The tests will
 # then be run, allowing for more rapid iteration.
 #
 

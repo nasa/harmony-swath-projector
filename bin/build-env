@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Script to run env-Dockerfile, building an image containing the full set
+# Script to run env.Dockerfile, building an image containing the full set
 # of Conda and Pip dependencies. This script should be run once, then bin/run-dev
 # can be run multiple times, taking much less time than running bin/build-test
 # and bin/run-test for each edit.
