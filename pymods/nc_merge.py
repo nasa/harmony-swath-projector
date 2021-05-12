@@ -33,14 +33,17 @@ def create_history_json(history_att: dict, properties: dict) -> Dict:
     new_history["time"] = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
     new_history["program"] = PROGRAM
     new_history["version"] = VERSION
-    new_history["cf_history"] = history_att
     new_history["parameters"] = properties
     new_history["derived_from"] = properties["input_file"]
     new_hist_att = new_history["time"] + " " + \
                    new_history["program"] + " " + \
                    new_history["version"] + " " + \
                    new_history["derived_from"]
-    new_history["cf_history"].append(new_hist_att)
+    if history_att!= "":
+        new_history["cf_history"] = history_att
+        new_history["cf_history"].append(new_hist_att)
+    else:
+        new_history["cf_history"] = new_hist_att
     new_history["program_ref"] = PROGRAM_REF
 
     return new_history
@@ -65,15 +68,25 @@ def create_output(properties: dict, output_file: str, temp_dir: str,
         logger.info('Copying input file attributes to output file.')
         output_dataset.setncatts(read_attrs(input_dataset))
 
-        # Create history_json attribute
+        # Remove properties with None value
         props = {k: v for k, v in properties.items() if v is not None}
-        del props["projection"]
-        history_att = read_attrs(input_dataset)["history"].split("\n")
+        # Remove unparsed by JSON
+        if "projection" in  props.keys() : del props["projection"]
+        if "x_extent" in  props.keys() : del props["x_extent"]
+        if "y_extent" in  props.keys() : del props["y_extent"]
+        # Create history_json attribute
+        if hasattr(input_dataset,'history'):
+            history_att = getattr(input_dataset, "history").split("\n")
+        else:
+            history_att = ""
         new_history_list = create_history_json(history_att, props)
         json_string = json.dumps(new_history_list)
         output_dataset.setncattr("history_json",json_string)
         # Create history attribute
-        new_history_att = "/n".join(new_history_list["cf_history"])
+        if history_att != "":
+            new_history_att = "/n".join(new_history_list["cf_history"])
+        else:
+            new_history_att = new_history_list["cf_history"]
         output_dataset.setncattr("history", new_history_att)
 
         if 'time' in input_dataset.dimensions:
