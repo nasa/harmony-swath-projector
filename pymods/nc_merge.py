@@ -79,14 +79,19 @@ def create_output(properties: dict, output_file: str, temp_dir: str,
             history_att = getattr(input_dataset, "history").split("\n")
         else:
             history_att = ""
-        new_history_list = create_history_json(history_att, props)
+        new_history_lst = create_history_json(history_att, props)
+        new_history_list = []
+        if hasattr(input_dataset, 'history_json'):
+            hist_json_att = json.loads(",".join(read_attrs(input_dataset)["history_json"]))
+            new_history_list.append(hist_json_att)
+        new_history_list.append(new_history_lst)
         json_string = json.dumps(new_history_list)
         output_dataset.setncattr("history_json",json_string)
         # Create history attribute
-        if history_att != "":
-            new_history_att = "/n".join(new_history_list["cf_history"])
+        if history_att == "":
+            new_history_att = str(new_history_lst["cf_history"])
         else:
-            new_history_att = new_history_list["cf_history"]
+            new_history_att = "/n".join(new_history_lst["cf_history"])
         output_dataset.setncattr("history", new_history_att)
 
         if 'time' in input_dataset.dimensions:
