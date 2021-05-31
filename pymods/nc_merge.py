@@ -9,7 +9,6 @@ import os
 import re
 import json
 import datetime
-from jsonschema import validate
 
 from netCDF4 import Dataset, Variable
 import numpy as np

@@ -1,6 +1,7 @@
 from unittest.mock import patch
 import logging
 import os
+from freezegun import freeze_time
 
 from netCDF4 import Dataset
 import numpy as np
@@ -17,6 +18,7 @@ from test.test_utils import TestBase
 class TestNCMerge(TestBase):
 
     @classmethod
+    @freeze_time('2021-05-12T19:03:04.419341+00:00')
     def setUpClass(cls):
         cls.logger = logging.getLogger('nc_merge test')
         cls.properties = {'input_file':'test/data/VNL2_test_data.nc'}
@@ -29,7 +31,6 @@ class TestNCMerge(TestBase):
         create_output(cls.properties, cls.output_file, cls.tmp_dir,
                       cls.science_variables, cls.metadata_variables,
                       cls.logger)
-
 
     @classmethod
     def tearDownClass(cls):
@@ -61,6 +62,7 @@ class TestNCMerge(TestBase):
         """ The root group of the output files should have the same global attributes.
             Both the history_json and history attributes are in the output file
         """
+
         in_dataset = Dataset(self.properties['input_file'])
         out_dataset = Dataset(self.output_file)
         input_attrs = read_attrs(in_dataset)
@@ -71,10 +73,9 @@ class TestNCMerge(TestBase):
                 self.assertEqual(input_value, output_attrs[input_key])
 
         self.assertIn('history', output_attrs.keys())
-        #self.assertAlmostEquals(output_attrs['history'], 'Mon Dec  9 11:22:11 2019: ncks -v sea_surface_temperature,satellite_zenith_angle,brightness_temperature_4um,wind_speed /Users/yzhang29/Desktop/NCOTest/VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc /Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc/nCreated with VIIRSseatemp on  2019/01/09 at 00:57:15 UT/n2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 test/data/VNL2_test_data.nc')
+        self.assertEqual(output_attrs['history'], 'Mon Dec  9 11:22:11 2019: ncks -v sea_surface_temperature,satellite_zenith_angle,brightness_temperature_4um,wind_speed /Users/yzhang29/Desktop/NCOTest/VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc /Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc/nCreated with VIIRSseatemp on  2019/01/09 at 00:57:15 UT/n2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 test/data/VNL2_test_data.nc')
         self.assertIn('history_json', output_attrs.keys())
-        #self.assertAlmostEquals(output_attrs['history_json'], '{"$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-0.1.0.json", "time": "2021-05-12T19:03:04.419341+00:00", "program": "sds/swot-reproject", "version": "0.9.0", "parameters": {"input_file": "test/data/VNL2_test_data.nc"}, "derived_from": "test/data/VNL2_test_data.nc", "cf_history": ["Mon Dec  9 11:22:11 2019: ncks -v sea_surface_temperature,satellite_zenith_angle,brightness_temperature_4um,wind_speed /Users/yzhang29/Desktop/NCOTest/VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc /Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc", "Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT", "2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 test/data/VNL2_test_data.nc"], "program_ref": "https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST"}')
-
+        self.assertEqual(output_attrs['history_json'], '[{"$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-0.1.0.json", "time": "2021-05-12T19:03:04.419341+00:00", "program": "sds/swot-reproject", "version": "0.9.0", "parameters": {"input_file": "test/data/VNL2_test_data.nc"}, "derived_from": "test/data/VNL2_test_data.nc", "cf_history": ["Mon Dec  9 11:22:11 2019: ncks -v sea_surface_temperature,satellite_zenith_angle,brightness_temperature_4um,wind_speed /Users/yzhang29/Desktop/NCOTest/VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc /Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc", "Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT", "2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 test/data/VNL2_test_data.nc"], "program_ref": "https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST"}]')
 
     def test_same_num_of_dataset_attributes(self):
         """ Variables in input should have the same number of attributes. """
