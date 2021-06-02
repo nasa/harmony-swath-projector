@@ -20,4 +20,4 @@ fi
 
 # Build the image
 #
-docker build -t ${image}:${tag} --file bin/env-Dockerfile .
+docker build -t ${image}:${tag} --file bin/env.Dockerfile .

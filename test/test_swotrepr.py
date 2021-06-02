@@ -101,6 +101,7 @@ class TestSwotReprojectionTool(TestBase):
         """ Nominal (successful) reprojection of test/data/africa.nc, using
             geographic coordinates, bilinear interpolation and specifying the
             extent of the target area grid.
+            Output file should succeed when input file already has history_json attribute.
 
         """
         test_data = Message({

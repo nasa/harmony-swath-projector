@@ -22,7 +22,7 @@ fi
 
 # Build the image with updated swotrepr.py, pymods and test directories
 #
-docker build -t ${image}:${tag} --file bin/dev-Dockerfile .
+docker build -t ${image}:${tag} --file bin/dev.Dockerfile .
 
 # Run the container
 #
