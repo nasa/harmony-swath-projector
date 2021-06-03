@@ -89,7 +89,10 @@ def set_output_attributes (input_dataset: Dataset, output_dataset: Dataset, prop
     if "x_extent" in props.keys(): del props["x_extent"]
     if "y_extent" in props.keys(): del props["y_extent"]
     # Takes old history attribute for cf-history element
-    history_att_txt = getattr(input_dataset, "history", None)
+    cf_att_name = "history"
+    if hasattr(input_dataset, "History"):
+        cf_att_name = "History"
+    history_att_txt = getattr(input_dataset, cf_att_name, None)
     # Create new history_json attribute
     new_history_json = create_history_json(history_att_txt, props)
     new_history_array = []
@@ -109,7 +112,7 @@ def set_output_attributes (input_dataset: Dataset, output_dataset: Dataset, prop
                                  new_history_json["version"],
                                  json.dumps(history_parameters)])
     new_history_att = "\n".join(filter(None,[history_att_txt, new_hist_att_val]))
-    output_dataset.setncattr("history", new_history_att)
+    output_dataset.setncattr(cf_att_name, new_history_att)
 
 def create_history_json(history_att_val: str, properties: dict) -> Dict:
     """ Creates json object which is used for history_json attrinute

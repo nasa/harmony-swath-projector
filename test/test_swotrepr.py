@@ -135,6 +135,44 @@ class TestSwotReprojectionTool(TestBase):
                                            location=self.staging_location,
                                            logger=ANY)
 
+    def test_africa_input_with_History(self, mock_download, mock_stage):
+        """ Nominal (successful) reprojection of test/data/africa.nc, using
+            geographic coordinates, bilinear interpolation and specifying the
+            extent of the target area grid.
+            Output file should succeed when input file has global CF attribute "History'.
+
+        """
+        test_data = Message({
+            'accessToken': self.access_token,
+            'callback': self.callback,
+            'stagingLocation': self.staging_location,
+            'sources': [{
+                'granules': [{
+                    'url': 'test/data/africa_History.nc',
+                    'temporal': self.temporal,
+                    'bbox': self.bounding_box,
+                }],
+            }],
+            'format': {'crs': 'EPSG:4326',
+                       'interpolation': 'bilinear',
+                       'scaleExtent': {'x': {'min': -20, 'max': 60},
+                                       'y': {'min': 10, 'max': 35}}}
+        })
+
+        reprojector = HarmonyAdapter(test_data, config=config(False))
+        reprojector.invoke()
+
+        mock_download.assert_called_once_with('test/data/africa_History.nc',
+                                              ANY,
+                                              logger=ANY,
+                                              access_token=self.access_token,
+                                              cfg=ANY)
+        mock_stage.assert_called_once_with(StringContains('africa_History_repr.nc'),
+                                           'africa_History_regridded.nc',
+                                           self.mime_type,
+                                           location=self.staging_location,
+                                           logger=ANY)
+
     def test_single_band_input_default_crs(self, mock_download, mock_stage):
         """ Nominal (successful) reprojection of a single band input. This
             will default to using a geographic coordinate system, and use the
