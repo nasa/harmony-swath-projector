@@ -31,7 +31,6 @@ class TestSwotReprojectionTool(TestBase):
         cls.staging_location = 's3://example-bucket/example-path/'
         cls.temporal = {'start': '2020-01-01T00:00:00.000Z',
                         'end': '2020-01-02T00:00:00.000Z'}
-        cls.history = ''
 
     def test_single_band_input(self, mock_download, mock_stage):
         """ Nominal (successful) reprojection of a single band input file. """
