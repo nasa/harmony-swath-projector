@@ -3,10 +3,12 @@
     attributes.
 """
 from argparse import ArgumentParser
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Dict, Optional, Set, Tuple, Union, Any
 import logging
 import os
 import re
+import json
+from datetime import datetime, timezone
 
 from netCDF4 import Dataset, Variable
 import numpy as np
@@ -15,8 +17,14 @@ from pymods.exceptions import MissingReprojectedDataError
 from pymods.utilities import (get_variable_file_path, qualify_reference,
                               variable_in_dataset)
 
+# Values needed for history_json attribute
+HISTORY_JSON_SCHEMA = "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+PROGRAM = "sds/swot-reproject"
+PROGRAM_REF = "https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST"
+VERSION = "0.9.0"
 
-def create_output(input_file: str, output_file: str, temp_dir: str,
+
+def create_output(properties: dict, output_file: str, temp_dir: str,
                   science_variables: Set[str], metadata_variables: Set[str],
                   logger: logging.Logger) -> None:
     """ Merge the reprojected single-dataset NetCDF-4 files from `pyresample`
@@ -28,13 +36,13 @@ def create_output(input_file: str, output_file: str, temp_dir: str,
         coordinate datasets will only be copied once.
 
     """
+    input_file = properties.get("input_file")
     logger.info(f'Creating output file "{output_file}"')
 
-    with Dataset(input_file) as input_dataset, \
-         Dataset(output_file, 'w', format='NETCDF4') as output_dataset:
-
+    with Dataset(input_file) as input_dataset, Dataset(output_file,
+                                                       'w', format='NETCDF4') as output_dataset:
         logger.info('Copying input file attributes to output file.')
-        output_dataset.setncatts(read_attrs(input_dataset))
+        set_output_attributes(input_dataset, output_dataset, properties)
 
         if 'time' in input_dataset.dimensions:
             copy_time_dimension(input_dataset, output_dataset, logger)
@@ -69,6 +77,59 @@ def create_output(input_file: str, output_file: str, temp_dir: str,
             else:
                 logger.error(f'Cannot find "{dataset_file}".')
                 raise MissingReprojectedDataError(variable_name)
+
+
+def set_output_attributes (input_dataset: Dataset, output_dataset: Dataset, properties: Dict):
+    # Copy attributes into output dataset
+    output_dataset.setncatts(read_attrs(input_dataset))
+    # Remove properties with None value
+    props = {k: v for k, v in properties.items() if v is not None}
+    # Remove unparsed by JSON
+    if "projection" in props.keys(): del props["projection"]
+    if "x_extent" in props.keys(): del props["x_extent"]
+    if "y_extent" in props.keys(): del props["y_extent"]
+    # Takes old history attribute for cf-history element
+    cf_att_name = "history"
+    if hasattr(input_dataset, "History"):
+        cf_att_name = "History"
+    history_att_txt = getattr(input_dataset, cf_att_name, None)
+    # Create new history_json attribute
+    new_history_json = create_history_json(history_att_txt, props)
+    new_history_array = []
+    # Append new history_json to old one
+    if hasattr(input_dataset, 'history_json'):
+        hist_json_att = json.loads(",".join(read_attrs(input_dataset)["history_json"]))
+        new_history_array.append(hist_json_att)
+    new_history_array.append(new_history_json)
+    json_string = json.dumps(new_history_array)
+    output_dataset.setncattr("history_json", json_string)
+
+    # Create history attribute
+    history_parameters = {key: value for key, value in new_history_json['parameters'].items()
+                          if key != 'input_file'}
+    new_hist_att_val = " ".join([new_history_json["time"],
+                                 new_history_json["program"],
+                                 new_history_json["version"],
+                                 json.dumps(history_parameters)])
+    new_history_att = "\n".join(filter(None,[history_att_txt, new_hist_att_val]))
+    output_dataset.setncattr(cf_att_name, new_history_att)
+
+def create_history_json(history_att_val: str, properties: dict) -> Dict:
+    """ Creates json object which is used for history_json attrinute
+    in the global attributes of output NetCDF-4.
+    """
+    new_json_history = {"$schema" : HISTORY_JSON_SCHEMA}
+    new_json_history["time"] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    new_json_history["program"] = PROGRAM
+    new_json_history["version"] = VERSION
+    new_json_history["parameters"] = properties
+    new_json_history["derived_from"] = properties["input_file"]
+    if isinstance(history_att_val, str):
+        history_att_val = history_att_val.split("\n")
+        new_json_history["cf_history"] = history_att_val
+    new_json_history["program_ref"] = PROGRAM_REF
+
+    return new_json_history
 
 
 def read_attrs(dataset: Union[Dataset, Variable]) -> Dict:
