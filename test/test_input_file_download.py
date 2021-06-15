@@ -34,7 +34,7 @@ class TestInputFileDownload(TestBase):
         )
 
         with self.assertRaises(Exception) as context:
-            reproject(reprojector.message, 'test/data/no_such_file',
-                      '/no/such/dir', reprojector.logger)
+            reproject(reprojector.message, 'https://example.com/no_such_file.nc4',
+                      'test/data/no_such_file', '/no/such/dir', reprojector.logger)
 
         self.assertEqual(str(context.exception), 'Input file does not exist')
