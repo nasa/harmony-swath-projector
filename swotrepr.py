@@ -1,6 +1,4 @@
-"""
- Data Services Reprojection service for Harmony
-"""
+""" Data Services Swath Projection service for Harmony. """
 import argparse
 import mimetypes
 import os
@@ -32,9 +30,8 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             the output catalog
         """
         logger = self.logger
-        logger.info("Starting Data Services Reprojection Service")
+        logger.info('Starting Data Services Reprojection Service')
         os.environ['HDF5_DISABLE_VERSION_CHECK'] = '1'
-        logger.info(f'Received message: {self.message}')
         self.validate_message()
         return super().invoke()
 
@@ -67,16 +64,19 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         try:
             # Get the data file
             asset = next(v for v in item.assets.values() if 'data' in (v.roles or []))
-            input_filename = download(asset.href,
+            granule_url = asset.href
+
+            input_filename = download(granule_url,
                                       workdir,
                                       logger=logger,
                                       access_token=self.message.accessToken,
                                       cfg=self.config)
 
-            logger.info("Granule data copied")
+            logger.info('Granule data copied')
 
             # Call Reprojection utility
-            working_filename = reproject(self.message, input_filename, workdir, logger)
+            working_filename = reproject(self.message, granule_url,
+                                         input_filename, workdir, logger)
 
             # Stage the output file with a conventional filename
             output_filename = generate_output_filename(asset.href, is_regridded=True)
@@ -94,13 +94,13 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             result.assets['data'] = asset
 
             # Return the output file back to Harmony
-            logger.info("Reprojection complete")
+            logger.info('Reprojection complete')
 
             return result
 
         except Exception as err:
-            logger.error("Reprojection failed: " + str(err), exc_info=1)
-            raise HarmonyException("Reprojection failed with error: " + str(err)) from err
+            logger.error('Reprojection failed: ' + str(err), exc_info=1)
+            raise HarmonyException('Reprojection failed with error: ' + str(err)) from err
 
         finally:
             # Clean up any intermediate resources
@@ -121,15 +121,15 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             has_items = False
 
         if not has_granules and not has_items:
-            raise HarmonyException("No granules specified for reprojection")
+            raise HarmonyException('No granules specified for reprojection')
 
         if not isinstance(self.message.granules, list):
-            raise Exception("Invalid granule list")
+            raise Exception('Invalid granule list')
 
 
 # Main program start
 #
-if __name__ == "__main__":
+if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(
         prog='Reproject',
         description='Run the Data Services Reprojection Tool'

@@ -1,15 +1,16 @@
-from unittest.mock import patch
+from datetime import datetime
+from unittest.mock import Mock, patch
+import json
 import logging
 import os
-from freezegun import freeze_time
 
 from netCDF4 import Dataset
 import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
 from pymods.nc_info import NCInfo
-from pymods.nc_merge import (check_coor_valid, create_output,
-                             get_fill_value_from_attributes,
+from pymods.nc_merge import (check_coor_valid, create_history_record,
+                             create_output, get_fill_value_from_attributes,
                              get_science_variable_attributes,
                              get_science_variable_dimensions, read_attrs)
 from test.test_utils import TestBase
@@ -18,17 +19,19 @@ from test.test_utils import TestBase
 class TestNCMerge(TestBase):
 
     @classmethod
-    @freeze_time('2021-05-12T19:03:04.419341+00:00')
     def setUpClass(cls):
         cls.logger = logging.getLogger('nc_merge test')
-        cls.properties = {'input_file':'test/data/VNL2_test_data.nc',
+        cls.properties = {'input_file': 'test/data/VNL2_test_data.nc',
+                          'granule_url': 'test/data/VNL2_test_data.nc',
                           'crs' : 'EPSG:4326',
                           'interpolation' : 'bilinear'}
+
         cls.tmp_dir = 'test/data/test_tmp/'
         cls.output_file = 'test/data/VNL2_test_data_repr.nc'
         cls.science_variables = {'/brightness_temperature_4um',
                                  '/satellite_zenith_angle',
                                  '/sea_surface_temperature', '/wind_speed'}
+
         cls.metadata_variables = set()
         create_output(cls.properties, cls.output_file, cls.tmp_dir,
                       cls.science_variables, cls.metadata_variables,
@@ -60,24 +63,68 @@ class TestNCMerge(TestBase):
         self.assertEqual(len(in_dataset[test_dataset].dimensions),
                          len(out_dataset[test_dataset].dimensions))
 
-    def test_output_global_attributes(self):
-        """ The root group of the output files should have the same global attributes.
-            Both the history_json and history attributes are in the output file
-        """
+    @patch('pymods.nc_merge.datetime')
+    def test_output_global_attributes(self, mock_datetime):
+        """ The root group of the output files should contain the global
+            attributes of the input file, with the addition of `history` (if
+            not originally present) and `history_json`.
 
-        in_dataset = Dataset(self.properties['input_file'])
-        out_dataset = Dataset(self.output_file)
-        input_attrs = read_attrs(in_dataset)
-        output_attrs = read_attrs(out_dataset)
+        """
+        mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
+
+        create_output(self.properties, self.output_file, self.tmp_dir,
+                      self.science_variables, self.metadata_variables,
+                      self.logger)
+
+        with Dataset(self.properties['input_file']) as in_dataset:
+            input_attrs = read_attrs(in_dataset)
+
+        with Dataset(self.output_file) as out_dataset:
+            output_attrs = read_attrs(out_dataset)
+
         for input_key, input_value in input_attrs.items():
             self.assertIn(input_key, output_attrs.keys())
-            if input_key != "history":
+            if input_key != 'history':
                 self.assertEqual(input_value, output_attrs[input_key])
 
+        expected_history = (
+            'Mon Dec  9 11:22:11 2019: ncks -v '
+            'sea_surface_temperature,satellite_zenith_angle,'
+            'brightness_temperature_4um,wind_speed '
+            '/Users/yzhang29/Desktop/NCOTest/'
+            'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc '
+            '/Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc\n'
+            'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT\n'
+            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '{"crs": "EPSG:4326", "interpolation": "bilinear"}'
+        )
+
         self.assertIn('history', output_attrs.keys())
-        self.assertEqual(output_attrs['history'], 'Mon Dec  9 11:22:11 2019: ncks -v sea_surface_temperature,satellite_zenith_angle,brightness_temperature_4um,wind_speed /Users/yzhang29/Desktop/NCOTest/VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc /Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc\nCreated with VIIRSseatemp on  2019/01/09 at 00:57:15 UT\n2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 {"crs": "EPSG:4326", "interpolation": "bilinear"}')
+        self.assertEqual(output_attrs['history'], expected_history)
+        self.assertNotIn('History', output_attrs.keys())
+
+        expected_history_json = [{
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'sds/swot-reproject',
+            'version': '0.9.0',
+            'parameters': {'input_file': 'test/data/VNL2_test_data.nc',
+                           'crs': 'EPSG:4326',
+                           'interpolation': 'bilinear'},
+            'derived_from': 'test/data/VNL2_test_data.nc',
+            'cf_history': [('Mon Dec  9 11:22:11 2019: ncks -v '
+                            'sea_surface_temperature,satellite_zenith_angle,'
+                            'brightness_temperature_4um,wind_speed '
+                            '/Users/yzhang29/Desktop/NCOTest/'
+                            'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc '
+                            '/Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc'),
+                           'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT'],
+            'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST'
+        }]
+
         self.assertIn('history_json', output_attrs.keys())
-        self.assertEqual(output_attrs['history_json'], '[{"$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json", "time": "2021-05-12T19:03:04.419341+00:00", "program": "sds/swot-reproject", "version": "0.9.0", "parameters": {"input_file": "test/data/VNL2_test_data.nc", "crs": "EPSG:4326", "interpolation": "bilinear"}, "derived_from": "test/data/VNL2_test_data.nc", "cf_history": ["Mon Dec  9 11:22:11 2019: ncks -v sea_surface_temperature,satellite_zenith_angle,brightness_temperature_4um,wind_speed /Users/yzhang29/Desktop/NCOTest/VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc /Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc", "Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT"], "program_ref": "https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST"}]')
+        self.assertEqual(json.loads(output_attrs['history_json']),
+                         expected_history_json)
 
     def test_same_num_of_dataset_attributes(self):
         """ Variables in input should have the same number of attributes. """
@@ -245,3 +292,50 @@ class TestNCMerge(TestBase):
             self.assertIn('grid_mapping', attributes)
             self.assertEqual(attributes['grid_mapping'],
                              single_band_attributes['grid_mapping'])
+
+    @patch('pymods.nc_merge.datetime')
+    def test_create_history_record(self, mock_datetime):
+        """ Ensure a history record is correctly constructed, and only contains
+            a `cf_history` attribute if there is valid a `history` (or
+            `History`) attribute specified from the input.
+
+        """
+        mock_datetime.utcnow = Mock(return_value=datetime(2001, 2, 3, 4, 5, 6))
+        granule_url = 'https://example.com/input.nc4'
+        request_parameters = {'crs': '+proj=longlat',
+                              'input_file': granule_url,
+                              'interpolation': 'near'}
+
+        with self.subTest('No specified history'):
+            expected_output = {
+                '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+                'time': '2001-02-03T04:05:06+00:00',
+                'program': 'sds/swot-reproject',
+                'version': '0.9.0',
+                'parameters': request_parameters,
+                'derived_from': granule_url,
+                'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST'
+            }
+            self.assertDictEqual(create_history_record(None, request_parameters),
+                                 expected_output)
+
+        string_history = '2000-12-31T00:00:00+00.00 Swathinator v0.0.1'
+        list_history = [string_history]
+        expected_output_with_history = {
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2001-02-03T04:05:06+00:00',
+            'program': 'sds/swot-reproject',
+            'version': '0.9.0',
+            'parameters': request_parameters,
+            'derived_from': granule_url,
+            'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST',
+            'cf_history': list_history
+        }
+
+        with self.subTest('String history specified in input file'):
+            self.assertDictEqual(create_history_record(string_history, request_parameters),
+                                 expected_output_with_history)
+
+        with self.subTest('List history specified in input file'):
+            self.assertDictEqual(create_history_record(list_history, request_parameters),
+                                 expected_output_with_history)

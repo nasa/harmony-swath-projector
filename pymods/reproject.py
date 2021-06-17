@@ -1,15 +1,9 @@
-"""
- Data Services Reprojection service for Harmony
-"""
-from argparse import ArgumentParser
+""" Data Services Reprojection service for Harmony """
 from tempfile import mkdtemp
 from typing import Dict
 import functools
-import json
 import logging
 import os
-import re
-import shutil
 
 from harmony.message import Message
 from pyproj import Proj
@@ -23,15 +17,15 @@ CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
 
 
-def reproject(message: Message, filename: str, temp_dir: str,
-              logger: logging.Logger) -> str:
+def reproject(message: Message, granule_url: str, local_filename: str,
+              temp_dir: str, logger: logging.Logger) -> str:
     """ Derive reprojection parameters from the input Harmony message. Then
         extract listing of science variables and coordinate variables from the
         source granule. Then reproject all science variables. Finally merge all
         individual output bands back into a single netCDF-4 file.
 
     """
-    parameters = get_parameters_from_message(message, filename)
+    parameters = get_parameters_from_message(message, granule_url, local_filename)
 
     # Set up source and destination files
     temp_dir = mkdtemp()
@@ -72,14 +66,20 @@ def reproject(message: Message, filename: str, temp_dir: str,
     return output_file
 
 
-def get_parameters_from_message(message: Message, input_file: str) -> Dict:
+def get_parameters_from_message(message: Message, granule_url: str,
+                                input_file: str) -> Dict:
     """ A helper function to parse the input Harmony message and extract
         required information. If the message is missing parameters, then
-        default values will be used.
+        default values will be used. The `granule_url` is taken from the
+        inbound STAC catalogue `Item.asset.href`, denoting a URL to the
+        original source of the input granule. The `input_file` is the local
+        path of that input granule, as downloaded by `harmony-service-lib-py`
+        utility functions for transformation by this service.
 
     """
     parameters = {
         'crs': rgetattr(message, 'format.crs', CRS_DEFAULT),
+        'granule_url': granule_url,
         'input_file': input_file,
         'interpolation': rgetattr(message, 'format.interpolation',
                                   INTERPOLATION_DEFAULT),
@@ -152,41 +152,3 @@ def rgetattr(obj, attr: str, *args):
         attribute_value = args[0]
 
     return attribute_value
-
-
-# Main program start for testing
-#
-if __name__ == '__main__':
-    PARSER = ArgumentParser(
-        prog='Reproject',
-        description='Run the Data Services Reprojection Tool'
-    )
-    PARSER.add_argument('--message',
-                        help='Dictionary representation of a Harmony message')
-
-    ARGS = PARSER.parse_args()
-    # Note it is hard to get properly quoted json string through shell invocation,
-    # It is easier if single and double quoting is inverted
-    QUOTED_MESSAGE = re.sub("'", '"', ARGS.message)
-    MESSAGE_DICTIONARY = json.loads(QUOTED_MESSAGE)
-    MESSAGE = Message(MESSAGE_DICTIONARY)
-
-    LOGGER = logging.getLogger('SwotRepr')
-    SYSLOG = logging.StreamHandler()
-    FORMATTER = logging.Formatter('[%(asctime)s] %(levelname)s '
-                                  '[%(name)s.%(funcName)s:%(lineno)d] '
-                                  '%(message)s')
-    SYSLOG.setFormatter(FORMATTER)
-    LOGGER.addHandler(SYSLOG)
-    LOGGER.setLevel(logging.INFO)
-    LOGGER.propagate = False
-
-    WORKDIR = mkdtemp()
-
-    try:
-        if len(MESSAGE.granules) > 0:
-            reproject(MESSAGE, MESSAGE.granules[0].url, WORKDIR, LOGGER)
-        else:
-            LOGGER.INFO('Message must have a source granule to reproject.')
-    finally:
-        shutil.rmtree(WORKDIR, ignore_errors=True)

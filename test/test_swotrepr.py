@@ -1,4 +1,10 @@
-from unittest.mock import patch, ANY
+from datetime import datetime
+from os import makedirs
+from shutil import copy, rmtree
+from unittest.mock import Mock, patch, ANY
+import json
+
+from netCDF4 import Dataset
 
 from harmony.message import Message
 from harmony.util import config
@@ -6,13 +12,10 @@ from harmony.util import config
 from swotrepr import HarmonyAdapter
 from test.test_utils import download_side_effect, StringContains, TestBase
 
-import netCDF4 as nc
-from freezegun import freeze_time
 
-
+@patch('pymods.nc_merge.datetime')
 @patch('harmony.util.stage', return_value='https://example.com/data')
 @patch('swotrepr.download', side_effect=download_side_effect)
-@freeze_time('2021-05-12T19:03:04.419341+00:00')
 class TestSwotReprojectionTool(TestBase):
     """ A test class that will run the full SWOT Reprojection tool against a
         variety of input files and Harmony messages.
@@ -31,16 +34,40 @@ class TestSwotReprojectionTool(TestBase):
         cls.staging_location = 's3://example-bucket/example-path/'
         cls.temporal = {'start': '2020-01-01T00:00:00.000Z',
                         'end': '2020-01-02T00:00:00.000Z'}
+        cls.tmp_dir = 'test/temp'
 
-    def test_single_band_input(self, mock_download, mock_stage):
+    def setUp(self):
+        """ Set properties of tests that need to be re-created every test. """
+        makedirs(self.tmp_dir)
+        copy('test/data/africa.nc', self.tmp_dir)
+
+    def tearDown(self):
+        """ Perform per-test teardown operations. """
+        rmtree(self.tmp_dir)
+
+    def get_provenance(self, file_path):
+        """ Utility method to retrieve `history`, `History` and `history_json`
+            global attributes from a test output file.
+
+        """
+        with Dataset(file_path, 'r') as dataset:
+            history = getattr(dataset, 'history', None)
+            history_uppercase = getattr(dataset, 'History', None)
+            history_json = getattr(dataset, 'history_json', None)
+
+        return history, history_uppercase, history_json
+
+    def test_single_band_input(self, mock_download, mock_stage, mock_datetime):
         """ Nominal (successful) reprojection of a single band input file. """
+        input_file_path = 'test/data/VNL2_oneBand.nc'
+        mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
                 'granules': [{
-                    'url': 'test/data/VNL2_oneBand.nc',
+                    'url': input_file_path,
                     'temporal': self.temporal,
                     'bbox': self.bounding_box,
                 }],
@@ -48,12 +75,10 @@ class TestSwotReprojectionTool(TestBase):
             'format': {'height': 500, 'width': 1000}
         })
 
-        print('mock_download')
-        print(mock_download)
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        mock_download.assert_called_once_with('test/data/VNL2_oneBand.nc',
+        mock_download.assert_called_once_with(input_file_path,
                                               ANY,
                                               logger=ANY,
                                               access_token=self.access_token,
@@ -64,19 +89,26 @@ class TestSwotReprojectionTool(TestBase):
                                            location=self.staging_location,
                                            logger=ANY)
 
-    def test_africa_input(self, mock_download, mock_stage):
+    def test_africa_input(self, mock_download, mock_stage, mock_datetime):
         """ Nominal (successful) reprojection of test/data/africa.nc, using
             geographic coordinates, bilinear interpolation and specifying the
             extent of the target area grid.
 
+            Also ensure that the provenance of the output file includes a
+            record of the operation performed via the `history` and
+            `history_json` global attributes.
+
         """
+        input_file_path = 'test/data/africa.nc'
+
+        mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
                 'granules': [{
-                    'url': 'test/data/africa.nc',
+                    'url': input_file_path,
                     'temporal': self.temporal,
                     'bbox': self.bounding_box,
                 }],
@@ -90,14 +122,7 @@ class TestSwotReprojectionTool(TestBase):
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        nc_out_path = mock_stage.call_args[0][0]
-        history_att_val = nc.Dataset(nc_out_path).getncattr("history")
-        self.assertEqual(history_att_val,'2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 {"crs": "EPSG:4326", "interpolation": "bilinear", "x_min": -20, "x_max": 60, "y_min": 10, "y_max": 35}')
-
-        history_json_att_val = nc.Dataset(nc_out_path).getncattr("history_json")
-        self.assertRegex(history_json_att_val,'[{\"$schema\": \"https:\/\/harmony.earthdata.nasa.gov\/schemas\/history\/0.1.0\/history\-v0.1.0.json\", \"time\": \"2021\-05\-12T19:03:04.419341+00:00\", \"program\": \"sds\/swot\-reproject\", \"version\": \"0.9.0\", \"parameters\": {\"crs\": \"EPSG:4326\", \"input_file\": \".*\/africa.nc\", \"interpolation\": \"bilinear\", \"x_min\": \-20, \"x_max\": 60, \"y_min\": 10, \"y_max\": 35}, \"derived_from\": \".*\/africa.nc\", \"program_ref\": \"https:\/\/cmr.uat.earthdata.nasa.gov\/search\/concepts\/S1237974711\-EEDTEST\"}]')
-
-        mock_download.assert_called_once_with('test/data/africa.nc',
+        mock_download.assert_called_once_with(input_file_path,
                                               ANY,
                                               logger=ANY,
                                               access_token=self.access_token,
@@ -108,20 +133,70 @@ class TestSwotReprojectionTool(TestBase):
                                            location=self.staging_location,
                                            logger=ANY)
 
-    def test_africa_input_with_histories(self, mock_download, mock_stage):
-        """ Nominal (successful) reprojection of test/data/africa.nc, using
-            geographic coordinates, bilinear interpolation and specifying the
-            extent of the target area grid.
-            Output file should succeed when input file already has history_json attribute.
+        output_path = mock_stage.call_args[0][0]
+        history, history_uppercase, history_json = self.get_provenance(output_path)
+
+        expected_history = ('2021-05-12T19:03:04+00:00 sds/swot-reproject '
+                            '0.9.0 {"crs": "EPSG:4326", "interpolation": '
+                            '"bilinear", "x_min": -20, "x_max": 60, "y_min": '
+                            '10, "y_max": 35}')
+
+        expected_history_json = [{
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'sds/swot-reproject',
+            'version': '0.9.0',
+            'parameters': {'crs': 'EPSG:4326',
+                           'input_file': input_file_path,
+                           'interpolation': 'bilinear',
+                           'x_min': -20,
+                           'x_max': 60,
+                           'y_min': 10,
+                           'y_max': 35},
+            'derived_from': input_file_path,
+            'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST',
+        }]
+
+        self.assertEqual(history, expected_history)
+        self.assertIsNone(history_uppercase)
+        self.assertListEqual(json.loads(history_json), expected_history_json)
+
+    def test_africa_input_with_history_and_history_json(self, mock_download,
+                                                        mock_stage, mock_datetime):
+        """ Ensure that an input file with existing `history` and
+            `history_json` global attributes include these metadata in the
+            output `history` and `history_json` global attributes.
+
+            This test will use a temporary copy of the `africa.nc` granule,
+            and update the global attributes to include values for `history`
+            and `history_json`. This updated file will then be used as input
+            to the service.
 
         """
+        input_file_path = f'{self.tmp_dir}/africa.nc'
+        old_history = '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1'
+        old_history_json = json.dumps([{
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'Swathinator',
+            'version': '0.0.1',
+            'parameters': {'input_file': 'africa.nc'},
+            'derived_from': 'africa.nc',
+            'program_ref': 'Swathinator Reference'
+        }])
+
+        with Dataset(input_file_path, 'a') as input_dataset:
+            input_dataset.setncattr('history', old_history)
+            input_dataset.setncattr('history_json', old_history_json)
+
+        mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
                 'granules': [{
-                    'url': 'test/data/africa_hist.nc',
+                    'url': input_file_path,
                     'temporal': self.temporal,
                     'bbox': self.bounding_box,
                 }],
@@ -135,38 +210,83 @@ class TestSwotReprojectionTool(TestBase):
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        nc_out_path = mock_stage.call_args[0][0]
-        history_att_val = nc.Dataset(nc_out_path).getncattr("history")
-        self.assertEqual(history_att_val,'2021-05-13T13:06:32.059168+00:00 sds/swot-reproject 0.9.0 /var/folders/qf/b564t1md6xdfklc2yzyg00lc0000gp/T/tmpv5s6hux7/africa.nc\n2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 {"crs": "EPSG:4326", "interpolation": "bilinear", "x_min": -20, "x_max": 60, "y_min": 10, "y_max": 35}')
-
-        history_json_att_val = nc.Dataset(nc_out_path).getncattr("history_json")
-        self.assertRegex(history_json_att_val,'[{\"$schema\": \"https:\/\/harmony.earthdata.nasa.gov\/schemas\/history\/0.1.0\/history\-v0.1.0.json\", \"time\": \"2021\-05\-12T19:03:04.419341+00:00\", \"program\": \"sds\/swot\-reproject\", \"version\": \"0.9.0\", \"parameters\": {\"crs\": \"EPSG:4326\", \"input_file\": \".*\/africa_hist.nc\", \"interpolation\": \"bilinear\", \"x_min\": \-20, \"x_max\": 60, \"y_min\": 10, \"y_max\": 35}, \"derived_from\": \".*\/africa_hist.nc\", \"program_ref\": \"https:\/\/cmr.uat.earthdata.nasa.gov\/search\/concepts\/S1237974711\-EEDTEST\"},{\"$schema\": \"https:\/\/harmony.earthdata.nasa.gov\/schemas\/history\/0.1.0\/history\-v0.1.0.json\", \"time\": \"2021\-05\-12T19:03:04.419341+00:00\", \"program\": \"sds\/swot\-reproject\", \"version\": \"0.9.0\", \"parameters\": {\"crs\": \"EPSG:4326\", \"input_file\": \".*\/africa_hist.nc\", \"interpolation\": \"bilinear\", \"x_min\": \-20, \"x_max\": 60, \"y_min\": 10, \"y_max\": 35}, \"derived_from\": \".*\/africa_hist.nc\", \"cf_history\": [\"2021\-05\-13T13:06:32.059168+00:00 sds/swot\-reproject 0.9.0 .*/africa_hist.nc\"]\"program_ref\": \"https:\/\/cmr.uat.earthdata.nasa.gov\/search\/concepts\/S1237974711\-EEDTEST\"}]')
-
-        mock_download.assert_called_once_with('test/data/africa_hist.nc',
+        mock_download.assert_called_once_with(input_file_path,
                                               ANY,
                                               logger=ANY,
                                               access_token=self.access_token,
                                               cfg=ANY)
-        mock_stage.assert_called_once_with(StringContains('africa_hist_repr.nc'),
-                                           'africa_hist_regridded.nc',
+        mock_stage.assert_called_once_with(StringContains('africa_repr.nc'),
+                                           'africa_regridded.nc',
                                            self.mime_type,
                                            location=self.staging_location,
                                            logger=ANY)
 
-    def test_africa_input_with_History(self, mock_download, mock_stage):
-        """ Nominal (successful) reprojection of test/data/africa.nc, using
-            geographic coordinates, bilinear interpolation and specifying the
-            extent of the target area grid.
-            Output file should succeed when input file has global CF attribute "History'.
+        output_path = mock_stage.call_args[0][0]
+        history, history_uppercase, history_json = self.get_provenance(output_path)
+
+        expected_history = (
+            '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1\n'
+            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '{"crs": "EPSG:4326", "interpolation": "bilinear", "x_min": -20, '
+            '"x_max": 60, "y_min": 10, "y_max": 35}'
+        )
+
+        expected_history_json = [{
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'Swathinator',
+            'version': '0.0.1',
+            'parameters': {'input_file': 'africa.nc'},
+            'derived_from': 'africa.nc',
+            'program_ref': 'Swathinator Reference'
+        }, {
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'sds/swot-reproject',
+            'version': '0.9.0',
+            'parameters': {'crs': 'EPSG:4326',
+                           'input_file': input_file_path,
+                           'interpolation': 'bilinear',
+                           'x_min': -20,
+                           'x_max': 60,
+                           'y_min': 10,
+                           'y_max': 35},
+            'derived_from': input_file_path,
+            'cf_history': ['2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1'],
+            'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST'
+        }]
+
+        self.assertEqual(history, expected_history)
+        self.assertIsNone(history_uppercase)
+        self.assertListEqual(json.loads(history_json), expected_history_json)
+
+    def test_africa_input_with_history_uppercase(self, mock_download,
+                                                 mock_stage, mock_datetime):
+        """ Ensure that an input file with an existing `History` global
+            attribute can be successfully projected, and that this existing
+            metadata is included in the output `History` and `history_json`
+            global attributes.
+
+            This test will use a temporary copy of the `africa.nc` granule,
+            and update the global attributes to include values for `History`.
+            This updated file will then be used as input to the service.
 
         """
+        input_file_path = 'test/data/africa_History.nc'
+        input_file_path = f'{self.tmp_dir}/africa.nc'
+        old_history = '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1'
+
+        with Dataset(input_file_path, 'a') as input_dataset:
+            input_dataset.setncattr('History', old_history)
+
+        mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
                 'granules': [{
-                    'url': 'test/data/africa_History.nc',
+                    'url': input_file_path,
                     'temporal': self.temporal,
                     'bbox': self.bounding_box,
                 }],
@@ -180,38 +300,66 @@ class TestSwotReprojectionTool(TestBase):
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        nc_out_path = mock_stage.call_args[0][0]
-        history_att_val = nc.Dataset(nc_out_path).getncattr("History")
-        self.assertEqual(history_att_val,'2021-06-03T20:00:00 Swathinator v0.0.1\n2021-05-12T19:03:04.419341+00:00 sds/swot-reproject 0.9.0 {"crs": "EPSG:4326", "interpolation": "bilinear", "x_min": -20, "x_max": 60, "y_min": 10, "y_max": 35}')
-
-        history_json_att_val = nc.Dataset(nc_out_path).getncattr("history_json")
-        self.assertRegex(history_json_att_val, '[{\"$schema\": \"https:\/\/harmony.earthdata.nasa.gov\/schemas\/history\/0.1.0\/history\-v0.1.0.json\", \"time\": \"2021\-05\-12T19:03:04.419341+00:00\", \"program\": \"sds\/swot\-reproject\", \"version\": \"0.9.0\", \"parameters\": {\"crs\": \"EPSG:4326\", \"input_file\": \".*\/africa.nc\", \"interpolation\": \"bilinear\", \"x_min\": \-20, \"x_max\": 60, \"y_min\": 10, \"y_max\": 35}, \"derived_from\": \".*\/africa.nc\", \"program_ref\": \"https:\/\/cmr.uat.earthdata.nasa.gov\/search\/concepts\/S1237974711\-EEDTEST\"}]')
-
-        mock_download.assert_called_once_with('test/data/africa_History.nc',
+        mock_download.assert_called_once_with(input_file_path,
                                               ANY,
                                               logger=ANY,
                                               access_token=self.access_token,
                                               cfg=ANY)
-        mock_stage.assert_called_once_with(StringContains('africa_History_repr.nc'),
-                                           'africa_History_regridded.nc',
+        mock_stage.assert_called_once_with(StringContains('africa_repr.nc'),
+                                           'africa_regridded.nc',
                                            self.mime_type,
                                            location=self.staging_location,
                                            logger=ANY)
 
-    def test_single_band_input_default_crs(self, mock_download, mock_stage):
+        output_path = mock_stage.call_args[0][0]
+        history, history_uppercase, history_json = self.get_provenance(output_path)
+
+        expected_history_uppercase = (
+            '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1\n'
+            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '{"crs": "EPSG:4326", "interpolation": "bilinear", "x_min": -20, '
+            '"x_max": 60, "y_min": 10, "y_max": 35}'
+        )
+
+        expected_history_json = [{
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'sds/swot-reproject',
+            'version': '0.9.0',
+            'parameters': {'crs': 'EPSG:4326',
+                           'input_file': input_file_path,
+                           'interpolation': 'bilinear',
+                           'x_min': -20,
+                           'x_max': 60,
+                           'y_min': 10,
+                           'y_max': 35},
+            'derived_from': input_file_path,
+            'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST',
+            'cf_history': ['2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1']
+        }]
+
+        self.assertIsNone(history)
+        self.assertEqual(history_uppercase, expected_history_uppercase)
+        self.assertListEqual(json.loads(history_json), expected_history_json)
+
+    def test_single_band_input_default_crs(self, mock_download, mock_stage,
+                                           mock_datetime):
         """ Nominal (successful) reprojection of a single band input. This
             will default to using a geographic coordinate system, and use the
             Elliptically Weighted Average (EWA) interpolation method to derive
             the reprojected variables.
 
         """
+        input_file_path = 'test/data/VNL2_oneBand.nc'
+
+        mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
                 'granules': [{
-                    'url': 'test/data/VNL2_oneBand.nc',
+                    'url': input_file_path,
                     'temporal': self.temporal,
                     'bbox': self.bounding_box,
                 }],
@@ -224,7 +372,7 @@ class TestSwotReprojectionTool(TestBase):
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        mock_download.assert_called_once_with('test/data/VNL2_oneBand.nc',
+        mock_download.assert_called_once_with(input_file_path,
                                               ANY,
                                               logger=ANY,
                                               access_token=self.access_token,
@@ -235,7 +383,46 @@ class TestSwotReprojectionTool(TestBase):
                                            location=self.staging_location,
                                            logger=ANY)
 
-    def test_single_band_input_reprojected_metres(self, mock_download, mock_stage):
+        output_path = mock_stage.call_args[0][0]
+        history, history_uppercase, history_json = self.get_provenance(output_path)
+
+        expected_history = (
+            'Tue Nov 12 15:31:14 2019: ncks -v sea_surface_temperature '
+            'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
+            '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc\n'
+            'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT\n'
+            '2021-05-12T19:03:04+00:00 sds/swot-reproject '
+            '0.9.0 {"crs": "+proj=longlat +ellps=WGS84", '
+            '"interpolation": "ewa", "x_min": -160, '
+            '"x_max": -159, "y_min": 24, "y_max": 25}'
+        )
+
+        expected_history_json = [{
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'sds/swot-reproject',
+            'version': '0.9.0',
+            'parameters': {'crs': '+proj=longlat +ellps=WGS84',
+                           'input_file': input_file_path,
+                           'interpolation': 'ewa',
+                           'x_min': -160,
+                           'x_max': -159,
+                           'y_min': 24,
+                           'y_max': 25},
+            'derived_from': input_file_path,
+            'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST',
+            'cf_history': [('Tue Nov 12 15:31:14 2019: ncks -v sea_surface_temperature '
+                            'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
+                            '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc'),
+                            'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT']
+        }]
+
+        self.assertEqual(history, expected_history)
+        self.assertIsNone(history_uppercase)
+        self.assertListEqual(json.loads(history_json), expected_history_json)
+
+    def test_single_band_input_reprojected_metres(self, mock_download,
+                                                  mock_stage, mock_datetime):
         """ Nominal (successful) reprojection of the single band input file,
             specifying the UTM Zone 3N (EPSG:32603) target projection and the
             Elliptically Weighted Average, Nearest Neighbour (EWA-NN)
@@ -245,13 +432,15 @@ class TestSwotReprojectionTool(TestBase):
             input data being near the Hawaiian islands.
 
         """
+        input_file_path = 'test/data/VNL2_oneBand.nc'
+        mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
             'callback': self.callback,
             'stagingLocation': self.staging_location,
             'sources': [{
                 'granules': [{
-                    'url': 'test/data/VNL2_oneBand.nc',
+                    'url': input_file_path,
                     'temporal': self.temporal,
                     'bbox': self.bounding_box,
                 }],
@@ -266,7 +455,7 @@ class TestSwotReprojectionTool(TestBase):
         reprojector = HarmonyAdapter(test_data, config=config(False))
         reprojector.invoke()
 
-        mock_download.assert_called_once_with('test/data/VNL2_oneBand.nc',
+        mock_download.assert_called_once_with(input_file_path,
                                               ANY,
                                               logger=ANY,
                                               access_token=self.access_token,
@@ -276,3 +465,40 @@ class TestSwotReprojectionTool(TestBase):
                                            self.mime_type,
                                            location=self.staging_location,
                                            logger=ANY)
+
+        output_path = mock_stage.call_args[0][0]
+        history, history_uppercase, history_json = self.get_provenance(output_path)
+
+        expected_history = (
+            'Tue Nov 12 15:31:14 2019: ncks -v sea_surface_temperature '
+            'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
+            '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc\n'
+            'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT\n'
+            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '{"crs": "EPSG:32603", "interpolation": "ewa-nn", "x_min": 0, '
+            '"x_max": 1500000, "y_min": 2500000, "y_max": 3300000}'
+        )
+
+        expected_history_json = [{
+            '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
+            'time': '2021-05-12T19:03:04+00:00',
+            'program': 'sds/swot-reproject',
+            'version': '0.9.0',
+            'parameters': {'crs': 'EPSG:32603',
+                           'input_file': input_file_path,
+                           'interpolation': 'ewa-nn',
+                           'x_min': 0,
+                           'x_max': 1500000,
+                           'y_min': 2500000,
+                           'y_max': 3300000},
+            'derived_from': input_file_path,
+            'program_ref': 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST',
+            'cf_history': [('Tue Nov 12 15:31:14 2019: ncks -v sea_surface_temperature '
+                            'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
+                            '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc'),
+                            'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT']
+        }]
+
+        self.assertEqual(history, expected_history)
+        self.assertIsNone(history_uppercase)
+        self.assertListEqual(json.loads(history_json), expected_history_json)

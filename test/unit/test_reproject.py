@@ -15,6 +15,7 @@ class TestReproject(TestBase):
         """ Class properties that only need to be set once. """
         cls.logger = Logger('Reproject test')
         cls.granule = 'test/data/africa.nc'
+        cls.granule_url = 'https://example.com/africa.nc'
         cls.granules = [{'local_filename': cls.granule}]
         cls.default_interpolation = 'ewa-nn'
         cls.height = 1200
@@ -28,6 +29,7 @@ class TestReproject(TestBase):
         """ Define properties that should be refreshed on each test. """
         self.default_parameters = {
             'crs': CRS_DEFAULT,
+            'granule_url': self.granule_url,
             'height': None,
             'input_file': self.granule,
             'interpolation': self.default_interpolation,
@@ -71,7 +73,9 @@ class TestReproject(TestBase):
                 message_content = {'format': format_attribute,
                                    'granules': self.granules}
                 message = Message(message_content)
-                parameters = get_parameters_from_message(message, self.granule)
+                parameters = get_parameters_from_message(message,
+                                                         self.granule_url,
+                                                         self.granule)
 
                 self.assertEqual(parameters['interpolation'],
                                  expected_interpolation)
@@ -111,7 +115,8 @@ class TestReproject(TestBase):
                             message_content['scaleSize']['y'] = self.y_res
 
                     message = Message(message_content)
-                    get_parameters_from_message(message, self.granules)
+                    get_parameters_from_message(message, self.granule_url,
+                                                self.granules)
                     self.assertTrue(exception_snippet in str(exception))
 
     def test_get_parameters_missing_extents_or_dimensions(self):
@@ -133,7 +138,8 @@ class TestReproject(TestBase):
                                        'format': format_content}
 
                     message = Message(message_content)
-                    get_parameters_from_message(message, self.granule)
+                    get_parameters_from_message(message, self.granule_url,
+                                                self.granule)
                     self.assertTrue('Missing' in str(exception))
 
     def test_get_parameters_from_message_defaults(self):
@@ -145,7 +151,8 @@ class TestReproject(TestBase):
         expected_parameters = self.default_parameters
 
         message = Message({'granules': self.granules, 'format': {}})
-        parameters = get_parameters_from_message(message, self.granule)
+        parameters = get_parameters_from_message(message, self.granule_url,
+                                                 self.granule)
         self.assert_parameters_equal(parameters, expected_parameters)
 
     def test_get_parameters_from_message_extents(self):
@@ -166,7 +173,8 @@ class TestReproject(TestBase):
         expected_parameters['x_extent'] = message.format.scaleExtent.x
         expected_parameters['y_extent'] = message.format.scaleExtent.y
 
-        parameters = get_parameters_from_message(message, self.granule)
+        parameters = get_parameters_from_message(message, self.granule_url,
+                                                 self.granule)
         self.assert_parameters_equal(parameters, expected_parameters)
 
     def test_get_parameters_from_message_resolutions(self):
@@ -181,7 +189,8 @@ class TestReproject(TestBase):
         resolutions_format = {'scaleSize': {'x': self.x_res, 'y': self.y_res}}
         message = Message({'granules': self.granules,
                            'format': resolutions_format})
-        parameters = get_parameters_from_message(message, self.granule)
+        parameters = get_parameters_from_message(message, self.granule_url,
+                                                 self.granule)
         self.assert_parameters_equal(parameters, expected_parameters)
 
     def test_get_parameters_from_message_dimensions(self):
@@ -196,7 +205,8 @@ class TestReproject(TestBase):
         extents_format = {'height': self.height, 'width': self.width}
         message = Message({'granules': self.granules,
                            'format': extents_format})
-        parameters = get_parameters_from_message(message, self.granule)
+        parameters = get_parameters_from_message(message, self.granule_url,
+                                                 self.granule)
         self.assert_parameters_equal(parameters, expected_parameters)
 
     def test_rgetattr(self):
