@@ -144,7 +144,7 @@ def set_output_attributes(input_dataset: Dataset, output_dataset: Dataset,
                           in new_history_json_record['parameters'].items()
                           if parameter_name != 'input_file'}
 
-    new_history_line = ' '.join([new_history_json_record['time'],
+    new_history_line = ' '.join([new_history_json_record['date_time'],
                                  new_history_json_record['program'],
                                  new_history_json_record['version'],
                                  json.dumps(history_parameters)])
@@ -162,7 +162,7 @@ def create_history_record(input_history: str, request_parameters: dict) -> Dict:
     """
     history_record = {
         '$schema': HISTORY_JSON_SCHEMA,
-        'time': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+        'date_time': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
         'program': PROGRAM,
         'version': VERSION,
         'parameters': request_parameters,

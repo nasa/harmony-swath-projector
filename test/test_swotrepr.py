@@ -143,7 +143,7 @@ class TestSwotReprojectionTool(TestBase):
 
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'sds/swot-reproject',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:4326',
@@ -177,7 +177,7 @@ class TestSwotReprojectionTool(TestBase):
         old_history = '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1'
         old_history_json = json.dumps([{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'Swathinator',
             'version': '0.0.1',
             'parameters': {'input_file': 'africa.nc'},
@@ -233,7 +233,7 @@ class TestSwotReprojectionTool(TestBase):
 
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'Swathinator',
             'version': '0.0.1',
             'parameters': {'input_file': 'africa.nc'},
@@ -241,7 +241,7 @@ class TestSwotReprojectionTool(TestBase):
             'program_ref': 'Swathinator Reference'
         }, {
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'sds/swot-reproject',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:4326',
@@ -323,7 +323,7 @@ class TestSwotReprojectionTool(TestBase):
 
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'sds/swot-reproject',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:4326',
@@ -399,7 +399,7 @@ class TestSwotReprojectionTool(TestBase):
 
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'sds/swot-reproject',
             'version': '0.9.0',
             'parameters': {'crs': '+proj=longlat +ellps=WGS84',
@@ -481,7 +481,7 @@ class TestSwotReprojectionTool(TestBase):
 
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'sds/swot-reproject',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:32603',

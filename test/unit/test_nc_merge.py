@@ -105,7 +105,7 @@ class TestNCMerge(TestBase):
 
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2021-05-12T19:03:04+00:00',
+            'date_time': '2021-05-12T19:03:04+00:00',
             'program': 'sds/swot-reproject',
             'version': '0.9.0',
             'parameters': {'input_file': 'test/data/VNL2_test_data.nc',
@@ -309,7 +309,7 @@ class TestNCMerge(TestBase):
         with self.subTest('No specified history'):
             expected_output = {
                 '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-                'time': '2001-02-03T04:05:06+00:00',
+                'date_time': '2001-02-03T04:05:06+00:00',
                 'program': 'sds/swot-reproject',
                 'version': '0.9.0',
                 'parameters': request_parameters,
@@ -323,7 +323,7 @@ class TestNCMerge(TestBase):
         list_history = [string_history]
         expected_output_with_history = {
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
-            'time': '2001-02-03T04:05:06+00:00',
+            'date_time': '2001-02-03T04:05:06+00:00',
             'program': 'sds/swot-reproject',
             'version': '0.9.0',
             'parameters': request_parameters,
