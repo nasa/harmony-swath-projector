@@ -1,8 +1,16 @@
 #
-# Using Conda within ENTRYPOINT was taken from:
-# https://pythonspeed.com/articles/activate-conda-dockerfile/
+# Service image for sds/swot-reproject, a Harmony backend service that projects
+# Earth Observation, L2 swath files of a NetCDF-4 format. The output from this
+# service is a NetCDF-4 file containing the data projected on to a grid of the
+# specified projection.
 #
-
+# This image instantiates a conda environment, with required packages, before
+# Installing additional dependencies via Pip. The service code is then copied
+# into the Docker image, before environment variables are set to activate the
+# created conda environment.
+#
+# Updated: 2021-06-24
+#
 FROM continuumio/miniconda3
 
 WORKDIR "/home"
