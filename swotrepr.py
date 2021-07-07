@@ -1,4 +1,4 @@
-""" Data Services Swath Projection service for Harmony. """
+""" Data Services Swath Projector service for Harmony. """
 import argparse
 import mimetypes
 import os
@@ -13,24 +13,22 @@ from pymods.reproject import reproject
 
 
 class HarmonyAdapter(harmony.BaseHarmonyAdapter):
-    """
-        Data Services Reprojection service for Harmony
+    """ Data Services Swath Projector service for Harmony
 
         This class uses the Harmony utility library for processing the
         service input options.
     """
 
     def invoke(self):
-        """
-        Adds validation to default process_item-based invocation
+        """ Adds validation to default process_item-based invocation
 
-        Returns
-        -------
-        pystac.Catalog
-            the output catalog
+            Returns
+            -------
+            pystac.Catalog
+                the output catalog
         """
         logger = self.logger
-        logger.info('Starting Data Services Reprojection Service')
+        logger.info('Starting Data Services Swath Projector Service')
         os.environ['HDF5_DISABLE_VERSION_CHECK'] = '1'
         self.validate_message()
         return super().invoke()
