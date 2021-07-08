@@ -7,9 +7,9 @@ import os
 
 from harmony.message import Message
 from pyproj import Proj
+from varinfo import VarInfoFromNetCDF4
 
 from pymods import nc_merge
-from pymods.nc_info import NCInfo
 from pymods.interpolation import resample_all_variables
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
@@ -37,12 +37,12 @@ def reproject(message: Message, granule_url: str, local_filename: str,
                 f'Interpolation: {parameters.get("interpolation")}')
 
     try:
-        nc_info = NCInfo(parameters['input_file'])
+        var_info = VarInfoFromNetCDF4(parameters['input_file'], logger)
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
         raise Exception('Unable to parse input file variables') from err
 
-    science_variables = nc_info.get_science_variables()
+    science_variables = var_info.get_science_variables()
 
     if len(science_variables) == 0:
         raise Exception('No science variables found in input file')
@@ -58,7 +58,7 @@ def reproject(message: Message, granule_url: str, local_filename: str,
         raise Exception('No variables could be reprojected')
 
     # Now merge outputs (unless we only have one)
-    metadata_variables = nc_info.get_metadata_variables()
+    metadata_variables = var_info.get_metadata_variables()
     nc_merge.create_output(parameters, output_file, temp_dir,
                            science_variables, metadata_variables, logger)
 

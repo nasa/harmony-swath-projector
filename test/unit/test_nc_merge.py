@@ -8,7 +8,6 @@ from netCDF4 import Dataset
 import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
-from pymods.nc_info import NCInfo
 from pymods.nc_merge import (check_coor_valid, create_history_record,
                              create_output, get_fill_value_from_attributes,
                              get_science_variable_attributes,
@@ -44,13 +43,16 @@ class TestNCMerge(TestBase):
 
     def test_output_has_all_variables(self):
         """ Output file has all expected variables from the input file. """
-        output_info = NCInfo(self.output_file)
-        output_science_variables = output_info.get_science_variables()
-        self.assertSetEqual(output_science_variables, self.science_variables)
+        with Dataset(self.output_file, 'r') as output_dataset:
+            # Output has all projected science variables:
+            for expected_variable in self.science_variables:
+                self.assertIn(expected_variable.lstrip('/'),
+                              output_dataset.variables)
 
-        # Output also has a CRS grid_mapping variable, and three dimensions:
-        self.assertEqual(output_info.ancillary_data, {'/latitude_longitude'})
-        self.assertEqual(output_info.dims, {'/lat', '/lon', '/time'})
+            # Output also has a CRS grid_mapping variable, and three dimensions:
+            self.assertIn('latitude_longitude', output_dataset.variables)
+            for expected_dimension in {'lat', 'lon', 'time'}:
+                self.assertIn(expected_dimension, output_dataset.variables)
 
     def test_same_dimensions(self):
         """ Corresponding variables in input and output should have the same
