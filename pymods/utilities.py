@@ -1,11 +1,10 @@
 from typing import Dict, Optional, Tuple, Union
 import os
 import re
-from pymods.exceptions import MissingCoordinatesError
 
 from netCDF4 import Dataset, Variable
 import numpy as np
-
+from pymods.exceptions import MissingCoordinatesError
 
 FillValueType = Optional[Union[float, int]]
 
