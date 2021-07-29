@@ -66,16 +66,26 @@ conda activate swotrepr-local
 pip install -r pip_requirements.txt
 ```
 
-The Python module will not parse the `.env`, so the invocation of that code
-will require the environment variables be specified at runtime:
+For simple invocations, you can then use the `bin.project_local_granule` Python
+module:
 
 ```
-python swotrepr.py -e EDL_USERNAME=narmstrong -e EDL_PASSWORD=4p0ll0_11 -e ENV=test --harmony-action 'invoke' --harmony-input '{"sources": [{"granules": [{"url": "test/data/africa.nc"}]}], "user": "usr_user", "callback": ""}'
+$ cd swotrepr
+$ python
+>>> from bin.project_local_granule import project_granule
+>>> project_granule('<full path to local granule, including: file:///>')
 ```
 
-Again, note this example assumes granule downloads will be authenticated via
-EDL username and password, not token. If a token is to be used, it should be
-specified in the Harmony message content.
+The `project_granule` function allows a user to specify the target
+Coordinate Reference System (CRS) and interpolation method. For more
+complicated requests a user can mimic the behavior of the `project_granule`
+script, but defining a custom input Harmony message with more parameters
+defined. When manually constructing and invoking a Harmony message, the
+environment variables `ENV`, `OAUTH_CLIENT_ID`, `OAUTH_PASSWORD`,
+`OAUTH_REDIRECT_URI`, `STAGING_BUCKET` and `STAGING_PATH` will need to be
+manually set. If `ENV=dev` or `ENV=test`, then the other environment variables
+can be set to anything. Be careful not to update these variables in the same
+environment as a locally running instance of Harmony.
 
 ### Message schema:
 
