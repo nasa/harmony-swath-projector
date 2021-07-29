@@ -4,7 +4,7 @@ import re
 
 from netCDF4 import Dataset, Variable
 import numpy as np
-
+from pymods.exceptions import MissingCoordinatesError
 
 FillValueType = Optional[Union[float, int]]
 
@@ -61,8 +61,7 @@ def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
                 variable_in_dataset(coordinate, dataset)
         ):
             return dataset[coordinate]
-
-    return None
+    raise MissingCoordinatesError(coordinates_tuple)
 
 
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
