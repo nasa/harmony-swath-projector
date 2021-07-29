@@ -129,7 +129,8 @@ class TestUtilities(TestBase):
 
         with self.subTest('Non existent coordinate variable "latitude" returns MissingCoordinatesError'):
             absent_coordinates_tuple = ['latitude']
-            coordinates = get_coordinate_variable(dataset,
+            with self.assertRaises(MissingCoordinatesError,):
+                coordinates = get_coordinate_variable(dataset,
                                                   absent_coordinates_tuple,
                                                   absent_coordinates_tuple[0])
 
