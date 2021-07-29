@@ -62,11 +62,7 @@ def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
                 variable_in_dataset(coordinate, dataset)
         ):
             return dataset[coordinate]
-        else:
-            raise MissingCoordinatesError(coordinate)
-        # Put exeption: "Can not find coordinate {}"
-        logger.error(f'Cannot find coordinate "{coordinate}".')
-
+    raise MissingCoordinatesError(coordinate)
 
 
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:

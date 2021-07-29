@@ -10,6 +10,7 @@ from pymods.utilities import (construct_absolute_path, create_coordinates_key,
                               make_array_two_dimensional, qualify_reference,
                               variable_in_dataset)
 from test.test_utils import TestBase
+from pymods.exceptions import MissingCoordinatesError
 
 
 class TestUtilities(TestBase):
@@ -126,7 +127,7 @@ class TestUtilities(TestBase):
 
                 self.assertIsInstance(coordinates, Variable)
 
-        with self.subTest('Non existent coordinate variable returns None'):
+        with self.subTest('Non existent coordinate variable "latitude" returns MissingCoordinatesError'):
             absent_coordinates_tuple = ['latitude']
             coordinates = get_coordinate_variable(dataset,
                                                   absent_coordinates_tuple,
