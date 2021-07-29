@@ -33,6 +33,6 @@ class MissingCoordinatesError(CustomError):
 
     """
     def __init__(self, missing_coordinate):
-        super().__init__('MissingReprojectedDataError',
+        super().__init__('MissingCoordinatesError',
                          ('Could not find coordinate '
                           f'{missing_coordinate}.'))
