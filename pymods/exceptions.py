@@ -26,3 +26,13 @@ class MissingReprojectedDataError(CustomError):
         super().__init__('MissingReprojectedDataError',
                          ('Could not find reprojected output file for '
                           f'{missing_variable}.'))
+
+class MissingCoordinatesError(CustomError):
+    """ This exception is raised when for science variables an coordinate variable is not found in
+        dataset by the `get_coordinate_variable` function in `utilities.py`.
+
+    """
+    def __init__(self, missing_coordinate):
+        super().__init__('MissingReprojectedDataError',
+                         ('Could not find coordinate '
+                          f'{missing_coordinate}.'))
