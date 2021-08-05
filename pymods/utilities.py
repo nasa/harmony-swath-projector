@@ -3,21 +3,19 @@ import os
 import re
 
 from netCDF4 import Dataset, Variable
+from varinfo import VariableFromNetCDF4
 import numpy as np
 from pymods.exceptions import MissingCoordinatesError
 
 FillValueType = Optional[Union[float, int]]
 
 
-def create_coordinates_key(variable: Variable) -> Tuple[str]:
+def create_coordinates_key(variable: VariableFromNetCDF4) -> Tuple[str]:
     """ Create a unique, hashable entity from a coordinates attribute in an
         Net-CDF4 file.
 
     """
-    coordinates = variable.getncattr('coordinates')
-    raw_coordinates = re.split(r'\s+|,\s*', coordinates)
-    return tuple(qualify_reference(raw_coordinate, variable)
-                 for raw_coordinate in raw_coordinates)
+    return tuple(sorted(list(variable.coordinates)))
 
 
 def get_variable_values(input_file: Dataset, variable: Variable,

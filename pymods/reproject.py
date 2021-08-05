@@ -10,7 +10,7 @@ from pyproj import Proj
 from varinfo import VarInfoFromNetCDF4
 
 from pymods import nc_merge
-from pymods.interpolation import resample_all_variables
+from pymods.interpolation import resample_all_variables, CF_CONFIG_FILE
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
@@ -37,7 +37,7 @@ def reproject(message: Message, granule_url: str, local_filename: str,
                 f'Interpolation: {parameters.get("interpolation")}')
 
     try:
-        var_info = VarInfoFromNetCDF4(parameters['input_file'], logger)
+        var_info = VarInfoFromNetCDF4(parameters["input_file"], logger, CF_CONFIG_FILE)
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
         raise Exception('Unable to parse input file variables') from err
@@ -52,7 +52,7 @@ def reproject(message: Message, granule_url: str, local_filename: str,
     # Loop through each dataset and reproject
     logger.debug('Using pyresample for reprojection.')
     outputs = resample_all_variables(parameters, science_variables, temp_dir,
-                                     logger)
+                                     logger, var_info)
 
     if not outputs:
         raise Exception('No variables could be reprojected')

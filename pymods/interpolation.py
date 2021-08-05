@@ -13,6 +13,7 @@ from pyresample.ewa import fornav, ll2cr
 from pyresample.geometry import AreaDefinition, SwathDefinition
 from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_info
 from pyresample.utils import check_and_wrap
+from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
 from pymods.nc_single_band import HARMONY_TARGET, write_single_band_output
@@ -24,7 +25,7 @@ from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
                               get_variable_numeric_fill_value,
                               get_variable_values,
                               make_array_two_dimensional)
-
+import pymods.reproject
 
 # In nearest neighbour interpolation, the distance to a found value is
 # guaranteed to be no further than (1 + EPSILON) times the distance to the
@@ -38,12 +39,14 @@ NEIGHBOURS = 16
 # This is used in both the bilinear and nearest-neighbour interpolation
 # methods, and is set to the default value from `pyresample`.
 RADIUS_OF_INFLUENCE = 50000
+CF_CONFIG_FILE = "pymods/cf_config.yml"
 
 
 def resample_all_variables(message_parameters: Dict,
                            science_variables: List[str],
                            temp_directory: str,
-                           logger: Logger) -> List[str]:
+                           logger: Logger,
+                           var_info: VarInfoFromNetCDF4) -> List[str]:
     """ Iterate through all science variables and reproject to the target
         coordinate grid.
 
@@ -68,7 +71,7 @@ def resample_all_variables(message_parameters: Dict,
 
             resample_variable(message_parameters, variable,
                               reprojection_cache, variable_output_path,
-                              logger)
+                              logger, var_info)
 
             output_variables.append(variable)
         except Exception as error:
@@ -82,7 +85,7 @@ def resample_all_variables(message_parameters: Dict,
 
 def resample_variable(message_parameters: Dict, full_variable: str,
                       reprojection_cache: Dict, variable_output_path: str,
-                      logger: Logger) -> None:
+                      logger: Logger, var_info: VarInfoFromNetCDF4) -> None:
     """ A function to perform the reprojection of a single variable. The
         reprojection information for each will be derived using interpolation
         method specific functions, as will the calculation of reprojected
@@ -98,7 +101,9 @@ def resample_variable(message_parameters: Dict, full_variable: str,
     )
     dataset = Dataset(message_parameters['input_file'])
     variable = dataset[full_variable]
-    coordinates_key = create_coordinates_key(variable)
+    # get variable with CF_Overrides and get real coordinates
+    variable_cf = var_info.get_variable(full_variable)
+    coordinates_key = create_coordinates_key(variable_cf)
 
     if coordinates_key in reprojection_cache:
         logger.debug('Retrieving previous interpolation information for '
@@ -386,7 +391,7 @@ def get_reprojection_cache(parameters: Dict) -> Dict:
     return reprojection_cache
 
 
-def get_target_area(parameters: Dict, dataset: Dataset,
+def get_target_area(parameters: Dict, dataset: VarInfoFromNetCDF4,
                     coordinates: Tuple[str], logger: Logger) -> AreaDefinition:
     """ Define the target area as specified by either a complete set of message
         parameters, or supplemented with coordinate variables as refered to in
