@@ -1,7 +1,6 @@
 from logging import Logger
 from unittest.mock import MagicMock, patch
 
-import varinfo
 from netCDF4 import Dataset, Variable
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition
@@ -16,8 +15,9 @@ from pymods.interpolation import (check_for_valid_interpolation, EPSILON,
                                   get_reprojection_cache,
                                   get_swath_definition, get_target_area,
                                   resample_all_variables, resample_variable,
-                                  RADIUS_OF_INFLUENCE, CF_CONFIG_FILE)
+                                  RADIUS_OF_INFLUENCE)
 from pymods.nc_single_band import HARMONY_TARGET
+from pymods.reproject import CF_CONFIG_FILE
 from test.test_utils import TestBase
 
 

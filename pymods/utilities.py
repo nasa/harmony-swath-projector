@@ -11,8 +11,11 @@ FillValueType = Optional[Union[float, int]]
 
 
 def create_coordinates_key(variable: VariableFromNetCDF4) -> Tuple[str]:
-    """ Create a unique, hashable entity from a coordinates attribute in an
-        Net-CDF4 file.
+    """ Create a unique, hashable entity from the coordinates
+        associated with a science variable. These coordinates
+        are derived using the `sds-varinfo` package, which
+        augments the CF-Convention `coordinates` metadata
+        attribute with supplements and overrides, where required.
 
     """
     return tuple(sorted(list(variable.coordinates)))

@@ -25,7 +25,6 @@ from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
                               get_variable_numeric_fill_value,
                               get_variable_values,
                               make_array_two_dimensional)
-import pymods.reproject
 
 # In nearest neighbour interpolation, the distance to a found value is
 # guaranteed to be no further than (1 + EPSILON) times the distance to the
@@ -39,7 +38,6 @@ NEIGHBOURS = 16
 # This is used in both the bilinear and nearest-neighbour interpolation
 # methods, and is set to the default value from `pyresample`.
 RADIUS_OF_INFLUENCE = 50000
-CF_CONFIG_FILE = "pymods/cf_config.yml"
 
 
 def resample_all_variables(message_parameters: Dict,
@@ -391,7 +389,7 @@ def get_reprojection_cache(parameters: Dict) -> Dict:
     return reprojection_cache
 
 
-def get_target_area(parameters: Dict, dataset: VarInfoFromNetCDF4,
+def get_target_area(parameters: Dict, dataset: Dataset,
                     coordinates: Tuple[str], logger: Logger) -> AreaDefinition:
     """ Define the target area as specified by either a complete set of message
         parameters, or supplemented with coordinate variables as refered to in

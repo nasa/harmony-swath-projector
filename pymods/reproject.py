@@ -10,12 +10,17 @@ from pyproj import Proj
 from varinfo import VarInfoFromNetCDF4
 
 from pymods import nc_merge
-from pymods.interpolation import resample_all_variables, CF_CONFIG_FILE
+from pymods.interpolation import resample_all_variables
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
+CF_CONFIG_FILE = "pymods/cf_config.yml"
 
+# In nearest neighbour interpolation, the distance to a found value is
+# guaranteed to be no further than (1 + EPSILON) times the distance to the
+# correct neighbour.
+EPSILON = 0.5
 
 def reproject(message: Message, granule_url: str, local_filename: str,
               temp_dir: str, logger: logging.Logger) -> str:
@@ -60,7 +65,7 @@ def reproject(message: Message, granule_url: str, local_filename: str,
     # Now merge outputs (unless we only have one)
     metadata_variables = var_info.get_metadata_variables()
     nc_merge.create_output(parameters, output_file, temp_dir,
-                           science_variables, metadata_variables, logger)
+                           science_variables, metadata_variables, logger, var_info)
 
     # Return the output file back to Harmony
     return output_file

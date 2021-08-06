@@ -1,35 +1,15 @@
 #
-# Configuration file for `var-info` Python package. Note, in the absense
-# of an otherwise specified configuration file, this will be used as a default
-# by VarInfo.
-#
-# This template is taken from the Variable Subsetter Harmony service.
+# Configuration file for `swotrepr` Python package.
 #
 # 2021-08-05
 #
-Identification: varinfo_VNP10_config
-Version: 13
+Identification: 'Swath Projector VarInfo configuration'
+Version: 1
 
-# A list of hdf subdataset paths that provide the shortname value of the
-# collection for the data file being processed.  Processed in this order to
-# find a shortname value for the current file.
 Collection_ShortName_Path:
   - 'ShortName'
-
-# A set of mission tagged shortname patterns defines a mission name for
-# matching shortname values.
 Mission:
   'VNP10': 'VIIRS'
-
-# If CF_Overrides and CF_Supplements are not enough VarInfo class will assume
-# variables with a coordinates attribute are science variables. This setting
-# provides variable path patterns for variables with coordinates references,
-# which should be excluded from consideration as a science variable
-
-# VarInfo will calculate a set of required fields (variables, subdatasets)
-# for a given science variable. This setting imposes additional contents
-# for the required fields list.
-
 CF_Overrides:
 - Applicability:
       Mission: 'VIIRS'
