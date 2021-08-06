@@ -31,13 +31,11 @@ class TestUtilities(TestBase):
         dataset.createVariable('/lat', data.dtype, dimensions=('lat', 'lon'))
         dataset.createVariable('/lon', data.dtype, dimensions=('lat', 'lon'))
 
-        test_args = [['spaces', 'lon lat'],
-                     ['multiple spaces', 'lon    lat'],
-                     ['comma', 'lon,lat'],
-                     ['comma-space', 'lon, lat'],
-                     ['comma-multiple-space', 'lon,    lat']]
+        test_args = [['comma-space', ['/lon', '/lat']],
+                     ['reverse order', ['/lat', '/lon']]]
 
-        expected_output = ('/lon', '/lat')
+        # should be sorted order
+        expected_output = ('/lat', '/lon')
 
         for description, coordinates in test_args:
             with self.subTest(description):

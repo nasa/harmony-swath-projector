@@ -1,10 +1,12 @@
 from logging import Logger
 from unittest.mock import MagicMock, patch
 
+import varinfo
 from netCDF4 import Dataset, Variable
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition
 import numpy as np
+from varinfo import VarInfoFromNetCDF4
 
 from pymods.interpolation import (check_for_valid_interpolation, EPSILON,
                                   get_bilinear_information,
@@ -14,7 +16,7 @@ from pymods.interpolation import (check_for_valid_interpolation, EPSILON,
                                   get_reprojection_cache,
                                   get_swath_definition, get_target_area,
                                   resample_all_variables, resample_variable,
-                                  RADIUS_OF_INFLUENCE)
+                                  RADIUS_OF_INFLUENCE, CF_CONFIG_FILE)
 from pymods.nc_single_band import HARMONY_TARGET
 from test.test_utils import TestBase
 
@@ -42,6 +44,8 @@ class TestInterpolation(TestBase):
         }
         self.temp_directory = '/tmp/01234'
         self.logger = Logger('test')
+        self.var_info = VarInfoFromNetCDF4(self.message_parameters["input_file"], self.logger,
+                                           CF_CONFIG_FILE)
         self.mock_target_area = MagicMock(spec=AreaDefinition,
                                           shape='ta_shape',
                                           area_id='/lon, /lat')
@@ -77,7 +81,8 @@ class TestInterpolation(TestBase):
         output_variables = resample_all_variables(parameters,
                                                   self.science_variables,
                                                   self.temp_directory,
-                                                  self.logger)
+                                                  self.logger,
+                                                  self.var_info)
 
         expected_output = ['/red_var', '/green_var', '/blue_var', '/alpha_var']
         self.assertEqual(output_variables, expected_output)
@@ -89,7 +94,7 @@ class TestInterpolation(TestBase):
                                                    variable,
                                                    {},
                                                    variable_output_path,
-                                                   self.logger)
+                                                   self.logger, self.var_info)
 
     @patch('pymods.interpolation.resample_variable')
     def test_resample_single_exception(self, mock_resample_variable):
@@ -105,7 +110,8 @@ class TestInterpolation(TestBase):
         output_variables = resample_all_variables(parameters,
                                                   self.science_variables,
                                                   self.temp_directory,
-                                                  self.logger)
+                                                  self.logger,
+                                                  self.var_info)
 
         expected_output = ['/green_var', '/blue_var', '/alpha_var']
         self.assertEqual(output_variables, expected_output)
@@ -119,7 +125,7 @@ class TestInterpolation(TestBase):
                                                    variable,
                                                    {},
                                                    variable_output_path,
-                                                   self.logger)
+                                                   self.logger, self.var_info)
 
     @patch('pymods.interpolation.write_single_band_output')
     @patch('pymods.interpolation.get_swath_definition')
@@ -153,10 +159,10 @@ class TestInterpolation(TestBase):
 
         with self.subTest('No pre-existing bilinear information'):
             resample_variable(message_parameters, variable_name, {},
-                              output_path, self.logger)
+                              output_path, self.logger, self.var_info)
 
             expected_cache = {
-                ('/lon', '/lat'): {'vertical_distances': 'vertical',
+                ('/lat', '/lon'): {'vertical_distances': 'vertical',
                                    'horizontal_distances': 'horizontal',
                                    'valid_input_indices': 'input_indices',
                                    'valid_point_mapping': 'point_mapping',
@@ -186,7 +192,7 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             bilinear_information = {
-                ('/lon', '/lat'): {
+                ('/lat', '/lon'): {
                     'vertical_distances': 'vertical_old',
                     'horizontal_distances': 'horizontal_old',
                     'valid_input_indices': 'input_indices_old',
@@ -196,7 +202,7 @@ class TestInterpolation(TestBase):
             }
 
             resample_variable(message_parameters, variable_name,
-                              bilinear_information, output_path, self.logger)
+                              bilinear_information, output_path, self.logger, self.var_info)
 
             mock_get_bil_info.assert_not_called()
             mock_get_sample.assert_called_once_with(ravel_data,
@@ -227,14 +233,14 @@ class TestInterpolation(TestBase):
             }
 
             resample_variable(message_parameters, variable_name, input_cache,
-                              output_path, self.logger)
+                              output_path, self.logger, self.var_info)
 
             # Check that there is a new entry in the cache, and that it only
             # contains references to the original Harmony target area object,
             # not copies of those objects.
             expected_cache = {
                 HARMONY_TARGET: {'target_area': harmony_target_area},
-                ('/lon', '/lat'): {
+                ('/lat', '/lon'): {
                     'vertical_distances': 'vertical',
                     'horizontal_distances': 'horizontal',
                     'valid_input_indices': 'input_indices',
@@ -291,15 +297,15 @@ class TestInterpolation(TestBase):
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'ewa'
-        variable_name = 'alpha_var'
+        variable_name = '/alpha_var'
         output_path = 'path/to/output'
 
         with self.subTest('No pre-existing EWA information'):
             resample_variable(message_parameters, variable_name, {},
-                              output_path, self.logger)
+                              output_path, self.logger, self.var_info)
 
             expected_cache = {
-                ('/lon', '/lat'): {'columns': 'columns',
+                ('/lat', '/lon'): {'columns': 'columns',
                                    'rows': 'rows',
                                    'target_area': self.mock_target_area}
             }
@@ -322,13 +328,13 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             ewa_information = {
-                ('/lon', '/lat'): {'columns': 'old_columns',
+                ('/lat', '/lon'): {'columns': 'old_columns',
                                    'rows': 'old_rows',
                                    'target_area': self.mock_target_area}
             }
 
             resample_variable(message_parameters, variable_name,
-                              ewa_information, output_path, self.logger)
+                              ewa_information, output_path, self.logger, self.var_info)
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
@@ -366,15 +372,15 @@ class TestInterpolation(TestBase):
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'ewa-nn'
-        variable_name = 'alpha_var'
+        variable_name = '/alpha_var'
         output_path = 'path/to/output'
 
         with self.subTest('No pre-existing EWA-NN information'):
             resample_variable(message_parameters, variable_name, {},
-                              output_path, self.logger)
+                              output_path, self.logger, self.var_info)
 
             expected_cache = {
-                ('/lon', '/lat'): {'columns': 'columns',
+                ('/lat', '/lon'): {'columns': 'columns',
                                    'rows': 'rows',
                                    'target_area': self.mock_target_area}
             }
@@ -397,12 +403,12 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             ewa_nn_information = {
-                ('/lon', '/lat'): {'columns': 'old_columns',
+                ('/lat', '/lon'): {'columns': 'old_columns',
                                    'rows': 'old_rows',
                                    'target_area': self.mock_target_area}}
 
             resample_variable(message_parameters, variable_name,
-                              ewa_nn_information, output_path, self.logger)
+                              ewa_nn_information, output_path, self.logger, self.var_info)
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
@@ -429,14 +435,14 @@ class TestInterpolation(TestBase):
             cache = {HARMONY_TARGET: {'target_area': harmony_target_area}}
 
             resample_variable(message_parameters, variable_name, cache,
-                              output_path, self.logger)
+                              output_path, self.logger, self.var_info)
 
             # Check that there is a new entry in the cache, and that it only
             # contains references to the original Harmony target area object,
             # not copies of those objects.
             expected_cache = {
                 HARMONY_TARGET: {'target_area': harmony_target_area},
-                ('/lon', '/lat'): {'columns': 'columns',
+                ('/lat', '/lon'): {'columns': 'columns',
                                    'rows': 'rows',
                                    'target_area': harmony_target_area}
             }
@@ -489,10 +495,10 @@ class TestInterpolation(TestBase):
 
         with self.subTest('No pre-existing nearest neighbour information'):
             resample_variable(message_parameters, variable_name, {},
-                              output_path, self.logger)
+                              output_path, self.logger, self.var_info)
 
             expected_cache = {
-                ('/lon', '/lat'): {'valid_input_index': 'valid_input_index',
+                ('/lat', '/lon'): {'valid_input_index': 'valid_input_index',
                                    'valid_output_index': 'valid_output_index',
                                    'index_array': 'index_array',
                                    'distance_array': 'distance_array',
@@ -524,7 +530,7 @@ class TestInterpolation(TestBase):
             mock_write_output.reset_mock()
 
             nearest_information = {
-                ('/lon', '/lat'): {
+                ('/lat', '/lon'): {
                     'valid_input_index': 'old_valid_input',
                     'valid_output_index': 'old_valid_output',
                     'index_array': 'old_index_array',
@@ -534,7 +540,7 @@ class TestInterpolation(TestBase):
             }
 
             resample_variable(message_parameters, variable_name,
-                              nearest_information, output_path, self.logger)
+                              nearest_information, output_path, self.logger, self.var_info)
 
             mock_get_info.assert_not_called()
             mock_get_sample.assert_called_once_with('nn', 'ta_shape',
@@ -564,14 +570,14 @@ class TestInterpolation(TestBase):
             cache = {HARMONY_TARGET: {'target_area': harmony_target_area}}
 
             resample_variable(message_parameters, variable_name, cache,
-                              output_path, self.logger)
+                              output_path, self.logger, self.var_info)
 
             # Check that there is a new entry in the cache, and that it only
             # contains references to the original Harmony target area object,
             # not copies of those objects.
             expected_cache = {
                 HARMONY_TARGET: {'target_area': harmony_target_area},
-                ('/lon', '/lat'): {
+                ('/lat', '/lon'): {
                     'valid_input_index': 'valid_input_index',
                     'valid_output_index': 'valid_output_index',
                     'index_array': 'index_array',
@@ -634,10 +640,10 @@ class TestInterpolation(TestBase):
         blue_var_fill = 0.0
 
         resample_variable(message_parameters, variable_name, {},
-                          output_path, self.logger)
+                          output_path, self.logger, self.var_info)
 
         expected_cache = {
-            ('/lon', '/lat'): {'valid_input_index': 'valid_input_index',
+            ('/lat', '/lon'): {'valid_input_index': 'valid_input_index',
                                'valid_output_index': 'valid_output_index',
                                'index_array': 'index_array',
                                'distance_array': 'distance_array',
