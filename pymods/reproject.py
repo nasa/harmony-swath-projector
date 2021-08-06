@@ -17,10 +17,6 @@ CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
 CF_CONFIG_FILE = "pymods/cf_config.yml"
 
-# In nearest neighbour interpolation, the distance to a found value is
-# guaranteed to be no further than (1 + EPSILON) times the distance to the
-# correct neighbour.
-EPSILON = 0.5
 
 def reproject(message: Message, granule_url: str, local_filename: str,
               temp_dir: str, logger: logging.Logger) -> str:
