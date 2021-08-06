@@ -2,20 +2,18 @@
     `pyresample`, back into a single output file with all the necessary
     attributes.
 """
-from argparse import ArgumentParser
 from datetime import datetime, timezone
 from typing import Dict, Optional, Set, Tuple, Union
 import json
 import logging
 import os
-import re
 
 from netCDF4 import Dataset, Variable
 from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
-from pymods.utilities import (get_variable_file_path, qualify_reference,
+from pymods.utilities import (get_variable_file_path,
                               variable_in_dataset)
 
 # Values needed for history_json attribute
