@@ -15,6 +15,7 @@ from pymods.interpolation import resample_all_variables
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
+CF_CONFIG_FILE = "pymods/cf_config.yml"
 
 
 def reproject(message: Message, granule_url: str, local_filename: str,
@@ -37,7 +38,7 @@ def reproject(message: Message, granule_url: str, local_filename: str,
                 f'Interpolation: {parameters.get("interpolation")}')
 
     try:
-        var_info = VarInfoFromNetCDF4(parameters['input_file'], logger)
+        var_info = VarInfoFromNetCDF4(parameters["input_file"], logger, CF_CONFIG_FILE)
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
         raise Exception('Unable to parse input file variables') from err
@@ -52,7 +53,7 @@ def reproject(message: Message, granule_url: str, local_filename: str,
     # Loop through each dataset and reproject
     logger.debug('Using pyresample for reprojection.')
     outputs = resample_all_variables(parameters, science_variables, temp_dir,
-                                     logger)
+                                     logger, var_info)
 
     if not outputs:
         raise Exception('No variables could be reprojected')
@@ -60,7 +61,7 @@ def reproject(message: Message, granule_url: str, local_filename: str,
     # Now merge outputs (unless we only have one)
     metadata_variables = var_info.get_metadata_variables()
     nc_merge.create_output(parameters, output_file, temp_dir,
-                           science_variables, metadata_variables, logger)
+                           science_variables, metadata_variables, logger, var_info)
 
     # Return the output file back to Harmony
     return output_file

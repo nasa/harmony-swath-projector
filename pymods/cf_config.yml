@@ -1,0 +1,21 @@
+#
+# Configuration file for `swotrepr` Python package.
+#
+# 2021-08-05
+#
+Identification: 'Swath Projector VarInfo configuration'
+Version: 1
+
+Collection_ShortName_Path:
+  - 'ShortName'
+Mission:
+  'VNP10': 'VIIRS'
+CF_Overrides:
+- Applicability:
+      Mission: 'VIIRS'
+      ShortNamePath: 'VNP10'
+      Variable_Pattern: '/SnowData/.*'
+  Attributes:
+    - Name: 'coordinates'
+      Value: '/GeolocationData/latitude, /GeolocationData/longitude'
+

@@ -2,19 +2,18 @@
     `pyresample`, back into a single output file with all the necessary
     attributes.
 """
-from argparse import ArgumentParser
 from datetime import datetime, timezone
 from typing import Dict, Optional, Set, Tuple, Union
 import json
 import logging
 import os
-import re
 
 from netCDF4 import Dataset, Variable
+from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
-from pymods.utilities import (get_variable_file_path, qualify_reference,
+from pymods.utilities import (get_variable_file_path,
                               variable_in_dataset)
 
 # Values needed for history_json attribute
@@ -26,7 +25,7 @@ VERSION = '0.9.0'
 
 def create_output(request_parameters: dict, output_file: str, temp_dir: str,
                   science_variables: Set[str], metadata_variables: Set[str],
-                  logger: logging.Logger) -> None:
+                  logger: logging.Logger, var_info: VarInfoFromNetCDF4) -> None:
     """ Merge the reprojected single-dataset NetCDF-4 files from `pyresample`
         into a single file, copying global attributes and metadata
         variables (those without coordinates, which therefore can't be
@@ -63,7 +62,7 @@ def create_output(request_parameters: dict, output_file: str, temp_dir: str,
                     set_dimensions(data, output_dataset)
 
                     copy_science_variable(input_dataset, output_dataset, data,
-                                          variable_name, logger)
+                                          variable_name, logger, var_info)
 
                     # Copy supporting variables from the single band output:
                     # the grid mapping, reprojected x and reprojected y.
@@ -250,7 +249,7 @@ def copy_metadata_variable(source_dataset: Dataset, output_dataset: Dataset,
 
 def copy_science_variable(input_dataset: Dataset, output_dataset: Dataset,
                           single_band_dataset: Dataset, variable_name: str,
-                          logger: logging.Logger) -> None:
+                          logger: logging.Logger, var_info: VarInfoFromNetCDF4) -> None:
     """ Write a reprojected variable from a single-band output file to the
         merged output file. This will first obtain metadata (dimensions,
         data type and  attributes) from either the single-band output, or from
@@ -267,7 +266,8 @@ def copy_science_variable(input_dataset: Dataset, output_dataset: Dataset,
                                                  variable_name)
     attributes = get_science_variable_attributes(input_dataset,
                                                  single_band_dataset,
-                                                 variable_name)
+                                                 variable_name,
+                                                 var_info)
 
     fill_value = get_fill_value_from_attributes(attributes)
 
@@ -298,7 +298,8 @@ def copy_science_variable(input_dataset: Dataset, output_dataset: Dataset,
 
 def get_science_variable_attributes(input_dataset: Dataset,
                                     single_band_dataset: Dataset,
-                                    variable_name: str) -> Dict:
+                                    variable_name: str,
+                                    var_info: VarInfoFromNetCDF4) -> Dict:
     """ Extract the attributes for a science variable, using a combination of
         the original metadata from the unprojected input variable, and then
         augmenting that with the grid_mapping of the reprojected data. Finally,
@@ -312,7 +313,7 @@ def get_science_variable_attributes(input_dataset: Dataset,
 
     if (
             'coordinates' in variable_attributes and
-            not check_coor_valid(variable_attributes, variable_name,
+            not check_coor_valid(var_info, variable_name,
                                  input_dataset, single_band_dataset)
     ):
         del variable_attributes['coordinates']
@@ -336,7 +337,7 @@ def get_science_variable_dimensions(input_dataset: Dataset,
     return dimensions
 
 
-def check_coor_valid(attrs: Dict, variable_name: str, input_dataset: Dataset,
+def check_coor_valid(var_info: VarInfoFromNetCDF4, variable_name: str, input_dataset: Dataset,
                      single_band_dataset: Dataset) -> bool:
     """ Check if variables listed in the coordinates metadata attributes are
         still valid after reprojection. Invalid coordinate reference cases:
@@ -347,13 +348,9 @@ def check_coor_valid(attrs: Dict, variable_name: str, input_dataset: Dataset,
              dataset does not match the input coordinate array shape.
 
     """
-    coordinates_attribute = attrs.get('coordinates')
+    coords = var_info.get_variable(variable_name).coordinates
 
-    if coordinates_attribute is not None:
-        coords = [qualify_reference(coordinate, input_dataset[variable_name])
-                  for coordinate
-                  in re.split(r'\s+|,\s*', coordinates_attribute)]
-    else:
+    if coords is None:
         coords = []
 
     all_coordinates_in_single_band = all(
@@ -378,27 +375,3 @@ def get_fill_value_from_attributes(variable_attributes: Dict) -> Optional:
 
     """
     return variable_attributes.pop('_FillValue', None)
-
-
-if __name__ == "__main__":
-    PARSER = ArgumentParser(prog='nc_merge',
-                            description='Merge reprojected NetCDF4 files into one')
-    PARSER.add_argument('--ori-inputfile', dest='ori_inputfile',
-                        help='Source NetCDF4 file (before reprojection)')
-    PARSER.add_argument('--output-filename', dest='output_filename',
-                        help='Merged NetCDF4 output file')
-    PARSER.add_argument('--proj-dir', dest='proj_dir',
-                        help='Output directory with projected NetCDF4 files')
-    PARSER.add_argument('--science-variables', dest='science_variables',
-                        help='Variables to include in the merged output file')
-    PARSER.add_argument('--metadata-variables', dest='metadata_variables',
-                        help='Variables without coordinate references',
-                        default=set())
-    ARGS = PARSER.parse_args()
-
-    LOGGER = logging.getLogger('nc_merge')
-    logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %I:%M:%S %p')
-
-    create_output(ARGS.ori_inputfile, ARGS.output_filename, ARGS.proj_dir,
-                  ARGS.science_variables, ARGS.metadata_variables, LOGGER)

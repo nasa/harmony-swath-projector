@@ -5,6 +5,7 @@ import logging
 import os
 
 from netCDF4 import Dataset
+from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
@@ -12,6 +13,7 @@ from pymods.nc_merge import (check_coor_valid, create_history_record,
                              create_output, get_fill_value_from_attributes,
                              get_science_variable_attributes,
                              get_science_variable_dimensions, read_attrs)
+from pymods.reproject import CF_CONFIG_FILE
 from test.test_utils import TestBase
 
 
@@ -32,9 +34,10 @@ class TestNCMerge(TestBase):
                                  '/sea_surface_temperature', '/wind_speed'}
 
         cls.metadata_variables = set()
+        cls.var_info = VarInfoFromNetCDF4(cls.properties["input_file"], cls.logger,CF_CONFIG_FILE)
         create_output(cls.properties, cls.output_file, cls.tmp_dir,
                       cls.science_variables, cls.metadata_variables,
-                      cls.logger)
+                      cls.logger, cls.var_info)
 
     @classmethod
     def tearDownClass(cls):
@@ -76,7 +79,7 @@ class TestNCMerge(TestBase):
 
         create_output(self.properties, self.output_file, self.tmp_dir,
                       self.science_variables, self.metadata_variables,
-                      self.logger)
+                      self.logger, self.var_info)
 
         with Dataset(self.properties['input_file']) as in_dataset:
             input_attrs = read_attrs(in_dataset)
@@ -158,7 +161,7 @@ class TestNCMerge(TestBase):
 
         with self.assertRaises(MissingReprojectedDataError):
             create_output(self.properties, temporary_output_file, self.tmp_dir,
-                          test_variables, self.metadata_variables, self.logger)
+                          test_variables, self.metadata_variables, self.logger, self.var_info)
 
         if os.path.exists(temporary_output_file):
             os.remove(temporary_output_file)
@@ -193,19 +196,11 @@ class TestNCMerge(TestBase):
         input_dataset = Dataset(self.properties['input_file'])
 
         with self.subTest('No coordinate data returns True'):
-            self.assertTrue(check_coor_valid({}, '/brightness_temperature_4um',
+            self.assertTrue(check_coor_valid(self.var_info, '/lat',
                                              input_dataset, single_band_dataset))
 
         with self.subTest('Reprojected data missing coordinates returns False'):
-            attributes = {'coordinates': 'random, string, values'}
-            self.assertFalse(check_coor_valid(attributes,
-                                              '/brightness_temperature_4um',
-                                              input_dataset,
-                                              single_band_dataset))
-
-        with self.subTest('Reprojected data with different shape returns False'):
-            attributes = {'coordinates': 'lat lon'}
-            self.assertFalse(check_coor_valid(attributes,
+            self.assertFalse(check_coor_valid(self.var_info,
                                               '/brightness_temperature_4um',
                                               input_dataset,
                                               single_band_dataset))
@@ -214,9 +209,8 @@ class TestNCMerge(TestBase):
             # To ensure a match, this uses two different reprojected output
             # files, as these are guaranteed to match coordinate shapes.
             second_dataset = Dataset(f'{self.tmp_dir}wind_speed.nc')
-            attributes = {'coordinates': 'lat lon'}
 
-            self.assertTrue(check_coor_valid(attributes, '/wind_speed',
+            self.assertTrue(check_coor_valid(self.var_info, '/wind_speed',
                                              second_dataset,
                                              single_band_dataset))
 
@@ -260,7 +254,7 @@ class TestNCMerge(TestBase):
             mock_check_coord_valid.return_value = True
             attributes = get_science_variable_attributes(input_dataset,
                                                          single_band_dataset,
-                                                         variable_name)
+                                                         variable_name, self.var_info)
 
             input_attributes = input_dataset[variable_name].__dict__
             single_band_attributes = single_band_dataset[variable_name].__dict__
@@ -278,7 +272,7 @@ class TestNCMerge(TestBase):
             mock_check_coord_valid.return_value = False
             attributes = get_science_variable_attributes(input_dataset,
                                                          single_band_dataset,
-                                                         variable_name)
+                                                         variable_name, self.var_info)
 
             input_attributes = input_dataset[variable_name].__dict__
             single_band_attributes = single_band_dataset[variable_name].__dict__
