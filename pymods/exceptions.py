@@ -4,6 +4,7 @@
 
 """
 
+
 class CustomError(Exception):
     """ Base class for exceptions in the SWOT reprojection tool. This base
         class could be extended in the future to assign exit codes, for
@@ -27,12 +28,13 @@ class MissingReprojectedDataError(CustomError):
                          ('Could not find reprojected output file for '
                           f'{missing_variable}.'))
 
+
 class MissingCoordinatesError(CustomError):
-    """ This exception is raised when for science variables an coordinate variable is not found in
-        dataset by the `get_coordinate_variable` function in `utilities.py`.
+    """ This exception is raised when for science variables an coordinate
+        variable is not found in dataset by the `get_coordinate_variable`
+        function in `utilities.py`.
 
     """
     def __init__(self, missing_coordinate):
         super().__init__('MissingCoordinatesError',
-                         ('Could not find coordinate '
-                          f'{missing_coordinate}.'))
+                         f'Could not find coordinate {missing_coordinate}.')

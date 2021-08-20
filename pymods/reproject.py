@@ -15,7 +15,7 @@ from pymods.interpolation import resample_all_variables
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
-CF_CONFIG_FILE = "pymods/cf_config.yml"
+CF_CONFIG_FILE = 'pymods/cf_config.yml'
 
 
 def reproject(message: Message, granule_url: str, local_filename: str,
@@ -38,7 +38,8 @@ def reproject(message: Message, granule_url: str, local_filename: str,
                 f'Interpolation: {parameters.get("interpolation")}')
 
     try:
-        var_info = VarInfoFromNetCDF4(parameters["input_file"], logger, CF_CONFIG_FILE)
+        var_info = VarInfoFromNetCDF4(parameters['input_file'], logger,
+                                      CF_CONFIG_FILE)
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
         raise Exception('Unable to parse input file variables') from err
