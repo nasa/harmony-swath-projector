@@ -44,7 +44,7 @@ class TestInterpolation(TestBase):
         }
         self.temp_directory = '/tmp/01234'
         self.logger = Logger('test')
-        self.var_info = VarInfoFromNetCDF4(self.message_parameters["input_file"], self.logger,
+        self.var_info = VarInfoFromNetCDF4(self.message_parameters['input_file'], self.logger,
                                            CF_CONFIG_FILE)
         self.mock_target_area = MagicMock(spec=AreaDefinition,
                                           shape='ta_shape',
@@ -202,7 +202,8 @@ class TestInterpolation(TestBase):
             }
 
             resample_variable(message_parameters, variable_name,
-                              bilinear_information, output_path, self.logger, self.var_info)
+                              bilinear_information, output_path, self.logger,
+                              self.var_info)
 
             mock_get_bil_info.assert_not_called()
             mock_get_sample.assert_called_once_with(ravel_data,
@@ -334,7 +335,8 @@ class TestInterpolation(TestBase):
             }
 
             resample_variable(message_parameters, variable_name,
-                              ewa_information, output_path, self.logger, self.var_info)
+                              ewa_information, output_path, self.logger,
+                              self.var_info)
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',
@@ -359,8 +361,8 @@ class TestInterpolation(TestBase):
                              mock_write_output):
         """ EWA-NN interpolation should call both ll2cr and fornav if there are
                     no matching entries for the coordinates in the reprojection
-                    information. If there is an entry, then only fornav should be
-                    called.
+                    information. If there is an entry, then only fornav should
+                    be called.
         """
         mock_ll2cr.return_value = ['swath_points_in_grid', 'columns', 'rows']
         results = np.array([5.0])
@@ -408,7 +410,8 @@ class TestInterpolation(TestBase):
                                    'target_area': self.mock_target_area}}
 
             resample_variable(message_parameters, variable_name,
-                              ewa_nn_information, output_path, self.logger, self.var_info)
+                              ewa_nn_information, output_path, self.logger,
+                              self.var_info)
 
             mock_ll2cr.assert_not_called()
             mock_fornav.assert_called_once_with('old_columns', 'old_rows',

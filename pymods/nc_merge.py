@@ -13,8 +13,7 @@ from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
-from pymods.utilities import (get_variable_file_path,
-                              variable_in_dataset)
+from pymods.utilities import get_variable_file_path, variable_in_dataset
 
 # Values needed for history_json attribute
 HISTORY_JSON_SCHEMA = 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json'

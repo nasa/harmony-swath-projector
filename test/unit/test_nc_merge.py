@@ -24,8 +24,8 @@ class TestNCMerge(TestBase):
         cls.logger = logging.getLogger('nc_merge test')
         cls.properties = {'input_file': 'test/data/VNL2_test_data.nc',
                           'granule_url': 'test/data/VNL2_test_data.nc',
-                          'crs' : 'EPSG:4326',
-                          'interpolation' : 'bilinear'}
+                          'crs': 'EPSG:4326',
+                          'interpolation': 'bilinear'}
 
         cls.tmp_dir = 'test/data/test_tmp/'
         cls.output_file = 'test/data/VNL2_test_data_repr.nc'
@@ -34,7 +34,8 @@ class TestNCMerge(TestBase):
                                  '/sea_surface_temperature', '/wind_speed'}
 
         cls.metadata_variables = set()
-        cls.var_info = VarInfoFromNetCDF4(cls.properties["input_file"], cls.logger,CF_CONFIG_FILE)
+        cls.var_info = VarInfoFromNetCDF4(cls.properties['input_file'],
+                                          cls.logger, CF_CONFIG_FILE)
         create_output(cls.properties, cls.output_file, cls.tmp_dir,
                       cls.science_variables, cls.metadata_variables,
                       cls.logger, cls.var_info)
