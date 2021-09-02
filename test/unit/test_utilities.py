@@ -1,8 +1,11 @@
+from logging import getLogger
 from unittest.mock import Mock
 
 from netCDF4 import Dataset, Variable
+from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
+from pymods.exceptions import MissingCoordinatesError
 from pymods.utilities import (construct_absolute_path, create_coordinates_key,
                               get_variable_values, get_coordinate_variable,
                               get_scale_and_offset, get_variable_file_path,
@@ -10,40 +13,46 @@ from pymods.utilities import (construct_absolute_path, create_coordinates_key,
                               make_array_two_dimensional, qualify_reference,
                               variable_in_dataset)
 from test.test_utils import TestBase
-from pymods.exceptions import MissingCoordinatesError
 
 
 class TestUtilities(TestBase):
 
     def test_create_coordinates_key(self):
-        """ When given a string, ensure a list is returned that is split based
-            on spaces, commas and space, commas.
+        """ Extract the coordinates from a `VariableFromNetCDF4` instance and
+            return an alphabetically sorted tuple. The ordering prevents any
+            shuffling due to sds-varinfo storing CF-Convention attribute
+            references as a Python Set.
 
         """
-        dataset = Dataset('test.nc', 'w', diskless=True)
-        dataset.createDimension('lat', size=2)
-        dataset.createDimension('lon', size=4)
+        logger = getLogger('test')
 
         data = np.ones((2, 4))
-
-        variable = dataset.createVariable('/group/variable', data.dtype,
-                                          dimensions=('lat', 'lon'))
-        dataset.createVariable('/lat', data.dtype, dimensions=('lat', 'lon'))
-        dataset.createVariable('/lon', data.dtype, dimensions=('lat', 'lon'))
-
-        test_args = [['comma-space', ['/lon', '/lat']],
-                     ['reverse order', ['/lat', '/lon']]]
-
-        # should be sorted order
+        dimensions = ('lat', 'lon')
         expected_output = ('/lat', '/lon')
+
+        test_args = [['comma-space', ['/lon, /lat']],
+                     ['reverse order', ['/lat, /lon']]]
 
         for description, coordinates in test_args:
             with self.subTest(description):
-                variable.setncattr('coordinates', coordinates)
-                self.assertEqual(create_coordinates_key(variable),
-                                 expected_output)
+                with Dataset('test.nc', 'w') as dataset:
+                    dataset.createDimension('lat', size=2)
+                    dataset.createDimension('lon', size=4)
 
-        dataset.close()
+                    nc4_variable = dataset.createVariable(
+                        '/group/variable', data.dtype, dimensions=dimensions
+                    )
+                    dataset.createVariable('/lat', data.dtype,
+                                           dimensions=dimensions)
+                    dataset.createVariable('/lon', data.dtype,
+                                           dimensions=dimensions)
+
+                    nc4_variable.setncattr('coordinates', coordinates)
+
+                varinfo = VarInfoFromNetCDF4('test.nc', logger)
+                varinfo_variable = varinfo.get_variable('/group/variable')
+                self.assertEqual(create_coordinates_key(varinfo_variable),
+                                 expected_output)
 
     def test_get_variable_values(self):
         """ Ensure values for a variable are retrieved, respecting the absence

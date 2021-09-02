@@ -1,6 +1,6 @@
 --extra-index-url https://maven.earthdata.nasa.gov/repository/python-repo/simple
 # Packages available only from Maven
-sds-varinfo ~= 1.0.0
+sds-varinfo ~= 1.1.0
 
 # Open source packages available from PyPI:
 harmony-service-lib~=1.0.4
