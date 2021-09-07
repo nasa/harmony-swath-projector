@@ -336,7 +336,8 @@ def get_science_variable_dimensions(input_dataset: Dataset,
     return dimensions
 
 
-def check_coor_valid(var_info: VarInfoFromNetCDF4, variable_name: str, input_dataset: Dataset,
+def check_coor_valid(var_info: VarInfoFromNetCDF4, variable_name: str,
+                     input_dataset: Dataset,
                      single_band_dataset: Dataset) -> bool:
     """ Check if variables listed in the coordinates metadata attributes are
         still valid after reprojection. Invalid coordinate reference cases:
@@ -347,10 +348,8 @@ def check_coor_valid(var_info: VarInfoFromNetCDF4, variable_name: str, input_dat
              dataset does not match the input coordinate array shape.
 
     """
-    coords = var_info.get_variable(variable_name).coordinates
-
-    if coords is None:
-        coords = []
+    coords = var_info.get_variable(variable_name).references.get('coordinates',
+                                                                 [])
 
     all_coordinates_in_single_band = all(
         variable_in_dataset(coord, single_band_dataset) for coord in coords

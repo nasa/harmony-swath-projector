@@ -18,7 +18,7 @@ def create_coordinates_key(variable: VariableFromNetCDF4) -> Tuple[str]:
         attribute with supplements and overrides, where required.
 
     """
-    return tuple(sorted(list(variable.coordinates)))
+    return tuple(sorted(list(variable.references.get('coordinates'))))
 
 
 def get_variable_values(input_file: Dataset, variable: Variable,
