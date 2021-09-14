@@ -15,12 +15,11 @@ FROM continuumio/miniconda3
 WORKDIR "/home"
 
 # Copy requirements files
-COPY conda_requirements.txt .
 COPY pip_requirements.txt .
 COPY test/pip_test_requirements.txt .
 
 # Create Conda environment
-RUN conda create -y --name swotrepr --file conda_requirements.txt python=3.7 -q \
+RUN conda create -y --name swotrepr python=3.7 -q \
 	--channel conda-forge \
 	--channel defaults
 

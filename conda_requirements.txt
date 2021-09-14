@@ -1,5 +1,0 @@
-pyresample==1.20.0
-
-# These are unspecified requirements of pyresample
-dask==2.30.0
-zarr==2.5.0

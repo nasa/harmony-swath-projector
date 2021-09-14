@@ -61,7 +61,7 @@ First ensure you are in a conda environment, with the conda and Pip dependencies
 installed, as specified in their requirements files.
 
 ```
-conda create --name=swotrepr-local --file conda_requirements.txt python=3.7 --channel conda-forge --channel defaults
+conda create --name=swotrepr python=3.7 --channel conda-forge --channel defaults
 conda activate swotrepr-local
 pip install -r pip_requirements.txt
 ```
@@ -140,8 +140,6 @@ that are run for CI/CD. If you add a new Python package to be used within
 SwotRepr (or remove a third party package), the change in dependencies will need
 to be recorded in the relevant requirements file:
 
-* `swotrepr/conda_requirements.txt`: Requirements needed for SwotRepr to run,
-	obtained from the `conda-forge` channel.
 * `swotrepr/pip_requirements.txt`: Additional requirements installed within
 	the container's conda environment via Pip. These are also required for the
 	source code of SwotRepr to run.

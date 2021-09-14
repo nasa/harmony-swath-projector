@@ -16,12 +16,10 @@ FROM continuumio/miniconda3
 WORKDIR "/home"
 
 # Add dependencies
-COPY conda_requirements.txt .
 COPY pip_requirements.txt .
 
 # Create Conda environment
-RUN conda create -y --name swotrepr --file conda_requirements.txt python=3.7 -q \
-	--channel conda-forge \
+RUN conda create -y --name swotrepr python=3.7 -q --channel conda-forge \
 	--channel defaults && conda clean --all --quiet --yes
 
 # Install additional Pip dependencies
