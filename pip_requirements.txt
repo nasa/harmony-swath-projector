@@ -3,10 +3,10 @@
 sds-varinfo ~= 1.1.0
 
 # Open source packages available from PyPI:
-harmony-service-lib~=1.0.4
+harmony-service-lib~=1.0.12
 netCDF4 ~= 1.5.4
 pyproj ~= 3.0.0
-pyresample ~= 1.20.0
+pyresample ~= 1.21.1
 pystac ~= 0.5.3
 
 # These are `extras_require` requirements of pyresample
