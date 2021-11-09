@@ -10,5 +10,5 @@ pyresample ~= 1.21.1
 pystac ~= 0.5.3
 
 # These are `extras_require` requirements of pyresample
-dask ~= 2.30.0
+dask ~= 2021.11.1
 zarr ~= 2.5.0
