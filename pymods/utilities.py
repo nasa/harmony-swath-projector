@@ -58,8 +58,8 @@ def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
     """
     for coordinate in coordinates_tuple:
         if (
-                coordinate_substring in coordinate.split('/')[-1] and
-                variable_in_dataset(coordinate, dataset)
+                coordinate_substring in coordinate.split('/')[-1]
+                and variable_in_dataset(coordinate, dataset)
         ):
             return dataset[coordinate]
     raise MissingCoordinatesError(coordinates_tuple)

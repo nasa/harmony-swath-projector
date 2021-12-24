@@ -1,4 +1,4 @@
-## Data Services Reprojection Service for SWOT Swath Data
+## Data Services Swath Projector
 
 To download source code:
 
@@ -13,10 +13,27 @@ cd swotrepr
 ./bin/build-image
 ```
 
-### To run the service locally in Docker:
+### Directory contents:
 
-SwotRepr can either be run within its Docker container, or purely by invoking
-the Python module `swotrepr.py`.
+* bin - A directory containing scripts to build and run Docker images. This
+  includes the service and test Docker images.
+* doc - A directory containing documentations, primarily in Jupyter notebooks.
+* docker - A directory containing the service and test Dockerfiles.
+* pip_requirements.txt - A file containing third party packages to be installed
+  via Pip.
+* pymods - A directory containing most of the source code for the service.
+* swotrepr.py - The main entrypoint for the Swath Projectory service.
+* test - A directory containing a Python unit-test suite.
+
+### Running the Swath Projector:
+
+The Swath Projector can either be run:
+
+* Via Harmony locally (preferred).
+* Within its Docker container.
+* Purely by invoking the Python module `swotrepr.py`.
+
+#### Running the service locally via Docker:
 
 A minimal example of running within the Docker container, specifying a granule
 in the local file system:
@@ -89,7 +106,7 @@ environment as a locally running instance of Harmony.
 
 ### Message schema:
 
-The SWOT Reprojection tool can specify several options for reprojection in the
+The Swath Projector can specify several options for reprojection in the
 `format` property of the Harmony message:
 
 ```
@@ -149,8 +166,8 @@ to be recorded in the relevant requirements file:
 
 ### Running tests:
 
-SwotRepr has Python tests that use the `unittest` package. These can be run
-within a Docker container using the following two scripts:
+The Swath Projector has Python tests that use the `unittest` package. These can
+be run within a Docker container using the following two scripts:
 
 ```bash
 # Build a Docker image with all test files and dependencies
@@ -179,3 +196,21 @@ the local development environment and the environment in which the SWOT
 Reprojection tool will actually run. Additionally, the Docker container
 invocation will provide pylint checking, to ensure linting errors have not been
 added during development.
+
+### Versioning
+
+As a Harmony service, the Swath Projector is meant to follow semantic version
+numbers (e.g., `major.minor.patch`). This version is included in the
+`docker/service_version.txt` file. When updating the Swath Projector, the
+version number contained in that file should be incremented before creating a
+pull request.
+
+The general rules for which version number to increment are:
+
+* Major: When API changes are made to the service that are not backwards
+  compatible.
+* Minor: When functionality is added in a backwards compatible way.
+* Patch: Used for backwards compatible bug fixes or performance improvements.
+
+When the Docker image is built, it will be tagged with the semantic version
+number as stored in `docker/service_version.txt`.

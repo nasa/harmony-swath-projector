@@ -13,4 +13,4 @@ fi
 
 # Build the image
 #
-docker build -t ${image}:${tag} -f test/Dockerfile .
+docker build -t ${image}:${tag} -f docker/tests.Dockerfile .

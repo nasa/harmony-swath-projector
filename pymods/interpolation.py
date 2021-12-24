@@ -366,8 +366,8 @@ def get_reprojection_cache(parameters: Dict) -> Dict:
     resolutions = get_parameters_tuple(parameters, ['xres', 'yres'])
     projection_string = parameters['projection'].definition_string()
 
-    if grid_extents is not None and (dimensions is not None or
-                                     resolutions is not None):
+    if grid_extents is not None and (dimensions is not None
+                                     or resolutions is not None):
         x_range = grid_extents[2] - grid_extents[0]
         y_range = grid_extents[1] - grid_extents[3]
 

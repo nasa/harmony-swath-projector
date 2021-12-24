@@ -32,21 +32,4 @@ if [ "$RESULT" -ne "0" ]; then
     echo "ERROR: pylint generated errors"
 fi
 
-
-
-# Run the python safety check
-#
-# CVE issue ID 39462 is an open issue against all tornado versions (>=6.1);
-# it relates to web cache poisoning. Snyk lists it as a medium vulnerability.
-# There is no remediation at this point (2021-02-05).
-#
-safety check --ignore=39462
-RESULT=$?
-if [ "$RESULT" -ne "0" ]; then
-    STATUS=1
-    echo "ERROR: safety check generated errors"
-fi
-
-
-
 exit $STATUS

@@ -100,8 +100,8 @@ def get_parameters_from_message(message: Message, granule_url: str,
 
     # ERROR 5: -tr and -ts options cannot be used at the same time.
     if (
-            (parameters['xres'] is not None or parameters['yres'] is not None) and
-            (parameters['height'] is not None or parameters['width'] is not None)
+            (parameters['xres'] is not None or parameters['yres'] is not None)
+            and (parameters['height'] is not None or parameters['width'] is not None)
     ):
         raise Exception('"scaleSize", "width" or/and "height" cannot '
                         'be used at the same time in the message.')

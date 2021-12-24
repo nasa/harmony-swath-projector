@@ -33,4 +33,4 @@ ENV _CE_CONDA='' \
     SHLVL=1
 
 # Configure a container to be executable via the `docker run` command.
-ENTRYPOINT ["/home/test/run"]
+ENTRYPOINT ["/home/test/run_tests.sh"]
