@@ -67,8 +67,8 @@ def create_output(request_parameters: dict, output_file: str, temp_dir: str,
                     # the grid mapping, reprojected x and reprojected y.
                     for variable_key in data.variables:
                         if (
-                                variable_key not in output_dataset.variables and
-                                variable_key != variable_name
+                                variable_key not in output_dataset.variables
+                                and variable_key != variable_name
                         ):
                             copy_metadata_variable(data, output_dataset,
                                                    variable_key, logger)
@@ -311,9 +311,9 @@ def get_science_variable_attributes(input_dataset: Dataset,
     variable_attributes['grid_mapping'] = grid_mapping
 
     if (
-            'coordinates' in variable_attributes and
-            not check_coor_valid(var_info, variable_name,
-                                 input_dataset, single_band_dataset)
+            'coordinates' in variable_attributes
+            and not check_coor_valid(var_info, variable_name,
+                                     input_dataset, single_band_dataset)
     ):
         del variable_attributes['coordinates']
 
