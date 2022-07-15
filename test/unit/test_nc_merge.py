@@ -6,7 +6,6 @@ import os
 
 from netCDF4 import Dataset
 from varinfo import VarInfoFromNetCDF4
-import numpy as np
 
 from pymods.exceptions import MissingReprojectedDataError
 from pymods.nc_merge import (check_coor_valid, create_history_record,

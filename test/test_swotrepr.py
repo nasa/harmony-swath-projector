@@ -414,7 +414,7 @@ class TestSwotReprojectionTool(TestBase):
             'cf_history': [('Tue Nov 12 15:31:14 2019: ncks -v sea_surface_temperature '
                             'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
                             '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc'),
-                            'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT']
+                           'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT']
         }]
 
         self.assertEqual(history, expected_history)
@@ -496,7 +496,7 @@ class TestSwotReprojectionTool(TestBase):
             'cf_history': [('Tue Nov 12 15:31:14 2019: ncks -v sea_surface_temperature '
                             'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
                             '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc'),
-                            'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT']
+                           'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT']
         }]
 
         self.assertEqual(history, expected_history)

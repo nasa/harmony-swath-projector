@@ -9,7 +9,7 @@
 # into the Docker image, before environment variables are set to activate the
 # created conda environment.
 #
-# Updated: 2021-06-24
+# Updated: 2021-07-15 - Change Python version from 3.7 to 3.9
 #
 FROM continuumio/miniconda3
 
@@ -19,7 +19,7 @@ WORKDIR "/home"
 COPY pip_requirements.txt .
 
 # Create Conda environment
-RUN conda create -y --name swotrepr python=3.7 -q --channel conda-forge \
+RUN conda create -y --name swotrepr python=3.9 -q --channel conda-forge \
 	--channel defaults && conda clean --all --quiet --yes
 
 # Install additional Pip dependencies

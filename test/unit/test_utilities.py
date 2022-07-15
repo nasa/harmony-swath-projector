@@ -117,7 +117,6 @@ class TestUtilities(TestBase):
                 self.assertIsInstance(returned_data, np.ndarray)
                 np.testing.assert_array_equal(input_data, returned_data)
 
-
     def test_get_coordinate_variables(self):
         """ Ensure the longitude or latitude coordinate variable, is retrieved
             when requested.
@@ -137,9 +136,11 @@ class TestUtilities(TestBase):
         with self.subTest('Non existent coordinate variable "latitude" returns MissingCoordinatesError'):
             absent_coordinates_tuple = ['latitude']
             with self.assertRaises(MissingCoordinatesError):
-                coordinates = get_coordinate_variable(dataset,
+                coordinates = get_coordinate_variable(
+                    dataset,
                     absent_coordinates_tuple,
-                    absent_coordinates_tuple[0])
+                    absent_coordinates_tuple[0]
+                )
 
     def test_get_variable_numeric_fill_value(self):
         """ Ensure a fill value is retrieved from a variable that has a vaild
