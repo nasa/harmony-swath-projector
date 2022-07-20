@@ -1,7 +1,6 @@
 from random import shuffle
 from shutil import rmtree
 from tempfile import mkdtemp
-from unittest.mock import patch
 from uuid import uuid4
 
 from netCDF4 import Dataset

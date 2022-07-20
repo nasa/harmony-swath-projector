@@ -1,7 +1,6 @@
 from logging import Logger
 
 from harmony.message import Message
-from numpy.testing import assert_array_equal
 from pyproj import Proj
 
 from pymods.reproject import CRS_DEFAULT, get_parameters_from_message, rgetattr

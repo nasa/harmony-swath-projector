@@ -36,14 +36,13 @@ class TestBase(unittest.TestCase):
     def setUp(self):
         description = inspect.getdoc(getattr(self, self._testMethodName)) or self._testMethodName
         hdr = '-' * (len(description) + 6)
-        print("\n%s\nTEST: %s\n%s" % (hdr, description, hdr))
+        print(f'\n{hdr}\nTEST: {description}\n{hdr}')
 
         if not TestBase._log_handler:
             TestBase._log_handler = TestLogHandler()
             logging.basicConfig(handlers=[TestBase._log_handler], level=logging.DEBUG)
 
         TestBase._log_handler.reset()
-
 
     def tearDown(self):
         messages = TestBase._log_handler.get_messages()

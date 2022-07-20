@@ -1,7 +1,7 @@
 #
 # Requirements file for running documentation Jupyter notebook.
 # 1) Create a conda environment:
-#    $ conda create --name=swotrepr-jupyter python=3.8
+#    $ conda create --name=swotrepr-jupyter python=3.8 --channel conda-forge --channel defaults
 # 2) Activate the environment:
 #    $ conda activate swotrepr-jupyter
 # 3) Install these Python packages:
