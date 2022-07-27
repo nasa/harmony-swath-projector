@@ -97,26 +97,28 @@ class TestReproject(TestBase):
 
         for description, has_height, has_width, has_x_res, has_y_res in test_args:
             with self.subTest(description):
-                with self.assertRaises(Exception) as exception:
-                    message_content = {'granules': self.granules}
-                    if has_height:
-                        message_content['height'] = self.height
+                message_content = {'granules': self.granules, 'format': {}}
+                if has_height:
+                    message_content['format']['height'] = self.height
 
-                    if has_width:
-                        message_content['width'] = self.width
+                if has_width:
+                    message_content['format']['width'] = self.width
 
-                    if has_x_res or has_y_res:
-                        message_content['scaleSize'] = {}
-                        if has_x_res:
-                            message_content['scaleSize']['x'] = self.x_res
+                if has_x_res or has_y_res:
+                    message_content['format']['scaleSize'] = {}
+                    if has_x_res:
+                        message_content['format']['scaleSize']['x'] = self.x_res
 
-                        if has_y_res:
-                            message_content['scaleSize']['y'] = self.y_res
+                    if has_y_res:
+                        message_content['format']['scaleSize']['y'] = self.y_res
 
-                    message = Message(message_content)
+                message = Message(message_content)
+
+                with self.assertRaises(Exception) as context:
                     get_parameters_from_message(message, self.granule_url,
-                                                self.granules)
-                    self.assertTrue(exception_snippet in str(exception))
+                                                self.granule)
+
+                self.assertTrue(str(context.exception).endswith(exception_snippet))
 
     def test_get_parameters_missing_extents_or_dimensions(self):
         """ Ensure that an exception is raised if there is only one of either
@@ -132,14 +134,16 @@ class TestReproject(TestBase):
 
         for description, format_content in test_args:
             with self.subTest(description):
-                with self.assertRaises(Exception) as exception:
-                    message_content = {'granules': self.granules,
-                                       'format': format_content}
+                message_content = {'granules': self.granules,
+                                   'format': format_content}
 
-                    message = Message(message_content)
+                message = Message(message_content)
+
+                with self.assertRaises(Exception) as context:
                     get_parameters_from_message(message, self.granule_url,
                                                 self.granule)
-                    self.assertTrue('Missing' in str(exception))
+
+                self.assertTrue('Missing' in str(context.exception))
 
     def test_get_parameters_from_message_defaults(self):
         """ Ensure that if the most minimal Harmony message is supplied to the
