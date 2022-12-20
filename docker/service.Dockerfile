@@ -19,7 +19,7 @@ WORKDIR "/home"
 COPY pip_requirements.txt .
 
 # Create Conda environment
-RUN conda create -y --name swotrepr python=3.9 -q --channel conda-forge \
+RUN conda create -y --name swotrepr python=3.10 -q --channel conda-forge \
 	--channel defaults && conda clean --all --quiet --yes
 
 # Install additional Pip dependencies

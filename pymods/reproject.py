@@ -15,7 +15,7 @@ from pymods.interpolation import resample_all_variables
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
-CF_CONFIG_FILE = 'pymods/cf_config.yml'
+CF_CONFIG_FILE = 'pymods/cf_config.json'
 
 
 def reproject(message: Message, granule_url: str, local_filename: str,
