@@ -37,8 +37,10 @@ def create_output(request_parameters: dict, output_file: str, temp_dir: str,
     input_file = request_parameters.get('input_file')
     logger.info(f'Creating output file "{output_file}"')
 
-    with Dataset(input_file) as input_dataset, \
-         Dataset(output_file, 'w', format='NETCDF4') as output_dataset:
+    with (
+        Dataset(input_file) as input_dataset,
+        Dataset(output_file, 'w', format='NETCDF4') as output_dataset
+    ):
 
         logger.info('Copying input file attributes to output file.')
         set_output_attributes(input_dataset, output_dataset, request_parameters)

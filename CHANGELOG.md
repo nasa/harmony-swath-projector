@@ -1,3 +1,11 @@
+## v0.0.3
+### 2022-12-20
+
+This version of the Swath Projector updates the `sds-varinfo` dependency to
+v3.0.0. The major difference in this upgrade is the adoption of a JSON
+formatted configuration file, in place of the previous YAML format. In addition,
+the version of Python used in the service Docker images has been updated to 3.10.
+
 ## v0.0.2
 ### 2022-07-11
 
