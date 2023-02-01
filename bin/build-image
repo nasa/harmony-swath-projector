@@ -8,12 +8,9 @@ image="sds/swot-reproject"
 #
 tag=${1:-latest}
 
-# Look for old version of image and remove
+# Remove old versions of sds/swot-reproject and sds/swot-reproject-test
 #
-old=$(docker images | grep "$image" | grep "$tag" | awk '{print $3}')
-if [ ! -z "$old" ]; then
-    docker rmi "$old"
-fi
+./bin/clean-images
 
 # Build the image
 # This command tags the image with two tags:
