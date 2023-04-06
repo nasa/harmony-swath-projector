@@ -1,7 +1,7 @@
 #
 # Requirements file for running documentation Jupyter notebook.
 # 1) Create a conda environment:
-#    $ conda create --name=swotrepr-jupyter python=3.8 --channel conda-forge --channel defaults
+#    $ conda create --name=swotrepr-jupyter python=3.10 --channel conda-forge --channel defaults
 # 2) Activate the environment:
 #    $ conda activate swotrepr-jupyter
 # 3) Install these Python packages:
@@ -10,7 +10,7 @@
 #    $ jupyter notebook.
 # 5) Click on the Swath Projector User Guide notebook.
 #
-harmony-py ~= 0.1.2
-jupyter ~= 1.0.0
-matplotlib ~= 3.4
-netCDF4 ~= 1.5.7
+harmony-py ~= 0.4.6
+matplotlib ~= 3.7.1
+netCDF4 ~= 1.6.3
+notebook ~= 6.5.3
