@@ -20,12 +20,10 @@ class TestUtilities(TestBase):
     def test_create_coordinates_key(self):
         """ Extract the coordinates from a `VariableFromNetCDF4` instance and
             return an alphabetically sorted tuple. The ordering prevents any
-            shuffling due to sds-varinfo storing CF-Convention attribute
+            shuffling due to earthdata-varinfo storing CF-Convention attribute
             references as a Python Set.
 
         """
-        logger = getLogger('test')
-
         data = np.ones((2, 4))
         dimensions = ('lat', 'lon')
         expected_output = ('/lat', '/lon')
@@ -49,7 +47,7 @@ class TestUtilities(TestBase):
 
                     nc4_variable.setncattr('coordinates', coordinates)
 
-                varinfo = VarInfoFromNetCDF4('test.nc', logger)
+                varinfo = VarInfoFromNetCDF4('test.nc')
                 varinfo_variable = varinfo.get_variable('/group/variable')
                 self.assertEqual(create_coordinates_key(varinfo_variable),
                                  expected_output)
@@ -153,18 +151,17 @@ class TestUtilities(TestBase):
         """
         variable = Mock(spec=Variable)
 
-        test_args = [['np.float', np.float, 4.0, 4.0],
-                     ['np.float128', np.float128, 4.0, 4.0],
+        test_args = [['np.float128', np.float128, 4.0, 4.0],
                      ['np.float16', np.float16, 4.0, 4.0],
                      ['np.float32', np.float32, 4.0, 4.0],
                      ['np.float64', np.float64, 4.0, 4.0],
                      ['np.float_', np.float_, 4.0, 4.0],
-                     ['np.int', np.int, 5, 5],
-                     ['np.int0', np.int, 5, 5],
-                     ['np.int16', np.int, 5, 5],
-                     ['np.int32', np.int, 5, 5],
-                     ['np.int64', np.int, 5, 5],
-                     ['np.int8', np.int, 5, 5],
+                     ['int', int, 5, 5],
+                     ['np.int0', np.int0, 5, 5],
+                     ['np.int16', np.int16, 5, 5],
+                     ['np.int32', np.int32, 5, 5],
+                     ['np.int64', np.int64, 5, 5],
+                     ['np.int8', np.int8, 5, 5],
                      ['np.uint', np.uint, 5, 5],
                      ['np.uint0', np.uint0, 5, 5],
                      ['np.uint16', np.uint16, 5, 5],
@@ -173,7 +170,7 @@ class TestUtilities(TestBase):
                      ['np.uint8', np.uint8, 5, 5],
                      ['np.uintc', np.uintc, 5, 5],
                      ['np.uintp', np.uintp, 5, 5],
-                     ['np.long', np.long, 5, 5],
+                     ['np.longlong', np.longlong, 5, 5],
                      ['float', float, 4.0, 4.0],
                      ['int', int, 5, 5],
                      ['str', str, '1235', None]]

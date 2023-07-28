@@ -34,7 +34,8 @@ class TestNCMerge(TestBase):
 
         cls.metadata_variables = set()
         cls.var_info = VarInfoFromNetCDF4(cls.properties['input_file'],
-                                          cls.logger, CF_CONFIG_FILE)
+                                          short_name='VIIRS_NPP-NAVO-L2P-v3.0',
+                                          config_file=CF_CONFIG_FILE)
         create_output(cls.properties, cls.output_file, cls.tmp_dir,
                       cls.science_variables, cls.metadata_variables,
                       cls.logger, cls.var_info)

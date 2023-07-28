@@ -18,8 +18,9 @@ INTERPOLATION_DEFAULT = 'ewa-nn'
 CF_CONFIG_FILE = 'pymods/cf_config.json'
 
 
-def reproject(message: Message, granule_url: str, local_filename: str,
-              temp_dir: str, logger: logging.Logger) -> str:
+def reproject(message: Message, collection_short_name: str, granule_url: str,
+              local_filename: str, temp_dir: str,
+              logger: logging.Logger) -> str:
     """ Derive reprojection parameters from the input Harmony message. Then
         extract listing of science variables and coordinate variables from the
         source granule. Then reproject all science variables. Finally merge all
@@ -38,8 +39,9 @@ def reproject(message: Message, granule_url: str, local_filename: str,
                 f'Interpolation: {parameters.get("interpolation")}')
 
     try:
-        var_info = VarInfoFromNetCDF4(parameters['input_file'], logger,
-                                      CF_CONFIG_FILE)
+        var_info = VarInfoFromNetCDF4(parameters['input_file'],
+                                      short_name=collection_short_name,
+                                      config_file=CF_CONFIG_FILE)
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
         raise Exception('Unable to parse input file variables') from err

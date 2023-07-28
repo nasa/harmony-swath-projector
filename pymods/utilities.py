@@ -83,7 +83,7 @@ def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
         fill_value = None
 
     if not isinstance(fill_value,
-                      (np.integer, np.long, np.floating, int, float)):
+                      (np.integer, np.longlong, np.floating, int, float)):
         fill_value = None
 
     if fill_value is not None:

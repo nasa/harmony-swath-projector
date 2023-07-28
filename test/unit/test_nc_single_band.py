@@ -40,6 +40,7 @@ class TestNCSingleBand(TestBase):
             'geographic_crs_name': 'unknown',
             'grid_mapping_name': 'latitude_longitude',
             'towgs84': (0, 0, 0.0, 0.0),
+            'horizontal_datum_name': 'World Geodetic System 1984',
         }
         cls.non_geographic_area = AreaDefinition.from_extent(
             'cea', '+proj=cea', (2, 4),

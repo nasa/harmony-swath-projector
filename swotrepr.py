@@ -73,8 +73,9 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
             logger.info('Granule data copied')
 
             # Call Reprojection utility
-            working_filename = reproject(self.message, granule_url,
-                                         input_filename, workdir, logger)
+            working_filename = reproject(self.message, source.shortName,
+                                         granule_url, input_filename, workdir,
+                                         logger)
 
             # Stage the output file with a conventional filename
             output_filename = generate_output_filename(asset.href, is_regridded=True)

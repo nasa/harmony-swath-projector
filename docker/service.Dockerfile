@@ -10,6 +10,7 @@
 # created conda environment.
 #
 # Updated: 2021-07-15 - Change Python version from 3.7 to 3.9
+# Updated: 2023-07-20 - Update Python version to 3.11.
 #
 FROM continuumio/miniconda3
 
@@ -19,7 +20,7 @@ WORKDIR "/home"
 COPY pip_requirements.txt .
 
 # Create Conda environment
-RUN conda create -y --name swotrepr python=3.10 -q --channel conda-forge \
+RUN conda create -y --name swotrepr python=3.11 -q --channel conda-forge \
 	--channel defaults && conda clean --all --quiet --yes
 
 # Install additional Pip dependencies

@@ -43,10 +43,10 @@ class TestSwotReprGeometry(TestBase):
         cls.test_file = Dataset(cls.test_path, 'w')
         cls.test_file.createDimension('nj', size=3)
         cls.test_file.createDimension('ni', size=4)
-        cls.test_file.createVariable('lat', np.float, dimensions=('nj', 'ni'))
-        cls.test_file.createVariable('lon', np.float, dimensions=('nj', 'ni'))
-        cls.test_file.createVariable('lat_1d', np.float, dimensions=('ni',))
-        cls.test_file.createVariable('lon_1d', np.float, dimensions=('ni',))
+        cls.test_file.createVariable('lat', float, dimensions=('nj', 'ni'))
+        cls.test_file.createVariable('lon', float, dimensions=('nj', 'ni'))
+        cls.test_file.createVariable('lat_1d', float, dimensions=('ni',))
+        cls.test_file.createVariable('lon_1d', float, dimensions=('ni',))
         cls.test_file['lat'][:] = cls.lat_data
         cls.test_file['lon'][:] = cls.lon_data
         cls.test_file['lat_1d'][:] = np.array([0.0, 3.0, 6.0, 9.0])
@@ -286,9 +286,9 @@ class TestSwotReprGeometry(TestBase):
                 test_file = Dataset(test_path, 'w')
                 test_file.createDimension('nj', size=2)
                 test_file.createDimension('ni', size=2)
-                test_file.createVariable('lat', np.float, dimensions=('nj', 'ni'),
+                test_file.createVariable('lat', float, dimensions=('nj', 'ni'),
                                          fill_value=fill_value)
-                test_file.createVariable('lon', np.float, dimensions=('nj', 'ni'),
+                test_file.createVariable('lon', float, dimensions=('nj', 'ni'),
                                          fill_value=fill_value)
                 test_file['lat'][:] = lat_data
                 test_file['lon'][:] = lon_data

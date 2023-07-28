@@ -1,11 +1,8 @@
---extra-index-url https://maven.earthdata.nasa.gov/repository/python-repo/simple
-# Packages available only from Maven
-sds-varinfo ~= 3.0.0
-
 # Open source packages available from PyPI:
-harmony-service-lib~=1.0.20
-netCDF4 ~= 1.5.8
-numpy ~= 1.22.4
-pyproj ~= 3.3.1
-pyresample ~= 1.24.1
+earthdata-varinfo ~= 1.0.0
+harmony-service-lib~=1.0.22
+netCDF4 ~= 1.6.4
+numpy ~= 1.24.2
+pyproj ~= 3.6.0
+pyresample ~= 1.27.1
 pystac ~= 0.5.6

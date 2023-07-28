@@ -44,8 +44,9 @@ class TestInterpolation(TestBase):
         }
         self.temp_directory = '/tmp/01234'
         self.logger = Logger('test')
-        self.var_info = VarInfoFromNetCDF4(self.message_parameters['input_file'], self.logger,
-                                           CF_CONFIG_FILE)
+        self.var_info = VarInfoFromNetCDF4(self.message_parameters['input_file'],
+                                           short_name='harmony_example_l2',
+                                           config_file=CF_CONFIG_FILE)
         self.mock_target_area = MagicMock(spec=AreaDefinition,
                                           shape='ta_shape',
                                           area_id='/lon, /lat')

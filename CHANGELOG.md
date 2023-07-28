@@ -1,3 +1,11 @@
+## v0.0.4
+### 2023-07-20
+
+This version of the Swath Projector updates dependencies used by the service,
+including converting to the use of `earthdata-varinfo` in place of
+`sds-varinfo`. The Python version of the conda environment is also updated to
+Python 3.11.
+
 ## v0.0.3
 ### 2022-12-20
 
