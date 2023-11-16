@@ -1,4 +1,5 @@
 from logging import Logger
+from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from netCDF4 import Dataset, Variable
@@ -7,28 +8,35 @@ from pyresample.geometry import AreaDefinition
 import numpy as np
 from varinfo import VarInfoFromNetCDF4
 
-from pymods.interpolation import (check_for_valid_interpolation, EPSILON,
-                                  get_bilinear_information,
-                                  get_bilinear_results, get_ewa_information,
-                                  get_ewa_results, get_near_information,
-                                  get_near_results, get_parameters_tuple,
-                                  get_reprojection_cache,
-                                  get_swath_definition, get_target_area,
-                                  resample_all_variables, resample_variable,
-                                  RADIUS_OF_INFLUENCE)
-from pymods.nc_single_band import HARMONY_TARGET
-from pymods.reproject import CF_CONFIG_FILE
-from test.test_utils import TestBase
+from swath_projector.interpolation import (
+    check_for_valid_interpolation,
+    EPSILON,
+    get_bilinear_information,
+    get_bilinear_results,
+    get_ewa_information,
+    get_ewa_results,
+    get_near_information,
+    get_near_results,
+    get_parameters_tuple,
+    get_reprojection_cache,
+    get_swath_definition,
+    get_target_area,
+    resample_all_variables,
+    resample_variable,
+    RADIUS_OF_INFLUENCE
+)
+from swath_projector.nc_single_band import HARMONY_TARGET
+from swath_projector.reproject import CF_CONFIG_FILE
 
 
-class TestInterpolation(TestBase):
+class TestInterpolation(TestCase):
 
     def setUp(self):
         self.science_variables = ('/red_var', '/green_var', '/blue_var',
                                   '/alpha_var')
         self.message_parameters = {
             'crs': '+proj=longlat',
-            'input_file': 'test/data/africa.nc',
+            'input_file': 'tests/data/africa.nc',
             'interpolation': 'bilinear',
             'projection': Proj('+proj=longlat'),
             'height': None,
@@ -65,7 +73,7 @@ class TestInterpolation(TestBase):
             self.assertEqual(getattr(area_one, attribute),
                              getattr(area_two, attribute), attribute)
 
-    @patch('pymods.interpolation.resample_variable')
+    @patch('swath_projector.interpolation.resample_variable')
     def test_resample_all_variables(self, mock_resample_variable):
         """ Ensure resample_variable is called for each non-coordinate
             variable, and those variables are all included in the list of
@@ -97,7 +105,7 @@ class TestInterpolation(TestBase):
                                                    variable_output_path,
                                                    self.logger, self.var_info)
 
-    @patch('pymods.interpolation.resample_variable')
+    @patch('swath_projector.interpolation.resample_variable')
     def test_resample_single_exception(self, mock_resample_variable):
         """ Ensure that if a single variable fails reprojection, the remaining
             variables will still be reprojected.
@@ -128,12 +136,12 @@ class TestInterpolation(TestBase):
                                                    variable_output_path,
                                                    self.logger, self.var_info)
 
-    @patch('pymods.interpolation.write_single_band_output')
-    @patch('pymods.interpolation.get_swath_definition')
-    @patch('pymods.interpolation.get_target_area')
-    @patch('pymods.interpolation.get_variable_values')
-    @patch('pymods.interpolation.get_sample_from_bil_info')
-    @patch('pymods.interpolation.get_bil_info')
+    @patch('swath_projector.interpolation.write_single_band_output')
+    @patch('swath_projector.interpolation.get_swath_definition')
+    @patch('swath_projector.interpolation.get_target_area')
+    @patch('swath_projector.interpolation.get_variable_values')
+    @patch('swath_projector.interpolation.get_sample_from_bil_info')
+    @patch('swath_projector.interpolation.get_bil_info')
     def test_resample_bilinear(self, mock_get_bil_info, mock_get_sample,
                                mock_get_values, mock_get_target_area,
                                mock_get_swath, mock_write_output):
@@ -274,12 +282,12 @@ class TestInterpolation(TestBase):
                                                       {})
             mock_get_target_area.assert_not_called()
 
-    @patch('pymods.interpolation.write_single_band_output')
-    @patch('pymods.interpolation.get_swath_definition')
-    @patch('pymods.interpolation.get_target_area')
-    @patch('pymods.interpolation.get_variable_values')
-    @patch('pymods.interpolation.fornav')
-    @patch('pymods.interpolation.ll2cr')
+    @patch('swath_projector.interpolation.write_single_band_output')
+    @patch('swath_projector.interpolation.get_swath_definition')
+    @patch('swath_projector.interpolation.get_target_area')
+    @patch('swath_projector.interpolation.get_variable_values')
+    @patch('swath_projector.interpolation.fornav')
+    @patch('swath_projector.interpolation.ll2cr')
     def test_resample_ewa(self, mock_ll2cr, mock_fornav, mock_get_values,
                           mock_get_target_area, mock_get_swath,
                           mock_write_output):
@@ -351,12 +359,12 @@ class TestInterpolation(TestBase):
                                                       ewa_information,
                                                       {})
 
-    @patch('pymods.interpolation.write_single_band_output')
-    @patch('pymods.interpolation.get_swath_definition')
-    @patch('pymods.interpolation.get_target_area')
-    @patch('pymods.interpolation.get_variable_values')
-    @patch('pymods.interpolation.fornav')
-    @patch('pymods.interpolation.ll2cr')
+    @patch('swath_projector.interpolation.write_single_band_output')
+    @patch('swath_projector.interpolation.get_swath_definition')
+    @patch('swath_projector.interpolation.get_target_area')
+    @patch('swath_projector.interpolation.get_variable_values')
+    @patch('swath_projector.interpolation.fornav')
+    @patch('swath_projector.interpolation.ll2cr')
     def test_resample_ewa_nn(self, mock_ll2cr, mock_fornav, mock_get_values,
                              mock_get_target_area, mock_get_swath,
                              mock_write_output):
@@ -467,12 +475,12 @@ class TestInterpolation(TestBase):
                                                       {})
             mock_get_target_area.assert_not_called()
 
-    @patch('pymods.interpolation.write_single_band_output')
-    @patch('pymods.interpolation.get_swath_definition')
-    @patch('pymods.interpolation.get_target_area')
-    @patch('pymods.interpolation.get_variable_values')
-    @patch('pymods.interpolation.get_sample_from_neighbour_info')
-    @patch('pymods.interpolation.get_neighbour_info')
+    @patch('swath_projector.interpolation.write_single_band_output')
+    @patch('swath_projector.interpolation.get_swath_definition')
+    @patch('swath_projector.interpolation.get_target_area')
+    @patch('swath_projector.interpolation.get_variable_values')
+    @patch('swath_projector.interpolation.get_sample_from_neighbour_info')
+    @patch('swath_projector.interpolation.get_neighbour_info')
     def test_resample_nearest(self, mock_get_info, mock_get_sample,
                               mock_get_values, mock_get_target_area,
                               mock_get_swath, mock_write_output):
@@ -613,12 +621,12 @@ class TestInterpolation(TestBase):
                                                       expected_cache,
                                                       {})
 
-    @patch('pymods.interpolation.write_single_band_output')
-    @patch('pymods.interpolation.get_swath_definition')
-    @patch('pymods.interpolation.get_target_area')
-    @patch('pymods.interpolation.get_variable_values')
-    @patch('pymods.interpolation.get_sample_from_neighbour_info')
-    @patch('pymods.interpolation.get_neighbour_info')
+    @patch('swath_projector.interpolation.write_single_band_output')
+    @patch('swath_projector.interpolation.get_swath_definition')
+    @patch('swath_projector.interpolation.get_target_area')
+    @patch('swath_projector.interpolation.get_variable_values')
+    @patch('swath_projector.interpolation.get_sample_from_neighbour_info')
+    @patch('swath_projector.interpolation.get_neighbour_info')
     def test_resample_scaled_variable(self, mock_get_info, mock_get_sample,
                                       mock_get_values, mock_get_target_area,
                                       mock_get_swath, mock_write_output):
@@ -695,7 +703,7 @@ class TestInterpolation(TestBase):
             values should be correctly stored in the swath definition.
 
         """
-        dataset = Dataset('test/data/africa.nc')
+        dataset = Dataset('tests/data/africa.nc')
         longitudes = dataset['/lon']
         latitudes = dataset['/lat']
         coordinates = ('/lat', '/lon')
@@ -868,9 +876,9 @@ class TestInterpolation(TestBase):
 
         self.assertDictEqual(get_reprojection_cache(message_parameters), {})
 
-    @patch('pymods.interpolation.get_projected_resolution')
-    @patch('pymods.interpolation.get_extents_from_perimeter')
-    @patch('pymods.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_projected_resolution')
+    @patch('swath_projector.interpolation.get_extents_from_perimeter')
+    @patch('swath_projector.interpolation.get_coordinate_variable')
     def test_get_target_area_minimal(self, mock_get_coordinates,
                                      mock_get_extents, mock_get_resolution):
         """ If the Harmony message does not define a target area, then that
@@ -917,9 +925,9 @@ class TestInterpolation(TestBase):
 
         self.assert_areadefinitions_equal(target_area, expected_target_area)
 
-    @patch('pymods.interpolation.get_projected_resolution')
-    @patch('pymods.interpolation.get_extents_from_perimeter')
-    @patch('pymods.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_projected_resolution')
+    @patch('swath_projector.interpolation.get_extents_from_perimeter')
+    @patch('swath_projector.interpolation.get_coordinate_variable')
     def test_get_target_area_extents(self, mock_get_coordinates,
                                      mock_get_extents, mock_get_resolution):
         """ If the Harmony message defines the target area extents, these
@@ -965,9 +973,9 @@ class TestInterpolation(TestBase):
 
         self.assert_areadefinitions_equal(target_area, expected_target_area)
 
-    @patch('pymods.interpolation.get_projected_resolution')
-    @patch('pymods.interpolation.get_extents_from_perimeter')
-    @patch('pymods.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_projected_resolution')
+    @patch('swath_projector.interpolation.get_extents_from_perimeter')
+    @patch('swath_projector.interpolation.get_coordinate_variable')
     def test_get_target_area_extents_resolutions(self, mock_get_coordinates,
                                                  mock_get_extents,
                                                  mock_get_resolution):
@@ -1016,9 +1024,9 @@ class TestInterpolation(TestBase):
 
         self.assert_areadefinitions_equal(target_area, expected_target_area)
 
-    @patch('pymods.interpolation.get_projected_resolution')
-    @patch('pymods.interpolation.get_extents_from_perimeter')
-    @patch('pymods.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_projected_resolution')
+    @patch('swath_projector.interpolation.get_extents_from_perimeter')
+    @patch('swath_projector.interpolation.get_coordinate_variable')
     def test_get_target_area_extents_dimensions(self, mock_get_coordinates,
                                                 mock_get_extents,
                                                 mock_get_resolution):
@@ -1066,9 +1074,9 @@ class TestInterpolation(TestBase):
 
         self.assert_areadefinitions_equal(target_area, expected_target_area)
 
-    @patch('pymods.interpolation.get_projected_resolution')
-    @patch('pymods.interpolation.get_extents_from_perimeter')
-    @patch('pymods.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_projected_resolution')
+    @patch('swath_projector.interpolation.get_extents_from_perimeter')
+    @patch('swath_projector.interpolation.get_coordinate_variable')
     def test_get_target_area_dimensions(self, mock_get_coordinates,
                                         mock_get_extents, mock_get_resolution):
         """ If the Harmony message defines the target area dimensions, then
@@ -1111,9 +1119,9 @@ class TestInterpolation(TestBase):
 
         self.assert_areadefinitions_equal(target_area, expected_target_area)
 
-    @patch('pymods.interpolation.get_projected_resolution')
-    @patch('pymods.interpolation.get_extents_from_perimeter')
-    @patch('pymods.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_projected_resolution')
+    @patch('swath_projector.interpolation.get_extents_from_perimeter')
+    @patch('swath_projector.interpolation.get_coordinate_variable')
     def test_get_target_area_resolutions(self, mock_get_coordinates,
                                          mock_get_extents,
                                          mock_get_resolution):

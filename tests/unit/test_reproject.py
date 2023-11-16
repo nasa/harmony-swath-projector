@@ -1,19 +1,23 @@
 from logging import Logger
+from unittest import TestCase
 
 from harmony.message import Message
 from pyproj import Proj
 
-from pymods.reproject import CRS_DEFAULT, get_parameters_from_message, rgetattr
-from test.test_utils import TestBase
+from swath_projector.reproject import (
+    CRS_DEFAULT,
+    get_parameters_from_message,
+    rgetattr
+)
 
 
-class TestReproject(TestBase):
+class TestReproject(TestCase):
 
     @classmethod
     def setUpClass(cls):
         """ Class properties that only need to be set once. """
         cls.logger = Logger('Reproject test')
-        cls.granule = 'test/data/africa.nc'
+        cls.granule = 'tests/data/africa.nc'
         cls.granule_url = 'https://example.com/africa.nc'
         cls.granules = [{'local_filename': cls.granule}]
         cls.default_interpolation = 'ewa-nn'

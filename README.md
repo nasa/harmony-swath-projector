@@ -1,15 +1,15 @@
-## Data Services Swath Projector
+# Data Services Swath Projector
 
 To download source code:
 
 ```bash
-git clone https://git.earthdata.nasa.gov/scm/sitc/swotrepr.git swotrepr
+git clone https://github.com/nasa/harmony-swath-projector
 ```
 
 To build the Docker image:
 
 ```bash
-cd swotrepr
+cd harmony-swath-projector
 ./bin/build-image
 ```
 
@@ -17,60 +17,18 @@ cd swotrepr
 
 * bin - A directory containing scripts to build and run Docker images. This
   includes the service and test Docker images.
-* doc - A directory containing documentations, primarily in Jupyter notebooks.
+* docs - A directory containing documentations, primarily in Jupyter notebooks.
 * docker - A directory containing the service and test Dockerfiles.
 * pip_requirements.txt - A file containing third party packages to be installed
   via Pip.
-* pymods - A directory containing most of the source code for the service.
-* swotrepr.py - The main entrypoint for the Swath Projectory service.
-* test - A directory containing a Python unit-test suite.
+* swath_projector - A directory containing the source code for the service.
+* tests - A directory containing a Python unit-test suite.
 
 ### Running the Swath Projector:
 
-The Swath Projector can either be run:
-
-* Via Harmony locally (preferred).
-* Within its Docker container.
-* Purely by invoking the Python module `swotrepr.py`.
-
-#### Running the service locally via Docker:
-
-A minimal example of running within the Docker container, specifying a granule
-in the local file system:
-
-```
-./bin/build-image
-./bin/run-image --harmony-action 'invoke' --harmony-input '{"sources": [{"granules": [{"url": "test/data/africa.nc"}]}], "user": "usr_user", "callback": ""}'
-```
-Note, this will require a `.env` file within the root level of this directory.
-If authentication for granule download is to be done via Earthdata Login (EDL)
-credentials, the file should contain:
-
-```
-EDL_USERNAME=narmstrong
-EDL_PASSWORD=4p0ll0_11
-ENV=test
-```
-
-In the `run-image` command above, the `--harmony-input` contains a string representation
-of the input Harmony message. More details on the schema for these messages can
-be seen [here](https://git.earthdata.nasa.gov/projects/HARMONY/repos/harmony-service-lib-py/browse/harmony/message.py), in the documentation string of the `Message` class.
-
-Alternatively, if authentication is to be done via an EDL token, that token
-should be specified in the Harmony message as the `accessToken` property:
-
-```
-./bin/run-image --harmony-action 'invoke' --harmony-input '{"sources": [{"granules": [{"url": "test/data/africa.nc"}]}], "user": "usr_user", "callback": "", "accessToken": "encrypted_token"}'
-```
-
-The token should be sent encrypted using a shared secret. This shared secret
-should also be specified in the `.env` file, so the token can be decrypted for
-use:
-
-```
-ENV=test
-SHARED_SECRET_KEY=_THIS_IS_MY_32_CHARS_SECRET_KEY_
-```
+The Swath Projector can be run and tested as part of a local installation of
+Harmony. See <https://github.com/nasa/harmony/blob/main/README.md> for more
+details.
 
 ### To run the service locally, by invoking the Python module directly.
 
@@ -78,8 +36,9 @@ First ensure you are in a conda environment, with the conda and Pip dependencies
 installed, as specified in their requirements files.
 
 ```
-conda create --name=swotrepr python=3.7 --channel conda-forge --channel defaults
-conda activate swotrepr-local
+conda create --name=swathprojector python=3.11 -q \
+    --channel conda-forge --channel defaults -y
+conda activate swathprojector
 pip install -r pip_requirements.txt
 ```
 
@@ -87,7 +46,7 @@ For simple invocations, you can then use the `bin.project_local_granule` Python
 module:
 
 ```
-$ cd swotrepr
+$ cd harmony-swath-projector
 $ python
 >>> from bin.project_local_granule import project_granule
 >>> project_granule('<full path to local granule, including: file:///>')
@@ -127,7 +86,7 @@ The Swath Projector can specify several options for reprojection in the
 }
 ```
 
-* `crs`: Either an EPSG code, or a Proj4 string. Default to geographic coordintes.
+* `crs`: Either an EPSG code, or a Proj4 string. Default to geographic coordinates.
 * `interpolation`: `near`, `bilinear`, `ewa` or `ewa-nn`. Currently defaults to
   `ewa-nn`, which uses elliptically weighted averaging to pick the value of the
   highest weighted pixel in relation to the output grid pixel.
@@ -152,17 +111,17 @@ described.
 
 ### Development notes:
 
-SwotRepr runs within a Docker container (both the project itself, and the tests
-that are run for CI/CD. If you add a new Python package to be used within
-SwotRepr (or remove a third party package), the change in dependencies will need
-to be recorded in the relevant requirements file:
+The Swath Projector runs within a Docker container (both the project itself,
+and the tests that are run for CI/CD). If you add a new Python package to be
+used within the Swath Projector (or remove a third party package), the change
+in dependencies will need to be recorded in the relevant requirements file:
 
-* `swotrepr/pip_requirements.txt`: Additional requirements installed within
-	the container's conda environment via Pip. These are also required for the
-	source code of SwotRepr to run.
-* `swotrepr/test/pip_test_requirements.txt`: Requirements only used while running
-	tests, such as `pylint` or `coverage`. These are kept separate to reduce the
-	dependencies in the delivered software.
+* `harmony-swath-projector/pip_requirements.txt`: Additional requirements
+	installed within the container's conda environment via Pip. These are also
+	required for the source code of the Swath Projector to run.
+* `harmony-swath-projector/tests/pip_test_requirements.txt`: Requirements only
+	used while running tests, such as `pylint` or `coverage`. These are kept
+	separate to reduce the dependencies in the delivered software.
 
 ### Running tests:
 
@@ -174,12 +133,10 @@ be run within a Docker container using the following two scripts:
 ./bin/build-test
 
 # Execute the `unittest` suite within a Docker container
-./bin/run-test /full/path/to/swotrepr-coverage
+./bin/run-test /full/path/to/swath-projector-coverage
 ```
-Coverage reports are being generate for each build in Bamboo, and saved as artifacts.
-Following URL is an example coverage report in Bamboo:
-
-https://ci.earthdata.nasa.gov/artifact/HARMONY-SRT41/BRT/build-3/Coverage-Report/source/test/coverage/index.html
+Coverage reports are being generate for each build in GitHub, and saved as
+artifacts.
 
 The tests can also be run outside of the Docker container, for faster checks
 during development. To do so, first activate the requisite conda environment,
@@ -187,15 +144,15 @@ which will need requirements (including the test Pip requirements). Then run:
 
 ```
 export ENV=test
-python -m unittest discover test
+python -m unittest discover tests
 ```
 
 Note - before opening a pull request, all tests should be run in the Docker
 container environment, to be sure that there isn't something different between
-the local development environment and the environment in which the SWOT
-Reprojection tool will actually run. Additionally, the Docker container
-invocation will provide pylint checking, to ensure linting errors have not been
-added during development.
+the local development environment and the environment in which the Swath
+Projector will actually run. Additionally, the Docker container invocation will
+provide pylint checking, to ensure linting errors have not been added during
+development.
 
 ### Versioning
 

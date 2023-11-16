@@ -1,6 +1,7 @@
 from datetime import datetime
 from os import makedirs
 from shutil import copy, rmtree
+from unittest import TestCase
 from unittest.mock import Mock, patch, ANY
 import json
 
@@ -9,16 +10,16 @@ from netCDF4 import Dataset
 from harmony.message import Message
 from harmony.util import config
 
-from swotrepr import HarmonyAdapter
-from test.test_utils import download_side_effect, StringContains, TestBase
+from swath_projector.adapter import SwathProjectorAdapter
+from tests.test_utils import download_side_effect, StringContains
 
 
-@patch('pymods.nc_merge.datetime')
-@patch('harmony.util.stage', return_value='https://example.com/data')
-@patch('swotrepr.download', side_effect=download_side_effect)
-class TestSwotReprojectionTool(TestBase):
-    """ A test class that will run the full SWOT Reprojection tool against a
-        variety of input files and Harmony messages.
+@patch('swath_projector.nc_merge.datetime')
+@patch('swath_projector.adapter.stage', return_value='https://example.com/data')
+@patch('swath_projector.adapter.download', side_effect=download_side_effect)
+class TestSwathProjector(TestCase):
+    """ A test class that will run the full Swath Projector against a variety
+        of input files and Harmony messages.
 
     """
     @classmethod
@@ -34,12 +35,12 @@ class TestSwotReprojectionTool(TestBase):
         cls.staging_location = 's3://example-bucket/example-path/'
         cls.temporal = {'start': '2020-01-01T00:00:00.000Z',
                         'end': '2020-01-02T00:00:00.000Z'}
-        cls.tmp_dir = 'test/temp'
+        cls.tmp_dir = 'tests/temp'
 
     def setUp(self):
         """ Set properties of tests that need to be re-created every test. """
         makedirs(self.tmp_dir)
-        copy('test/data/africa.nc', self.tmp_dir)
+        copy('tests/data/africa.nc', self.tmp_dir)
 
     def tearDown(self):
         """ Perform per-test teardown operations. """
@@ -59,7 +60,7 @@ class TestSwotReprojectionTool(TestBase):
 
     def test_single_band_input(self, mock_download, mock_stage, mock_datetime):
         """ Nominal (successful) reprojection of a single band input file. """
-        input_file_path = 'test/data/VNL2_oneBand.nc'
+        input_file_path = 'tests/data/VNL2_oneBand.nc'
         mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
@@ -75,7 +76,7 @@ class TestSwotReprojectionTool(TestBase):
             'format': {'height': 500, 'width': 1000}
         })
 
-        reprojector = HarmonyAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(test_data, config=config(False))
         reprojector.invoke()
 
         mock_download.assert_called_once_with(input_file_path,
@@ -90,7 +91,7 @@ class TestSwotReprojectionTool(TestBase):
                                            logger=ANY)
 
     def test_africa_input(self, mock_download, mock_stage, mock_datetime):
-        """ Nominal (successful) reprojection of test/data/africa.nc, using
+        """ Nominal (successful) reprojection of tests/data/africa.nc, using
             geographic coordinates, bilinear interpolation and specifying the
             extent of the target area grid.
 
@@ -99,7 +100,7 @@ class TestSwotReprojectionTool(TestBase):
             `history_json` global attributes.
 
         """
-        input_file_path = 'test/data/africa.nc'
+        input_file_path = 'tests/data/africa.nc'
 
         mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
@@ -119,7 +120,7 @@ class TestSwotReprojectionTool(TestBase):
                                        'y': {'min': 10, 'max': 35}}}
         })
 
-        reprojector = HarmonyAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(test_data, config=config(False))
         reprojector.invoke()
 
         mock_download.assert_called_once_with(input_file_path,
@@ -136,7 +137,7 @@ class TestSwotReprojectionTool(TestBase):
         output_path = mock_stage.call_args[0][0]
         history, history_uppercase, history_json = self.get_provenance(output_path)
 
-        expected_history = ('2021-05-12T19:03:04+00:00 sds/swot-reproject '
+        expected_history = ('2021-05-12T19:03:04+00:00 sds/harmony-swath-projector '
                             '0.9.0 {"crs": "EPSG:4326", "interpolation": '
                             '"bilinear", "x_min": -20, "x_max": 60, "y_min": '
                             '10, "y_max": 35}')
@@ -144,7 +145,7 @@ class TestSwotReprojectionTool(TestBase):
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
             'date_time': '2021-05-12T19:03:04+00:00',
-            'program': 'sds/swot-reproject',
+            'program': 'sds/harmony-swath-projector',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:4326',
                            'input_file': input_file_path,
@@ -207,7 +208,7 @@ class TestSwotReprojectionTool(TestBase):
                                        'y': {'min': 10, 'max': 35}}}
         })
 
-        reprojector = HarmonyAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(test_data, config=config(False))
         reprojector.invoke()
 
         mock_download.assert_called_once_with(input_file_path,
@@ -226,7 +227,7 @@ class TestSwotReprojectionTool(TestBase):
 
         expected_history = (
             '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1\n'
-            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '2021-05-12T19:03:04+00:00 sds/harmony-swath-projector 0.9.0 '
             '{"crs": "EPSG:4326", "interpolation": "bilinear", "x_min": -20, '
             '"x_max": 60, "y_min": 10, "y_max": 35}'
         )
@@ -242,7 +243,7 @@ class TestSwotReprojectionTool(TestBase):
         }, {
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
             'date_time': '2021-05-12T19:03:04+00:00',
-            'program': 'sds/swot-reproject',
+            'program': 'sds/harmony-swath-projector',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:4326',
                            'input_file': input_file_path,
@@ -272,7 +273,7 @@ class TestSwotReprojectionTool(TestBase):
             This updated file will then be used as input to the service.
 
         """
-        input_file_path = 'test/data/africa_History.nc'
+        input_file_path = 'tests/data/africa_History.nc'
         input_file_path = f'{self.tmp_dir}/africa.nc'
         old_history = '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1'
 
@@ -297,7 +298,7 @@ class TestSwotReprojectionTool(TestBase):
                                        'y': {'min': 10, 'max': 35}}}
         })
 
-        reprojector = HarmonyAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(test_data, config=config(False))
         reprojector.invoke()
 
         mock_download.assert_called_once_with(input_file_path,
@@ -316,7 +317,7 @@ class TestSwotReprojectionTool(TestBase):
 
         expected_history_uppercase = (
             '2000-01-02T03:04:05.123456+00.00 Swathinator v0.0.1\n'
-            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '2021-05-12T19:03:04+00:00 sds/harmony-swath-projector 0.9.0 '
             '{"crs": "EPSG:4326", "interpolation": "bilinear", "x_min": -20, '
             '"x_max": 60, "y_min": 10, "y_max": 35}'
         )
@@ -324,7 +325,7 @@ class TestSwotReprojectionTool(TestBase):
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
             'date_time': '2021-05-12T19:03:04+00:00',
-            'program': 'sds/swot-reproject',
+            'program': 'sds/harmony-swath-projector',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:4326',
                            'input_file': input_file_path,
@@ -350,7 +351,7 @@ class TestSwotReprojectionTool(TestBase):
             the reprojected variables.
 
         """
-        input_file_path = 'test/data/VNL2_oneBand.nc'
+        input_file_path = 'tests/data/VNL2_oneBand.nc'
 
         mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
@@ -369,7 +370,7 @@ class TestSwotReprojectionTool(TestBase):
                                        'y': {'min': 24, 'max': 25}}}
         })
 
-        reprojector = HarmonyAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(test_data, config=config(False))
         reprojector.invoke()
 
         mock_download.assert_called_once_with(input_file_path,
@@ -391,7 +392,7 @@ class TestSwotReprojectionTool(TestBase):
             'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
             '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc\n'
             'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT\n'
-            '2021-05-12T19:03:04+00:00 sds/swot-reproject '
+            '2021-05-12T19:03:04+00:00 sds/harmony-swath-projector '
             '0.9.0 {"crs": "+proj=longlat +ellps=WGS84", '
             '"interpolation": "ewa", "x_min": -160, '
             '"x_max": -159, "y_min": 24, "y_max": 25}'
@@ -400,7 +401,7 @@ class TestSwotReprojectionTool(TestBase):
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
             'date_time': '2021-05-12T19:03:04+00:00',
-            'program': 'sds/swot-reproject',
+            'program': 'sds/harmony-swath-projector',
             'version': '0.9.0',
             'parameters': {'crs': '+proj=longlat +ellps=WGS84',
                            'input_file': input_file_path,
@@ -432,7 +433,7 @@ class TestSwotReprojectionTool(TestBase):
             input data being near the Hawaiian islands.
 
         """
-        input_file_path = 'test/data/VNL2_oneBand.nc'
+        input_file_path = 'tests/data/VNL2_oneBand.nc'
         mock_datetime.utcnow = Mock(return_value=datetime(2021, 5, 12, 19, 3, 4))
         test_data = Message({
             'accessToken': self.access_token,
@@ -452,7 +453,7 @@ class TestSwotReprojectionTool(TestBase):
                                 'y': {'min': 2500000, 'max': 3300000}}
             }
         })
-        reprojector = HarmonyAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(test_data, config=config(False))
         reprojector.invoke()
 
         mock_download.assert_called_once_with(input_file_path,
@@ -474,7 +475,7 @@ class TestSwotReprojectionTool(TestBase):
             'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS'
             '_NPP-v02.0-fv03.0.nc VNL2_oneBand.nc\n'
             'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT\n'
-            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '2021-05-12T19:03:04+00:00 sds/harmony-swath-projector 0.9.0 '
             '{"crs": "EPSG:32603", "interpolation": "ewa-nn", "x_min": 0, '
             '"x_max": 1500000, "y_min": 2500000, "y_max": 3300000}'
         )
@@ -482,7 +483,7 @@ class TestSwotReprojectionTool(TestBase):
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
             'date_time': '2021-05-12T19:03:04+00:00',
-            'program': 'sds/swot-reproject',
+            'program': 'sds/harmony-swath-projector',
             'version': '0.9.0',
             'parameters': {'crs': 'EPSG:32603',
                            'input_file': input_file_path,

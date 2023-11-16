@@ -16,15 +16,23 @@ from pyresample.utils import check_and_wrap
 from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
-from pymods.nc_single_band import HARMONY_TARGET, write_single_band_output
-from pymods.swotrepr_geometry import (get_extents_from_perimeter,
-                                      get_projected_resolution)
-from pymods.utilities import (create_coordinates_key, get_coordinate_variable,
-                              get_scale_and_offset,
-                              get_variable_file_path,
-                              get_variable_numeric_fill_value,
-                              get_variable_values,
-                              make_array_two_dimensional)
+from swath_projector.nc_single_band import (
+    HARMONY_TARGET,
+    write_single_band_output
+)
+from swath_projector.swath_geometry import (
+    get_extents_from_perimeter,
+    get_projected_resolution
+)
+from swath_projector.utilities import (
+    create_coordinates_key,
+    get_coordinate_variable,
+    get_scale_and_offset,
+    get_variable_file_path,
+    get_variable_numeric_fill_value,
+    get_variable_values,
+    make_array_two_dimensional
+)
 
 # In nearest neighbour interpolation, the distance to a found value is
 # guaranteed to be no further than (1 + EPSILON) times the distance to the
@@ -90,7 +98,7 @@ def resample_variable(message_parameters: Dict, full_variable: str,
         results.
 
         Reprojection information will be stored in a cache, enabling it to be
-        recalled, rather than rederived for subsequent science variables that
+        recalled, rather than re-derived for subsequent science variables that
         share the same coordinate variables.
 
     """
@@ -392,7 +400,7 @@ def get_reprojection_cache(parameters: Dict) -> Dict:
 def get_target_area(parameters: Dict, dataset: Dataset,
                     coordinates: Tuple[str], logger: Logger) -> AreaDefinition:
     """ Define the target area as specified by either a complete set of message
-        parameters, or supplemented with coordinate variables as refered to in
+        parameters, or supplemented with coordinate variables as referred to in
         the science variable metadata.
 
     """

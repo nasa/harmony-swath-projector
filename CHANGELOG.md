@@ -1,41 +1,19 @@
-## v0.0.4
-### 2023-07-20
+## v1.0.0
+### 2023-11-16
 
-This version of the Swath Projector updates dependencies used by the service,
-including converting to the use of `earthdata-varinfo` in place of
-`sds-varinfo`. The Python version of the conda environment is also updated to
-Python 3.11.
+This version of the Harmony Swath Projector contains all functionality
+previously released internally to EOSDIS as `sds/swot-reproject:0.0.4`.
+Minor reformatting of the repository structure has occurred to comply with
+recommended best practices for a Harmony backend service repository, but the
+service itself is functionally unchanged. Additional contents to the repository
+include updated documentation and files outlined by the
+[NASA open-source guidelines](https://code.nasa.gov/#/guide).
 
-## v0.0.3
-### 2022-12-20
+Repository structure changes include:
 
-This version of the Swath Projector updates the `sds-varinfo` dependency to
-v3.0.0. The major difference in this upgrade is the adoption of a JSON
-formatted configuration file, in place of the previous YAML format. In addition,
-the version of Python used in the service Docker images has been updated to 3.10.
+* Migrating `pymods` directory to `swath_projector`.
+* Migrating `swotrepr.py` to `swath_projector/adapter.py`.
+* Addition of `swath_projector/main.py`.
 
-## v0.0.2
-### 2022-07-11
-
-This version of the Swath Projector updates the `harmony-service-lib`
-dependency to v1.0.20, to accommodate change in the way Harmony handles STAC
-objects. Other dependencies are also updated, including the version of Python
-in which the service is run (now 3.9).
-
-## v0.0.1
-### 2022-01-05
-
-This version of the Swath Projector implements semantic version numbers to
-allow for tagging of Docker images, and better control of different Docker
-images in different environments.
-
-The basic functionality in this service offers projection of swath data into
-a projected grid. Interpolation options include:
-
-* Nearest Neighbour
-* Bilinear
-* Elliptically Weighted Averaging (EWA)
-* EWA-Nearest Neighbour (EWA-NN)
-
-Interpolation is accomplished using the [pyresample](https://pyresample.readthedocs.io/en/latest/)
-Python package.
+For more information on internal releases prior to NASA open-source approval,
+see legacy-CHANGELOG.md.

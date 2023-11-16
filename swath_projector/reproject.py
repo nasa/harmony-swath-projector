@@ -1,4 +1,4 @@
-""" Data Services Reprojection service for Harmony """
+""" Data Services Swath Projector service for Harmony """
 from tempfile import mkdtemp
 from typing import Dict
 import functools
@@ -9,13 +9,14 @@ from harmony.message import Message
 from pyproj import Proj
 from varinfo import VarInfoFromNetCDF4
 
-from pymods import nc_merge
-from pymods.interpolation import resample_all_variables
+from swath_projector import nc_merge
+from swath_projector.interpolation import resample_all_variables
+
 
 RADIUS_EARTH_METRES = 6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
-CF_CONFIG_FILE = 'pymods/cf_config.json'
+CF_CONFIG_FILE = 'swath_projector/cf_config.json'
 
 
 def reproject(message: Message, collection_short_name: str, granule_url: str,
@@ -24,7 +25,7 @@ def reproject(message: Message, collection_short_name: str, granule_url: str,
     """ Derive reprojection parameters from the input Harmony message. Then
         extract listing of science variables and coordinate variables from the
         source granule. Then reproject all science variables. Finally merge all
-        individual output bands back into a single netCDF-4 file.
+        individual output bands back into a single NetCDF-4 file.
 
     """
     parameters = get_parameters_from_message(message, granule_url, local_filename)
@@ -75,10 +76,10 @@ def get_parameters_from_message(message: Message, granule_url: str,
     """ A helper function to parse the input Harmony message and extract
         required information. If the message is missing parameters, then
         default values will be used. The `granule_url` is taken from the
-        inbound STAC catalogue `Item.asset.href`, denoting a URL to the
-        original source of the input granule. The `input_file` is the local
-        path of that input granule, as downloaded by `harmony-service-lib-py`
-        utility functions for transformation by this service.
+        inbound STAC `Item.asset.href`, denoting a URL to the original source
+        of the input granule. The `input_file` is the local path of that input
+        granule, as downloaded by `harmony-service-lib-py` utility functions
+        for transformation by this service.
 
     """
     parameters = {

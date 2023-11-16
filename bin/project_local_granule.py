@@ -10,11 +10,12 @@
 
     * The `harmony-service-lib-py` package must be installed, via Pip, in the
       current Python environment (e.g., conda environment or virtualenv).
-    * Python v3.7 or higher.
+    * Python v3.11 or higher.
 
     Usage:
 
-    * Navigate to the root directory of this repository, `swotrepr`.
+    * Navigate to the root directory of this repository,
+      `harmony-swath-projector`.
     * Begin a local Python session.
     * Run: the following:
 
@@ -72,14 +73,14 @@ from unittest.mock import patch
 from harmony.util import config
 from harmony.message import Message
 
-from swotrepr import HarmonyAdapter
+from swath_projector.adapter import SwathProjectorAdapter
 
 
 def set_environment_variables():
-    """ If the following environment variables are absent, the `HarmonyAdapter`
-        class will not allow the projector to run. Make sure to run this script
-        in a different environment (e.g. conda environment) than any local
-        instance of Harmony.
+    """ If the following environment variables are absent, the
+        `SwathProjectorAdapter` class will not allow the projector to run. Make
+        sure to run this script in a different environment (e.g. conda
+        environment) than any local instance of Harmony.
 
     """
     environ['ENV'] = 'dev'
@@ -128,7 +129,7 @@ def project_granule(local_file_path: str, target_crs: str = 'EPSG:4326',
 
     set_environment_variables()
 
-    reprojector = HarmonyAdapter(message, config=config(False))
+    reprojector = SwathProjectorAdapter(message, config=config(False))
 
     with patch('swotrepr.shutil.rmtree', side_effect=rmtree_side_effect):
         reprojector.invoke()

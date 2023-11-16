@@ -1,12 +1,13 @@
 #!/bin/bash
 ###############################################################################
-# Execute the sds/swot-reproject-test Docker image as a container. This will
-# run the unit test suite, check for Python linting errors, and ensure there
-# are no known security vulnerabilities in imported third party packages.
+# Execute the ghcr.io/nasa/swath-projector-test Docker image as a container.
+# This will run the unit test suite and check for Python linting errors.
 #
 # This script will output test coverage information to a `coverage` directory
 # and JUnit test report output to a `test-reports` directory on the host
 # machine executing this script.
+#
+# 2023-11-16: Updated to use new GitHub-related images.
 #
 ###############################################################################
 
@@ -24,6 +25,6 @@ mkdir -p coverage
 # Run the tests in a Docker container with mounted volumes for XML report
 # output and test coverage reporting
 docker run --rm \
-	-v $(pwd)/test-reports:/home/test/reports \
-	-v $(pwd)/coverage:/home/test/coverage \
-	sds/swot-reproject-test "$@"
+	-v $(pwd)/test-reports:/home/tests/reports \
+	-v $(pwd)/coverage:/home/tests/coverage \
+	ghcr.io/nasa/harmony-swath-projector-test "$@"

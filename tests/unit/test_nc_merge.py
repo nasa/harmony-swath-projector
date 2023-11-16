@@ -1,4 +1,5 @@
 from datetime import datetime
+from unittest import TestCase
 from unittest.mock import Mock, patch
 import json
 import logging
@@ -7,27 +8,31 @@ import os
 from netCDF4 import Dataset
 from varinfo import VarInfoFromNetCDF4
 
-from pymods.exceptions import MissingReprojectedDataError
-from pymods.nc_merge import (check_coor_valid, create_history_record,
-                             create_output, get_fill_value_from_attributes,
-                             get_science_variable_attributes,
-                             get_science_variable_dimensions, read_attrs)
-from pymods.reproject import CF_CONFIG_FILE
-from test.test_utils import TestBase
+from swath_projector.exceptions import MissingReprojectedDataError
+from swath_projector.nc_merge import (
+    check_coor_valid,
+    create_history_record,
+    create_output,
+    get_fill_value_from_attributes,
+    get_science_variable_attributes,
+    get_science_variable_dimensions,
+    read_attrs
+)
+from swath_projector.reproject import CF_CONFIG_FILE
 
 
-class TestNCMerge(TestBase):
+class TestNCMerge(TestCase):
 
     @classmethod
     def setUpClass(cls):
         cls.logger = logging.getLogger('nc_merge test')
-        cls.properties = {'input_file': 'test/data/VNL2_test_data.nc',
-                          'granule_url': 'test/data/VNL2_test_data.nc',
+        cls.properties = {'input_file': 'tests/data/VNL2_test_data.nc',
+                          'granule_url': 'tests/data/VNL2_test_data.nc',
                           'crs': 'EPSG:4326',
                           'interpolation': 'bilinear'}
 
-        cls.tmp_dir = 'test/data/test_tmp/'
-        cls.output_file = 'test/data/VNL2_test_data_repr.nc'
+        cls.tmp_dir = 'tests/data/test_tmp/'
+        cls.output_file = 'tests/data/VNL2_test_data_repr.nc'
         cls.science_variables = {'/brightness_temperature_4um',
                                  '/satellite_zenith_angle',
                                  '/sea_surface_temperature', '/wind_speed'}
@@ -69,7 +74,7 @@ class TestNCMerge(TestBase):
         self.assertEqual(len(in_dataset[test_dataset].dimensions),
                          len(out_dataset[test_dataset].dimensions))
 
-    @patch('pymods.nc_merge.datetime')
+    @patch('swath_projector.nc_merge.datetime')
     def test_output_global_attributes(self, mock_datetime):
         """ The root group of the output files should contain the global
             attributes of the input file, with the addition of `history` (if
@@ -101,7 +106,7 @@ class TestNCMerge(TestBase):
             'VNL2PSST_20190109000457-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv03.0.nc '
             '/Users/yzhang29/Desktop/NCOTest/VNL2_test_data.nc\n'
             'Created with VIIRSseatemp on  2019/01/09 at 00:57:15 UT\n'
-            '2021-05-12T19:03:04+00:00 sds/swot-reproject 0.9.0 '
+            '2021-05-12T19:03:04+00:00 sds/harmony-swath-projector 0.9.0 '
             '{"crs": "EPSG:4326", "interpolation": "bilinear"}'
         )
 
@@ -112,12 +117,12 @@ class TestNCMerge(TestBase):
         expected_history_json = [{
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
             'date_time': '2021-05-12T19:03:04+00:00',
-            'program': 'sds/swot-reproject',
+            'program': 'sds/harmony-swath-projector',
             'version': '0.9.0',
-            'parameters': {'input_file': 'test/data/VNL2_test_data.nc',
+            'parameters': {'input_file': 'tests/data/VNL2_test_data.nc',
                            'crs': 'EPSG:4326',
                            'interpolation': 'bilinear'},
-            'derived_from': 'test/data/VNL2_test_data.nc',
+            'derived_from': 'tests/data/VNL2_test_data.nc',
             'cf_history': [('Mon Dec  9 11:22:11 2019: ncks -v '
                             'sea_surface_temperature,satellite_zenith_angle,'
                             'brightness_temperature_4um,wind_speed '
@@ -158,7 +163,7 @@ class TestNCMerge(TestBase):
 
         """
         test_variables = {'missing_variable'}
-        temporary_output_file = 'test/data/unit_test.nc4'
+        temporary_output_file = 'tests/data/unit_test.nc4'
 
         with self.assertRaises(MissingReprojectedDataError):
             create_output(self.properties, temporary_output_file, self.tmp_dir,
@@ -238,7 +243,7 @@ class TestNCMerge(TestBase):
                                                          'lat')
             self.assertTupleEqual(dimensions, ('lat',))
 
-    @patch('pymods.nc_merge.check_coor_valid')
+    @patch('swath_projector.nc_merge.check_coor_valid')
     def test_get_science_variable_attributes(self, mock_check_coord_valid):
         """ The original input metadata should be mostly present. The
             `grid_mapping` metadata attribute should be added from the single
@@ -290,7 +295,7 @@ class TestNCMerge(TestBase):
             self.assertEqual(attributes['grid_mapping'],
                              single_band_attributes['grid_mapping'])
 
-    @patch('pymods.nc_merge.datetime')
+    @patch('swath_projector.nc_merge.datetime')
     def test_create_history_record(self, mock_datetime):
         """ Ensure a history record is correctly constructed, and only contains
             a `cf_history` attribute if there is valid a `history` (or
@@ -307,7 +312,7 @@ class TestNCMerge(TestBase):
             expected_output = {
                 '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
                 'date_time': '2001-02-03T04:05:06+00:00',
-                'program': 'sds/swot-reproject',
+                'program': 'sds/harmony-swath-projector',
                 'version': '0.9.0',
                 'parameters': request_parameters,
                 'derived_from': granule_url,
@@ -321,7 +326,7 @@ class TestNCMerge(TestBase):
         expected_output_with_history = {
             '$schema': 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json',
             'date_time': '2001-02-03T04:05:06+00:00',
-            'program': 'sds/swot-reproject',
+            'program': 'sds/harmony-swath-projector',
             'version': '0.9.0',
             'parameters': request_parameters,
             'derived_from': granule_url,

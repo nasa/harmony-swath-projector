@@ -1,10 +1,12 @@
 #!/bin/bash
 ###############################################################################
 #
-# Look for all versions of images containing the string "sds/swot-reproject"
-# and remove them. This is primarily for clean-up after development.
+# Look for all versions of images containing the string
+# "ghcr.io/nasa/harmony-swath-projector" and remove them. This is primarily for
+# clean-up after development.
 #
 # 2023-01-27: Updated to fix image deletion for both test and service images.
+# 2023-11-16: Updated to new, GitHub-related image names.
 #
 ###############################################################################
 remove_image_by_name() {
@@ -16,7 +18,7 @@ remove_image_by_name() {
     fi
 }
 
-image_base_name="sds/swot-reproject"
+image_base_name="ghcr.io/nasa/harmony-swath-projector"
 
 # First remove test images:
 remove_image_by_name "${image_base_name}-test"

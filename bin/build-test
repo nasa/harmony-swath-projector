@@ -1,6 +1,10 @@
 #!/bin/bash
-
-image="sds/swot-reproject-test"
+###############################################################################
+#
+# 2023-11-16: Updated image name to: ghcr.io/nasa/harmony-swath-projector-test.
+#
+###############################################################################
+image="ghcr.io/nasa/harmony-swath-projector-test"
 tag=${1:-latest}
 
 

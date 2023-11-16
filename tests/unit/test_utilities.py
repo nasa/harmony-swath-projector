@@ -1,21 +1,27 @@
 from logging import getLogger
+from unittest import TestCase
 from unittest.mock import Mock
 
 from netCDF4 import Dataset, Variable
 from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
-from pymods.exceptions import MissingCoordinatesError
-from pymods.utilities import (construct_absolute_path, create_coordinates_key,
-                              get_variable_values, get_coordinate_variable,
-                              get_scale_and_offset, get_variable_file_path,
-                              get_variable_numeric_fill_value,
-                              make_array_two_dimensional, qualify_reference,
-                              variable_in_dataset)
-from test.test_utils import TestBase
+from swath_projector.exceptions import MissingCoordinatesError
+from swath_projector.utilities import (
+    construct_absolute_path,
+    create_coordinates_key,
+    get_variable_values,
+    get_coordinate_variable,
+    get_scale_and_offset,
+    get_variable_file_path,
+    get_variable_numeric_fill_value,
+    make_array_two_dimensional,
+    qualify_reference,
+    variable_in_dataset
+)
 
 
-class TestUtilities(TestBase):
+class TestUtilities(TestCase):
 
     def test_create_coordinates_key(self):
         """ Extract the coordinates from a `VariableFromNetCDF4` instance and
@@ -59,7 +65,7 @@ class TestUtilities(TestBase):
         """
 
         with self.subTest('3-D variable, with time.'):
-            with Dataset('test/data/africa.nc') as dataset:
+            with Dataset('tests/data/africa.nc') as dataset:
                 red_var = dataset['red_var']
                 self.assertEqual(len(red_var.shape), 3)
 
@@ -69,7 +75,7 @@ class TestUtilities(TestBase):
                 self.assertEqual(red_var_values.shape, red_var.shape[-2:])
 
         with self.subTest('2-D variable, no time.'):
-            with Dataset('test/data/test_tmp/wind_speed.nc') as dataset:
+            with Dataset('tests/data/test_tmp/wind_speed.nc') as dataset:
                 wind_speed = dataset['wind_speed']
                 self.assertEqual(len(wind_speed.shape), 2)
 
@@ -120,7 +126,7 @@ class TestUtilities(TestBase):
             when requested.
 
         """
-        dataset = Dataset('test/data/africa.nc')
+        dataset = Dataset('tests/data/africa.nc')
         coordinates_tuple = ['lat', 'lon']
 
         for coordinate in coordinates_tuple:

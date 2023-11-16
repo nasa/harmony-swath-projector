@@ -1,5 +1,6 @@
 from shutil import rmtree
 from tempfile import mkdtemp
+from unittest import TestCase
 from unittest.mock import Mock
 
 from netCDF4 import Dataset
@@ -7,13 +8,17 @@ from pyproj.crs import CRS
 from pyresample.geometry import AreaDefinition
 import numpy as np
 
-from pymods.nc_single_band import (write_dimensions, write_dimension_variables,
-                                   write_grid_mapping, write_science_variable,
-                                   write_single_band_output, HARMONY_TARGET)
-from test.test_utils import TestBase
+from swath_projector.nc_single_band import (
+    write_dimensions,
+    write_dimension_variables,
+    write_grid_mapping,
+    write_science_variable,
+    write_single_band_output,
+    HARMONY_TARGET
+)
 
 
-class TestNCSingleBand(TestBase):
+class TestNCSingleBand(TestCase):
 
     @classmethod
     def setUpClass(cls):

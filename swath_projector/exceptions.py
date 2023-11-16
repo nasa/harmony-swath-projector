@@ -1,14 +1,13 @@
-""" This module contains custom exceptions specific to the SWOT reprojection
-    tool. These exceptions are intended to allow for easier debugging of the
-    expected errors that may occur during an invocation of the service.
+""" This module contains custom exceptions specific to the Harmony Swath
+    Projector. These exceptions are intended to allow for easier debugging of
+    the expected errors that may occur during an invocation of the service.
 
 """
 
 
 class CustomError(Exception):
-    """ Base class for exceptions in the SWOT reprojection tool. This base
-        class could be extended in the future to assign exit codes, for
-        example.
+    """ Base class for exceptions in the Swath Projector. This base class could
+        be extended in the future to assign exit codes, for example.
 
     """
     def __init__(self, exception_type, message):

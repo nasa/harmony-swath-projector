@@ -127,7 +127,7 @@ def get_absolute_resolution(polygon_area: float, n_pixels: int) -> float:
 
 def get_valid_coordinates_mask(longitudes: Variable,
                                latitudes: Variable) -> np.ma.core.MaskedArray:
-    """ Get a numpy N-d array containing boolean values (0 or 1) indicating
+    """ Get a `numpy` N-d array containing boolean values (0 or 1) indicating
         whether the elements of both longitude and latitude are valid at that
         location. Validity of these elements means that an element must not be
         a fill value, or contain a NaN. Note, a value of 1 means that the pixel
@@ -199,7 +199,7 @@ def get_slice_edges(slice_valid_indices: np.ndarray, slice_index: int,
     """ Given a list of indices for all valid data in a single row or column of
         an array, return the 2-dimensional indices of the first and last pixels
         with valid data. This function relies of the `nonzero` method of a
-        numpy masked array returning array indices in ascending order.
+        `numpy` masked array returning array indices in ascending order.
 
     """
     if is_row:
@@ -231,7 +231,7 @@ def clockwise_point_sort(origin: List[float],
                          point: List[float]) -> Tuple[float]:
     """ A key function to be used with the internal Python sorted function.
         This function should return a tuple of the clockwise angle and length
-        between the point and a reference vector, which is a vetical unit
+        between the point and a reference vector, which is a vertical unit
         vector. The origin argument should be the within the polygon for which
         perimeter points are being sorted, to ensure correct ordering. For
         simplicity, it is assumed this origin is the centroid of the polygon.

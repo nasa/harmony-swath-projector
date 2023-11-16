@@ -1,18 +1,19 @@
 """ Data Services Swath Projector service for Harmony. """
-import argparse
 import mimetypes
 import os
 import shutil
 from tempfile import mkdtemp
 
-import pystac
-import harmony
-from harmony.util import download, generate_output_filename, HarmonyException
+from harmony import BaseHarmonyAdapter
+from harmony.message import Source as HarmonySource
+from harmony.util import (download, generate_output_filename, HarmonyException,
+                          stage)
+from pystac import Asset, Item
 
-from pymods.reproject import reproject
+from swath_projector.reproject import reproject
 
 
-class HarmonyAdapter(harmony.BaseHarmonyAdapter):
+class SwathProjectorAdapter(BaseHarmonyAdapter):
     """ Data Services Swath Projector service for Harmony
 
         This class uses the Harmony utility library for processing the
@@ -33,7 +34,7 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
         self.validate_message()
         return super().invoke()
 
-    def process_item(self, item: pystac.Item, source: harmony.message.Source):
+    def process_item(self, item: Item, source: HarmonySource):
         """
         Processes a single input item.  Services that are not aggregating multiple input files
         should prefer to implement this method rather than #invoke
@@ -79,17 +80,20 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
             # Stage the output file with a conventional filename
             output_filename = generate_output_filename(asset.href, is_regridded=True)
-            mimetype, _ = (mimetypes.guess_type(output_filename, False) or
-                           ('application/x-netcdf4', None))
+            mimetype, _ = (
+                mimetypes.guess_type(output_filename, False)
+                or ('application/x-netcdf4', None)
+            )
 
-            url = harmony.util.stage(working_filename,
-                                     output_filename,
-                                     mimetype,
-                                     location=self.message.stagingLocation,
-                                     logger=self.logger)
+            url = stage(working_filename,
+                        output_filename,
+                        mimetype,
+                        location=self.message.stagingLocation,
+                        logger=self.logger)
 
             # Update the STAC record
-            asset = pystac.Asset(url, title=output_filename, media_type=mimetype, roles=['data'])
+            asset = Asset(url, title=output_filename, media_type=mimetype,
+                          roles=['data'])
             result.assets['data'] = asset
 
             # Return the output file back to Harmony
@@ -124,15 +128,3 @@ class HarmonyAdapter(harmony.BaseHarmonyAdapter):
 
         if not isinstance(self.message.granules, list):
             raise Exception('Invalid granule list')
-
-
-# Main program start
-#
-if __name__ == '__main__':
-    PARSER = argparse.ArgumentParser(
-        prog='Reproject',
-        description='Run the Data Services Reprojection Tool'
-    )
-    harmony.setup_cli(PARSER)
-    ARGS, _ = PARSER.parse_known_args()
-    harmony.run_cli(PARSER, ARGS, HarmonyAdapter)

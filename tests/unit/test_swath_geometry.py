@@ -1,29 +1,31 @@
 from random import shuffle
 from shutil import rmtree
 from tempfile import mkdtemp
+from unittest import TestCase
 from uuid import uuid4
 
 from netCDF4 import Dataset
 from pyproj import Proj
 import numpy as np
 
-from pymods.swotrepr_geometry import (clockwise_point_sort,
-                                      euclidean_distance,
-                                      get_absolute_resolution,
-                                      get_extents_from_perimeter,
-                                      get_one_dimensional_resolution,
-                                      get_perimeter_coordinates,
-                                      get_polygon_area,
-                                      get_projected_resolution,
-                                      get_slice_edges,
-                                      get_valid_coordinates_mask,
-                                      reproject_coordinates,
-                                      sort_perimeter_points,
-                                      swath_crosses_international_date_line)
-from test.test_utils import TestBase
+from swath_projector.swath_geometry import (
+    clockwise_point_sort,
+    euclidean_distance,
+    get_absolute_resolution,
+    get_extents_from_perimeter,
+    get_one_dimensional_resolution,
+    get_perimeter_coordinates,
+    get_polygon_area,
+    get_projected_resolution,
+    get_slice_edges,
+    get_valid_coordinates_mask,
+    reproject_coordinates,
+    sort_perimeter_points,
+    swath_crosses_international_date_line
+)
 
 
-class TestSwotReprGeometry(TestBase):
+class TestSwathGeometry(TestCase):
 
     @classmethod
     def setUpClass(cls):

@@ -1,6 +1,10 @@
 #!/bin/bash
-
-image="sds/swot-reproject"
+###############################################################################
+#
+# 2023-11-16: Updated image name to: ghcr.io/nasa/harmony-swath-projector.
+#
+###############################################################################
+image="ghcr.io/nasa/harmony-swath-projector"
 
 # Retrieve the tag from the script arguments, or default to "latest". Bamboo
 # will pass the contents of `docker/service_version.txt` as this argument,
@@ -8,8 +12,7 @@ image="sds/swot-reproject"
 #
 tag=${1:-latest}
 
-# Remove old versions of sds/swot-reproject and sds/swot-reproject-test
-#
+# Remove old versions of service and test images:
 ./bin/clean-images
 
 # Build the image

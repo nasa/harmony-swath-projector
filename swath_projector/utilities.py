@@ -5,7 +5,7 @@ from netCDF4 import Dataset, Variable
 from varinfo import VariableFromNetCDF4
 import numpy as np
 
-from pymods.exceptions import MissingCoordinatesError
+from swath_projector.exceptions import MissingCoordinatesError
 
 FillValueType = Optional[Union[float, int]]
 
@@ -13,7 +13,7 @@ FillValueType = Optional[Union[float, int]]
 def create_coordinates_key(variable: VariableFromNetCDF4) -> Tuple[str]:
     """ Create a unique, hashable entity from the coordinates
         associated with a science variable. These coordinates
-        are derived using the `sds-varinfo` package, which
+        are derived using the `earthdata-varinfo` package, which
         augments the CF-Convention `coordinates` metadata
         attribute with supplements and overrides, where required.
 
@@ -67,7 +67,7 @@ def get_coordinate_variable(dataset: Dataset, coordinates_tuple: Tuple[str],
 
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
     """ Retrieve the _FillValue attribute for a given variable. If there is no
-        _FillValue attribute, return None. The pyresample
+        _FillValue attribute, return None. The `pyresample`
         `get_sample_from_neighbour_info` function will only accept numerical
         inputs for `fill_value`. Non-numeric fill values are returned as None.
 
@@ -173,7 +173,7 @@ def qualify_reference(raw_reference: str, variable: Variable) -> str:
 
 
 def construct_absolute_path(reference: str, referee_group_path: str) -> str:
-    """ Construct an absolute pth for a relative reference to another variable
+    """ Construct an absolute path for a relative reference to another variable
         (e.g. '../latitude'), by combining the reference with the group path of
         the referee variable.
 

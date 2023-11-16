@@ -12,12 +12,15 @@ from netCDF4 import Dataset, Variable
 from varinfo import VarInfoFromNetCDF4
 import numpy as np
 
-from pymods.exceptions import MissingReprojectedDataError
-from pymods.utilities import get_variable_file_path, variable_in_dataset
+from swath_projector.exceptions import MissingReprojectedDataError
+from swath_projector.utilities import (
+    get_variable_file_path,
+    variable_in_dataset
+)
 
 # Values needed for history_json attribute
 HISTORY_JSON_SCHEMA = 'https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json'
-PROGRAM = 'sds/swot-reproject'
+PROGRAM = 'sds/harmony-swath-projector'
 PROGRAM_REF = 'https://cmr.uat.earthdata.nasa.gov/search/concepts/S1237974711-EEDTEST'
 VERSION = '0.9.0'
 

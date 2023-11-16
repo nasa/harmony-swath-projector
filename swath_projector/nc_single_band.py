@@ -74,7 +74,7 @@ def write_single_band_output(target_area: AreaDefinition,
 
 def write_dimensions(dataset: Dataset, target_area: AreaDefinition,
                      cache: Dict) -> Tuple[str]:
-    """ Derive the dimension names using the target area defintion and the
+    """ Derive the dimension names using the target area definition and the
         information available in the reprojection cache. Then write the
         dimensions to the output dataset. Finally, return the dimension names
         for later use; e.g. defining the grid mapping name and writing the
@@ -189,7 +189,7 @@ def write_science_variable(dataset: Dataset, data_values: np.ndarray,
         - The `grid_mapping_name` to be included as an attribute.
         - Scaling metadata attributes, if present on the input value.
 
-        Note, the `netCDF4` automatically applied the `add_offset` and
+        Note, the `netCDF4` library automatically applied the `add_offset` and
         `scale_factor` keywords on reading and writing of `Variable` objects.
 
     """
@@ -209,7 +209,7 @@ def write_dimension_variables(dataset: Dataset, dimensions: Tuple[str],
 
         - A 1-dimension array of the projected values of that dimension.
         - A reference to itself as a dimension.
-        - Metadata that includes a the dimension variable's name and units.
+        - Metadata that includes the dimension variable's name and units.
 
     """
     x_vector, y_vector = target_area.get_proj_vectors()

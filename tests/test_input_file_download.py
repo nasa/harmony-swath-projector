@@ -1,12 +1,13 @@
-from harmony.util import HarmonyException, config
+from unittest import TestCase
+
 from harmony.message import Message
+from harmony.util import HarmonyException, config
 
-from swotrepr import HarmonyAdapter
-from pymods.reproject import reproject
-from test.test_utils import TestBase
+from swath_projector.adapter import SwathProjectorAdapter
+from swath_projector.reproject import reproject
 
 
-class TestInputFileDownload(TestBase):
+class TestInputFileDownload(TestCase):
     """ A test class to ensure that common failures arising from missing or
         incorrect file details in the input Harmony message are well handled.
 
@@ -14,8 +15,10 @@ class TestInputFileDownload(TestBase):
 
     def test_message_has_no_granules_attribute(self):
         """ Handle a harmony message that does not list any granules """
-        reprojector = HarmonyAdapter(Message({'format': {}, 'sources': [{}]}),
-                                     config=config(False))
+        reprojector = SwathProjectorAdapter(
+            Message({'format': {}, 'sources': [{}]}),
+            config=config(False)
+        )
 
         with self.assertRaises(HarmonyException) as context:
             reprojector.invoke()
@@ -28,7 +31,7 @@ class TestInputFileDownload(TestBase):
             does not exist
 
         """
-        reprojector = HarmonyAdapter(
+        reprojector = SwathProjectorAdapter(
             Message({'format': {}, 'sources': [{'granules': [{}]}]}),
             config=config(False)
         )
