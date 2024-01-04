@@ -171,3 +171,41 @@ The general rules for which version number to increment are:
 
 When the Docker image is built, it will be tagged with the semantic version
 number as stored in `docker/service_version.txt`.
+
+## CI/CD:
+
+The CI/CD for the Swath Projector is contained in GitHub workflows in the
+`.github/workflows` directory:
+
+* `run_tests.yml` - A reusable workflow that builds the service and test Docker
+  images, then runs the Python unit test suite in an instance of the test
+  Docker container.
+* `run_tests_on_pull_request.yml` - Triggered for all PRs against the `main`
+  branch. It runs the workflow in `run_tests.yml` to ensure all tests pass for
+  the new code.
+* `publish_docker_image.yml` - Triggered either manually or for commits to the
+  `main` branch that contain changes to the `docker/service_version.txt` file.
+
+The `publish_docker_image.yml` workflow will:
+
+* Run the full unit tests suite, to prevent publication of broken code.
+* Extract the semantic version number from `docker/service_version.txt`.
+* Extract the release notes for the most recent version from `CHANGELOG.md`.
+* Create a GitHub release that will also tag the related git commit with the
+  semantic version number.
+
+Before triggering a release, ensure both the `docker/service_version.txt` and
+`CHANGELOG.md` files are updated. The `CHANGELOG.md` file requires a specific
+format for a new release, as it looks for the following string to define the
+newest release of the code (starting at the top of the file).
+
+```
+## vX.Y.Z
+```
+
+## Get in touch:
+
+You can reach out to the maintainers of this repository via email:
+
+* david.p.auty@nasa.gov
+* owen.m.littlejohns@nasa.gov
