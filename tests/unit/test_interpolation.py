@@ -2,7 +2,7 @@ from logging import Logger
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from netCDF4 import Dataset, Variable
+from netCDF4 import Dataset
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition
 import numpy as np
@@ -11,12 +11,6 @@ from varinfo import VarInfoFromNetCDF4
 from swath_projector.interpolation import (
     check_for_valid_interpolation,
     EPSILON,
-    get_bilinear_information,
-    get_bilinear_results,
-    get_ewa_information,
-    get_ewa_results,
-    get_near_information,
-    get_near_results,
     get_parameters_tuple,
     get_reprojection_cache,
     get_swath_definition,
