@@ -67,6 +67,7 @@
     function below can be edited.
 
 """
+
 from os import environ
 from unittest.mock import patch
 
@@ -77,10 +78,10 @@ from swath_projector.adapter import SwathProjectorAdapter
 
 
 def set_environment_variables():
-    """ If the following environment variables are absent, the
-        `SwathProjectorAdapter` class will not allow the projector to run. Make
-        sure to run this script in a different environment (e.g. conda
-        environment) than any local instance of Harmony.
+    """If the following environment variables are absent, the
+    `SwathProjectorAdapter` class will not allow the projector to run. Make
+    sure to run this script in a different environment (e.g. conda
+    environment) than any local instance of Harmony.
 
     """
     environ['ENV'] = 'dev'
@@ -93,39 +94,48 @@ def set_environment_variables():
 
 
 def rmtree_side_effect(workdir: str, ignore_errors=True) -> None:
-    """ A side effect for the `shutil.rmtree` mock that will print the
-        temporary working directory containing all output NetCDF-4 files.
+    """A side effect for the `shutil.rmtree` mock that will print the
+    temporary working directory containing all output NetCDF-4 files.
 
     """
     print(f'\n\n\n\033[92mOutput files saved to: {workdir}\033[0m\n\n\n')
 
 
-def project_granule(local_file_path: str, target_crs: str = 'EPSG:4326',
-                    interpolation_method: str = 'near') -> None:
-    """ The `local_file_path` will need to be absolute, and prepended with
-        `file:///` to ensure that the `harmony-service-lib-py` package can
-        recognise it as a local file.
+def project_granule(
+    local_file_path: str,
+    target_crs: str = 'EPSG:4326',
+    interpolation_method: str = 'near',
+) -> None:
+    """The `local_file_path` will need to be absolute, and prepended with
+    `file:///` to ensure that the `harmony-service-lib-py` package can
+    recognise it as a local file.
 
-        The optional keyword arguments `target_crs` and `interpolation_method`
-        allow for a test that overrides the default message parameters of a
-        geographically projected output using nearest neighbour interpolation.
+    The optional keyword arguments `target_crs` and `interpolation_method`
+    allow for a test that overrides the default message parameters of a
+    geographically projected output using nearest neighbour interpolation.
 
     """
-    message = Message({
-        'callback': 'https://example.com/callback',
-        'stagingLocation': 's3://example-bucket/example-path',
-        'sources': [{
-            'granules': [{
-                'url': local_file_path,
-                'temporal': {
-                    'start': '2021-01-03T23:45:00.000Z',
-                    'end': '2020-01-04T00:00:00.000Z',
-                },
-                'bbox': [-180, -90, 180, 90],
-            }],
-        }],
-        'format': {'crs': target_crs, 'interpolation': interpolation_method},
-    })
+    message = Message(
+        {
+            'callback': 'https://example.com/callback',
+            'stagingLocation': 's3://example-bucket/example-path',
+            'sources': [
+                {
+                    'granules': [
+                        {
+                            'url': local_file_path,
+                            'temporal': {
+                                'start': '2021-01-03T23:45:00.000Z',
+                                'end': '2020-01-04T00:00:00.000Z',
+                            },
+                            'bbox': [-180, -90, 180, 90],
+                        }
+                    ],
+                }
+            ],
+            'format': {'crs': target_crs, 'interpolation': interpolation_method},
+        }
+    )
 
     set_environment_variables()
 

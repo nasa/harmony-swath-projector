@@ -15,6 +15,7 @@ class TestPyResampleReproject(TestCase):
     interpolation options.
 
     """
+
     def test_pyresample_interpolation(self, mock_download, mock_stage):
         """Ensure SwotRepr will successfully complete when using pyresample and
         each specified interpolation.
@@ -24,28 +25,35 @@ class TestPyResampleReproject(TestCase):
 
         for interpolation in valid_interpolations:
             with self.subTest(f'pyresample "{interpolation}" interpolation.'):
-                test_data = Message({
-                    'accessToken': 'fake_token',
-                    'callback': 'https://example.com/callback',
-                    'stagingLocation': 's3://example-bucket/example-path/',
-                    'sources': [{
-                        'granules': [{
-                            'url': 'tests/data/VOL2PSST_2017.nc',
-                            'temporal': {
-                                'start': '2020-01-01T00:00:00.000Z',
-                                'end': '2020-01-02T00:00:00.000Z'
-                            },
-                            'bbox': [-180, -90, 180, 90]
-                        }],
-                    }],
-                    'format': {'crs': 'EPSG:32603',
-                               'interpolation': interpolation,
-                               'width': 1000,
-                               'height': 500}
-                })
+                test_data = Message(
+                    {
+                        'accessToken': 'fake_token',
+                        'callback': 'https://example.com/callback',
+                        'stagingLocation': 's3://example-bucket/example-path/',
+                        'sources': [
+                            {
+                                'granules': [
+                                    {
+                                        'url': 'tests/data/VOL2PSST_2017.nc',
+                                        'temporal': {
+                                            'start': '2020-01-01T00:00:00.000Z',
+                                            'end': '2020-01-02T00:00:00.000Z',
+                                        },
+                                        'bbox': [-180, -90, 180, 90],
+                                    }
+                                ],
+                            }
+                        ],
+                        'format': {
+                            'crs': 'EPSG:32603',
+                            'interpolation': interpolation,
+                            'width': 1000,
+                            'height': 500,
+                        },
+                    }
+                )
 
-                reprojector = SwathProjectorAdapter(test_data,
-                                                    config=config(False))
+                reprojector = SwathProjectorAdapter(test_data, config=config(False))
                 reprojector.invoke()
 
                 mock_download.assert_called_once_with(
@@ -53,14 +61,15 @@ class TestPyResampleReproject(TestCase):
                     ANY,
                     logger=ANY,
                     access_token='fake_token',
-                    cfg=ANY
+                    cfg=ANY,
                 )
                 mock_stage.assert_called_once_with(
                     StringContains('VOL2PSST_2017_repr.nc'),
                     'VOL2PSST_2017_regridded.nc',
                     'application/x-netcdf',
                     location='s3://example-bucket/example-path/',
-                    logger=ANY)
+                    logger=ANY,
+                )
 
                 # Reset mock calls for next interpolation
                 mock_download.reset_mock()
