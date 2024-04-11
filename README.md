@@ -236,6 +236,9 @@ review and `git add` the changes before you can make a commit.
 It is planned to implement additional hooks, possibly including tools such as
 `mypy`.
 
+[pre-commit.ci](pre-commit.ci) is configured such that these same hooks will be
+automatically run for every pull request.
+
 ## Get in touch:
 
 You can reach out to the maintainers of this repository via email:
