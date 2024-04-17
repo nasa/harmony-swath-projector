@@ -1,9 +1,9 @@
-from typing import Dict, Optional, Tuple, Union
 import os
+from typing import Dict, Optional, Tuple, Union
 
+import numpy as np
 from netCDF4 import Dataset, Variable
 from varinfo import VariableFromNetCDF4
-import numpy as np
 
 from swath_projector.exceptions import MissingCoordinatesError
 

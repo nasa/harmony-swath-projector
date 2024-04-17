@@ -3,15 +3,15 @@
     attributes.
 """
 
-from datetime import datetime, timezone
-from typing import Dict, Optional, Set, Tuple, Union
 import json
 import logging
 import os
+from datetime import datetime, timezone
+from typing import Dict, Optional, Set, Tuple, Union
 
+import numpy as np
 from netCDF4 import Dataset, Variable
 from varinfo import VarInfoFromNetCDF4
-import numpy as np
 
 from swath_projector.exceptions import MissingReprojectedDataError
 from swath_projector.utilities import get_variable_file_path, variable_in_dataset

@@ -7,7 +7,7 @@ from tempfile import mkdtemp
 
 from harmony import BaseHarmonyAdapter
 from harmony.message import Source as HarmonySource
-from harmony.util import download, generate_output_filename, HarmonyException, stage
+from harmony.util import HarmonyException, download, generate_output_filename, stage
 from pystac import Asset, Item
 
 from swath_projector.reproject import reproject

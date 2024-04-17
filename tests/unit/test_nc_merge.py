@@ -1,9 +1,9 @@
-from datetime import datetime
-from unittest import TestCase
-from unittest.mock import Mock, patch
 import json
 import logging
 import os
+from datetime import datetime
+from unittest import TestCase
+from unittest.mock import Mock, patch
 
 from netCDF4 import Dataset
 from varinfo import VarInfoFromNetCDF4

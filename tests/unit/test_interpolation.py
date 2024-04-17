@@ -2,22 +2,22 @@ from logging import Logger
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 from netCDF4 import Dataset
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition
-import numpy as np
 from varinfo import VarInfoFromNetCDF4
 
 from swath_projector.interpolation import (
-    check_for_valid_interpolation,
     EPSILON,
+    RADIUS_OF_INFLUENCE,
+    check_for_valid_interpolation,
     get_parameters_tuple,
     get_reprojection_cache,
     get_swath_definition,
     get_target_area,
     resample_all_variables,
     resample_variable,
-    RADIUS_OF_INFLUENCE,
 )
 from swath_projector.nc_single_band import HARMONY_TARGET
 from swath_projector.reproject import CF_CONFIG_FILE

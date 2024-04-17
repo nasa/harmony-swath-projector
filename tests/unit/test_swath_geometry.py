@@ -4,9 +4,9 @@ from tempfile import mkdtemp
 from unittest import TestCase
 from uuid import uuid4
 
+import numpy as np
 from netCDF4 import Dataset
 from pyproj import Proj
-import numpy as np
 
 from swath_projector.swath_geometry import (
     clockwise_point_sort,
