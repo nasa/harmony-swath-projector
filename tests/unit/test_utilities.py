@@ -1,19 +1,19 @@
 from unittest import TestCase
 from unittest.mock import Mock
 
+import numpy as np
 from netCDF4 import Dataset, Variable
 from varinfo import VarInfoFromNetCDF4
-import numpy as np
 
 from swath_projector.exceptions import MissingCoordinatesError
 from swath_projector.utilities import (
     construct_absolute_path,
     create_coordinates_key,
-    get_variable_values,
     get_coordinate_variable,
     get_scale_and_offset,
     get_variable_file_path,
     get_variable_numeric_fill_value,
+    get_variable_values,
     make_array_two_dimensional,
     qualify_reference,
     variable_in_dataset,

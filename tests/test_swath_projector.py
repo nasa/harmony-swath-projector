@@ -1,17 +1,16 @@
+import json
 from datetime import datetime
 from os import makedirs
 from shutil import copy, rmtree
 from unittest import TestCase
-from unittest.mock import Mock, patch, ANY
-import json
-
-from netCDF4 import Dataset
+from unittest.mock import ANY, Mock, patch
 
 from harmony.message import Message
 from harmony.util import config
+from netCDF4 import Dataset
 
 from swath_projector.adapter import SwathProjectorAdapter
-from tests.test_utils import download_side_effect, StringContains
+from tests.test_utils import StringContains, download_side_effect
 
 
 @patch('swath_projector.nc_merge.datetime')

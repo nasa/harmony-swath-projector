@@ -3,11 +3,12 @@
 
 """
 
+import os
 from functools import partial
 from logging import Logger
 from typing import Dict, List, Optional, Tuple
-import os
 
+import numpy as np
 from netCDF4 import Dataset
 from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
@@ -15,7 +16,6 @@ from pyresample.geometry import AreaDefinition, SwathDefinition
 from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_info
 from pyresample.utils import check_and_wrap
 from varinfo import VarInfoFromNetCDF4
-import numpy as np
 
 from swath_projector.nc_single_band import HARMONY_TARGET, write_single_band_output
 from swath_projector.swath_geometry import (

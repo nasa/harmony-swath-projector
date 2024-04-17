@@ -3,18 +3,18 @@ from tempfile import mkdtemp
 from unittest import TestCase
 from unittest.mock import Mock
 
+import numpy as np
 from netCDF4 import Dataset
 from pyproj.crs import CRS
 from pyresample.geometry import AreaDefinition
-import numpy as np
 
 from swath_projector.nc_single_band import (
-    write_dimensions,
+    HARMONY_TARGET,
     write_dimension_variables,
+    write_dimensions,
     write_grid_mapping,
     write_science_variable,
     write_single_band_output,
-    HARMONY_TARGET,
 )
 
 

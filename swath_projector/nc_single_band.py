@@ -25,10 +25,9 @@
 
 from typing import Dict, Tuple
 
-from pyresample.geometry import AreaDefinition
-from netCDF4 import Dataset
 import numpy as np
-
+from netCDF4 import Dataset
+from pyresample.geometry import AreaDefinition
 
 DIMENSION_METADATA = {
     'lat': {

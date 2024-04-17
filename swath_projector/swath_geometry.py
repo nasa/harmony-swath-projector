@@ -4,12 +4,12 @@
 
 """
 
-from typing import List, Tuple
 import functools
+from typing import List, Tuple
 
+import numpy as np
 from netCDF4 import Variable
 from pyproj import Proj
-import numpy as np
 
 
 def get_projected_resolution(

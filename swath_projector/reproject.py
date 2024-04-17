@@ -1,10 +1,10 @@
 """ Data Services Swath Projector service for Harmony """
 
-from tempfile import mkdtemp
-from typing import Dict
 import functools
 import logging
 import os
+from tempfile import mkdtemp
+from typing import Dict
 
 from harmony.message import Message
 from pyproj import Proj
@@ -12,7 +12,6 @@ from varinfo import VarInfoFromNetCDF4
 
 from swath_projector import nc_merge
 from swath_projector.interpolation import resample_all_variables
-
 
 RADIUS_EARTH_METRES = (
     6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
