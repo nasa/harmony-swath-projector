@@ -87,7 +87,7 @@ class TestReproject(TestCase):
         dimensions, an exception is raised.
 
         """
-        exception_snippet = 'cannot be used at the same time in the message.'
+        exception_snippet = 'Insufficient or invalid target grid parameters.'
 
         test_args = [
             ['height and scaleSize', True, False, True, True],
@@ -121,8 +121,10 @@ class TestReproject(TestCase):
 
                 with self.assertRaises(Exception) as context:
                     get_parameters_from_message(message, self.granule_url, self.granule)
-
-                self.assertTrue(str(context.exception).endswith(exception_snippet))
+                self.assertTrue(
+                    str(context.exception).endswith(exception_snippet),
+                    f'Test Failed: {description}',
+                )
 
     def test_get_parameters_missing_extents_or_dimensions(self):
         """Ensure that an exception is raised if there is only one of either
