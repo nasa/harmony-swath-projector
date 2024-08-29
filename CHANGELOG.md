@@ -9,8 +9,6 @@
   exception is raised only when the parameters describe a grid that is not
   internally consistent. [#14](https://github.com/nasa/harmony-swath-projector/pull/14)
 
-
-
 ## v1.0.1 - 2024-04-05
 
 This version of the Swath Projector implements black code formatting across the
