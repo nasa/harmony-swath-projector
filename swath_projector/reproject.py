@@ -124,8 +124,8 @@ def get_parameters_from_message(
     if parameters['interpolation'] in [None, '', 'None']:
         parameters['interpolation'] = INTERPOLATION_DEFAULT
 
-    # ERROR 5: -tr and -ts options cannot be used at the same time.
-
+    # when a user requests both a resolution and dimensions, then ensure the
+    # extents are consistent.
     if (parameters['xres'] is not None or parameters['yres'] is not None) and (
         parameters['height'] is not None or parameters['width'] is not None
     ):
