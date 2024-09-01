@@ -5,7 +5,7 @@
 
 - [[DAS-1934](https://bugs.earthdata.nasa.gov/browse/DAS-1934)]
   Input parameters that include both both resolutions (`xres` and `yres`) and
-  dimenions (`height` and `width`) no longer always raises an exception. An
+  dimenions (`height` and `width`) no longer always raise an exception. An
   exception is raised only when the parameters describe a grid that is not
   internally consistent. [#14](https://github.com/nasa/harmony-swath-projector/pull/14)
 
