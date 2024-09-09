@@ -268,6 +268,7 @@ def get_ewa_results(
         ewa_information['target_area'],
         variable['values'],
         maximum_weight_mode=maximum_weight_mode,
+        rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
     )
 
     if variable['fill_value'] is not None:

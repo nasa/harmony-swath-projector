@@ -95,7 +95,9 @@ def create_output(
 
             else:
                 logger.error(f'Cannot find "{dataset_file}".')
-                raise MissingReprojectedDataError(variable_name)
+                # QuickFix (DAS-2216) Ignore missing reprojections
+                logger.error(f'Not Including "{variable_name}" in "{output_file}".')
+                # raise MissingReprojectedDataError(variable_name)
 
 
 def set_output_attributes(

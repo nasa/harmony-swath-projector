@@ -1,11 +1,13 @@
 {
     "Identification": "Swath Projector VarInfo configuration",
-    "Version": 2,
+    "Version": 3,
     "Collection_ShortName_Path": [
-        "ShortName"
+        "ShortName",
+        "collection_shortname"
     ],
     "Mission": {
-        "VNP10": "VIIRS"
+        "VNP10": "VIIRS",
+        "TEMPO_O3TOT_L2": "TEMPO"
     },
     "CF_Overrides": [
         {
@@ -17,10 +19,24 @@
             "Attributes": [
                 {
                     "Name": "coordinates",
-                    "Value": "/GeolocationData/latitude, /GeolocationData/longitude"
+                    "Value": "/GeolocationData/latitude /GeolocationData/longitude"
                 }
             ],
-			"_Description": "VNP10 SnowData variables have incorrect relative paths for coordinates."
+         "_Description": "VNP10 SnowData variables have incorrect relative paths for coordinates."
+        },
+        {
+           "Applicability": {
+               "Mission": "TEMPO",
+               "ShortNamePath": "TEMPO_03TOT_L2",
+               "Variable_Pattern": "/product/.*"
+           },
+           "Attributes": [
+               {
+                   "Name": "coordinates",
+                   "Value": "/Geolocation/latitude /Geolocation/longitude"
+               }
+           ],
+           "_Description": "TEMPO variables only have simple, single names for coordinates, but need full paths."
         }
-    ]
+   ]
 }

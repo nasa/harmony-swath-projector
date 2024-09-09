@@ -52,3 +52,15 @@ class InvalidTargetGrid(CustomError):
         super().__init__(
             'InvalidTargetGrid', 'Insufficient or invalid target grid parameters.'
         )
+
+
+class VariableShapeError(CustomError):
+    """Raised to skip resampling if variable shape does not match coordinates shape.
+
+    While not optimal, raising this exception provides a temporary workaround
+    mismatched shapes for some science variables.
+
+    """
+
+    def __init__(self):
+        super().__init__('VariableShapeError', 'Unable to resample variable.')
