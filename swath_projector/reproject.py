@@ -7,10 +7,12 @@ from tempfile import mkdtemp
 from typing import Dict
 
 from harmony.message import Message
+from harmony.message_utility import has_self_consistent_grid
 from pyproj import Proj
 from varinfo import VarInfoFromNetCDF4
 
 from swath_projector import nc_merge
+from swath_projector.exceptions import InvalidTargetGrid
 from swath_projector.interpolation import resample_all_variables
 
 RADIUS_EARTH_METRES = (
@@ -122,14 +124,13 @@ def get_parameters_from_message(
     if parameters['interpolation'] in [None, '', 'None']:
         parameters['interpolation'] = INTERPOLATION_DEFAULT
 
-    # ERROR 5: -tr and -ts options cannot be used at the same time.
+    # when a user requests both a resolution and dimensions, then ensure the
+    # extents are consistent.
     if (parameters['xres'] is not None or parameters['yres'] is not None) and (
         parameters['height'] is not None or parameters['width'] is not None
     ):
-        raise Exception(
-            '"scaleSize", "width" or/and "height" cannot '
-            'be used at the same time in the message.'
-        )
+        if not has_self_consistent_grid(message):
+            raise InvalidTargetGrid()
 
     if not os.path.isfile(parameters['input_file']):
         raise Exception('Input file does not exist')

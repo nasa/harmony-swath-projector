@@ -105,10 +105,14 @@ The Swath Projector can specify several options for reprojection in the
   CRS. If the `scaleExtent` is not specified, it is derived from the walking the
   perimeter of the input grid, reprojected those points to the target CRS, and
   finding the extreme values in each reprojected dimension.
-* `scaleSize`: The resolution of each output pixel in the reprojected CRS. This
-  should not be specified if the `height` and `width` are also supplied. The
-  default values are derived from finding the total area of the swath via Gauss'
-  Area formula, and assuming the pixels are square.
+* `scaleSize`: The resolution of each output pixel in the reprojected CRS.  The
+  default values are derived from finding the total area of the swath via
+  Gauss' Area formula, and assuming the pixels are square. This should not
+  normally be specified if the `height` and `width` are also supplied, in this
+  case the grid definition must be internally consistent with itself.  Where
+  consistency is determined by the equation `scaleSize = (scaleExtent.max -
+  scaleExtent.min) / dimension`
+
 
 All the attributes in the `format` property are optional, and have defaults as
 described.

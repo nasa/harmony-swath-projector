@@ -43,3 +43,12 @@ class MissingCoordinatesError(CustomError):
             'MissingCoordinatesError',
             f'Could not find coordinate {missing_coordinate}.',
         )
+
+
+class InvalidTargetGrid(CustomError):
+    """Raised when a request specifies an incomplete or invalid grid."""
+
+    def __init__(self):
+        super().__init__(
+            'InvalidTargetGrid', 'Insufficient or invalid target grid parameters.'
+        )

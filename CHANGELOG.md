@@ -1,11 +1,20 @@
-## v1.0.1
-### 2024-04-05
+# Changelog
+
+## [v1.1.0] - 2024-08-29
+### Changed
+
+- [[DAS-1934](https://bugs.earthdata.nasa.gov/browse/DAS-1934)]
+  Input parameters that include both both resolutions (`xres` and `yres`) and
+  dimenions (`height` and `width`) no longer always raise an exception. An
+  exception is raised only when the parameters describe a grid that is not
+  internally consistent. [#14](https://github.com/nasa/harmony-swath-projector/pull/14)
+
+## [v1.0.1] - 2024-04-05
 
 This version of the Swath Projector implements black code formatting across the
 entire repository. There should be no functional changes to the service.
 
-## v1.0.0
-### 2023-11-16
+## [v1.0.0] - 2023-11-16
 
 This version of the Harmony Swath Projector contains all functionality
 previously released internally to EOSDIS as `sds/swot-reproject:0.0.4`.
@@ -23,3 +32,7 @@ Repository structure changes include:
 
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
+
+[v1.1.0]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
+[v1.0.1]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
+[v1.0.0]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.0)
