@@ -1,0 +1,26 @@
+{
+  "Identification": "Swath Projector VarInfo configuration",
+  "Version": 3,
+  "CollectionShortNamePath": [
+    "ShortName"
+  ],
+  "Mission": {
+    "VNP10": "VIIRS"
+  },
+  "MetadataOverrides": [
+    {
+      "Applicability": {
+        "Mission": "VIIRS",
+        "ShortNamePath": "VNP10",
+        "VariablePattern": "/SnowData/.*"
+      },
+      "Attributes": [
+        {
+          "Name": "coordinates",
+          "Value": "/GeolocationData/latitude, /GeolocationData/longitude"
+        }
+      ],
+			"_Description": "VNP10 SnowData variables have incorrect relative paths for coordinates."
+    }
+  ]
+}
