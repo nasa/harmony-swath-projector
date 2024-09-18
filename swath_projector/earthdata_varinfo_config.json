@@ -20,7 +20,7 @@
           "Value": "/GeolocationData/latitude, /GeolocationData/longitude"
         }
       ],
-			"_Description": "VNP10 SnowData variables have incorrect relative paths for coordinates."
+      "_Description": "VNP10 SnowData variables have incorrect relative paths for coordinates."
     }
   ]
 }

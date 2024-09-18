@@ -3,7 +3,7 @@
 ## [v1.1.1] - 2024-09-16
 ### Changed
 
-- [[TRT-558]](https://bugs.earthdata.nasa.gov/browse/TRT-558)]
+- [[TRT-558](https://bugs.earthdata.nasa.gov/browse/TRT-558)]
   The Swath Projector has been updated to use `earthdata-varinfo` version 3.0.0.
   This update primarily involves the streamlining of the configuration file
   schema. Please see the
