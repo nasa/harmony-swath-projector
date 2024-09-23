@@ -1,5 +1,16 @@
 # Changelog
 
+## [v1.1.1] - 2024-09-16
+### Changed
+
+- [[TRT-558](https://bugs.earthdata.nasa.gov/browse/TRT-558)]
+  The Swath Projector has been updated to use `earthdata-varinfo` version 3.0.0.
+  This update primarily involves the streamlining of the configuration file
+  schema. Please see the
+  [earthdata-varinfo release notes](https://github.com/nasa/earthdata-varinfo/releases/tag/3.0.0)
+  for more information. The configuration file used by the Swath Projector has
+  also been renamed to `earthdata_varinfo_config.json`.
+
 ## [v1.1.0] - 2024-08-29
 ### Changed
 
@@ -33,6 +44,7 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
+[v1.1.1]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.1.0)
 [v1.1.0]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
 [v1.0.1]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
 [v1.0.0]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.0)

@@ -20,7 +20,7 @@ RADIUS_EARTH_METRES = (
 )
 CRS_DEFAULT = '+proj=longlat +ellps=WGS84'
 INTERPOLATION_DEFAULT = 'ewa-nn'
-CF_CONFIG_FILE = 'swath_projector/cf_config.json'
+CF_CONFIG_FILE = 'swath_projector/earthdata_varinfo_config.json'
 
 
 def reproject(

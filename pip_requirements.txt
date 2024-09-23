@@ -1,5 +1,5 @@
 # Open source packages available from PyPI:
-earthdata-varinfo ~= 1.0.0
+earthdata-varinfo ~= 3.0.0
 harmony-service-lib~=1.0.22
 netCDF4 ~= 1.6.4
 numpy ~= 1.24.2
