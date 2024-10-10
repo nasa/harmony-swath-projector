@@ -67,6 +67,9 @@ def get_coordinate_variable(
             coordinate, dataset
         ):
             # QuickFix (DAS-2216) for short and wide swaths
+            if dataset[coordinate].ndim == 1:
+                return dataset[coordinate]
+
             return transpose_if_xdim_less_than_ydim(dataset[coordinate])
 
     raise MissingCoordinatesError(coordinates_tuple)
