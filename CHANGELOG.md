@@ -1,6 +1,14 @@
 # Changelog
 
+## [v1.2.0] - 2024-10-10
+
+### Changed
+
+- [[DAS-2216](https://bugs.earthdata.nasa.gov/browse/DAS-2216)]
+  The Swath Projector has been updated with quick fixes to add support for TEMPO level 2 data.
+
 ## [v1.1.1] - 2024-09-16
+
 ### Changed
 
 - [[TRT-558](https://bugs.earthdata.nasa.gov/browse/TRT-558)]
@@ -12,6 +20,7 @@
   also been renamed to `earthdata_varinfo_config.json`.
 
 ## [v1.1.0] - 2024-08-29
+
 ### Changed
 
 - [[DAS-1934](https://bugs.earthdata.nasa.gov/browse/DAS-1934)]
@@ -37,14 +46,14 @@ include updated documentation and files outlined by the
 
 Repository structure changes include:
 
-* Migrating `pymods` directory to `swath_projector`.
-* Migrating `swotrepr.py` to `swath_projector/adapter.py`.
-* Addition of `swath_projector/main.py`.
+- Migrating `pymods` directory to `swath_projector`.
+- Migrating `swotrepr.py` to `swath_projector/adapter.py`.
+- Addition of `swath_projector/main.py`.
 
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
-[v1.1.1]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.1.0)
-[v1.1.0]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
-[v1.0.1]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
-[v1.0.0]:(https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.0)
+[v1.1.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.1.0)
+[v1.1.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
+[v1.0.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.1)
+[v1.0.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.0.0)
