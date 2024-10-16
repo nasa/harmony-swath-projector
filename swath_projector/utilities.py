@@ -242,7 +242,7 @@ def transpose_if_xdim_less_than_ydim(variable: np.ndarray) -> np.ndarray:
         if hasattr(variable, 'mask'):
             transposed_variable.mask = np.ma.transpose(variable[:].mask)
             return transposed_variable
-        
+
         return transposed_variable
 
     return variable

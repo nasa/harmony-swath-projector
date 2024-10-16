@@ -80,7 +80,9 @@ class TestUtilities(TestCase):
                 wind_speed_values = get_variable_values(dataset, wind_speed, None)
                 self.assertIsInstance(wind_speed_values, np.ndarray)
                 self.assertEqual(len(wind_speed_values.shape), 2)
-                self.assertEqual(wind_speed_values.shape, np.ma.transpose(wind_speed).shape)
+                self.assertEqual(
+                    wind_speed_values.shape, np.ma.transpose(wind_speed).shape
+                )
 
         with self.subTest('Masked values are set to fill value.'):
             fill_value = 210

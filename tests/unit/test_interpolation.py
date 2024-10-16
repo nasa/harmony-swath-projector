@@ -384,7 +384,7 @@ class TestInterpolation(TestCase):
                 self.mock_target_area,
                 mock_values,
                 maximum_weight_mode=False,
-                rows_per_scan=2 # Added in QuickFix DAS-2216 to be fixed in DAS-2220
+                rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
             mock_write_output.assert_called_once_with(
                 self.mock_target_area,
@@ -424,7 +424,7 @@ class TestInterpolation(TestCase):
                 self.mock_target_area,
                 mock_values,
                 maximum_weight_mode=False,
-                rows_per_scan=2 # Added in QuickFix DAS-2216 to be fixed in DAS-2220
+                rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
             mock_write_output.assert_called_once_with(
                 self.mock_target_area,
@@ -493,7 +493,7 @@ class TestInterpolation(TestCase):
                 self.mock_target_area,
                 mock_values,
                 maximum_weight_mode=True,
-                rows_per_scan=2 # Added in QuickFix DAS-2216 to be fixed in DAS-2220
+                rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
             mock_write_output.assert_called_once_with(
                 self.mock_target_area,
@@ -533,7 +533,7 @@ class TestInterpolation(TestCase):
                 self.mock_target_area,
                 mock_values,
                 maximum_weight_mode=True,
-                rows_per_scan=2 # Added in QuickFix DAS-2216 to be fixed in DAS-2220
+                rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
             mock_write_output.assert_called_once_with(
                 self.mock_target_area,
@@ -585,7 +585,7 @@ class TestInterpolation(TestCase):
                 harmony_target_area,
                 mock_values,
                 maximum_weight_mode=True,
-                rows_per_scan=2 # Added in QuickFix DAS-2216 to be fixed in DAS-2220
+                rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
 
             # The Harmony target area should be given to the output function
