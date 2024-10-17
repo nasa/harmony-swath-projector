@@ -125,8 +125,8 @@ def project_granule(
                         {
                             'url': local_file_path,
                             'temporal': {
-                                'start': '2021-01-03T23:45:00.000Z',
-                                'end': '2020-01-04T00:00:00.000Z',
+                                'start': '2020-01-03T23:45:00.000Z',
+                                'end': '2025-01-04T00:00:00.000Z',
                             },
                             'bbox': [-180, -90, 180, 90],
                         }
@@ -141,5 +141,5 @@ def project_granule(
 
     reprojector = SwathProjectorAdapter(message, config=config(False))
 
-    with patch('swotrepr.shutil.rmtree', side_effect=rmtree_side_effect):
+    with patch('swath_projector.adapter.shutil.rmtree', side_effect=rmtree_side_effect):
         reprojector.invoke()

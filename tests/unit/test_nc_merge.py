@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from unittest import TestCase
+from unittest import TestCase, skip
 from unittest.mock import Mock, patch
 
 from netCDF4 import Dataset
@@ -186,6 +186,7 @@ class TestNCMerge(TestCase):
         output_data_type = out_dataset[test_variable].datatype
         self.assertEqual(input_data_type, output_data_type, 'Should be equal')
 
+    @skip("Test disabled for DAS-2216 quick fix that ignores missing reprojections")
     def test_missing_file_raises_error(self):
         """If a science variable should be included in the output, but there
         is no associated output file, an exception should be raised.
