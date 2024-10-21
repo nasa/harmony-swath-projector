@@ -42,12 +42,12 @@ def get_variable_values(
     if len(variable[:].shape) == 1:
         return make_array_two_dimensional(variable[:])
     elif 'time' in input_file.variables and 'time' in variable.dimensions:
-        # Assumption: Array = (1, y, x)
+        # Assumption: Array = (time, along-track, across-track)
         return transpose_if_xdim_less_than_ydim(
             variable[0][:].filled(fill_value=fill_value)
         )
     else:
-        # Assumption: Array = (y, x)
+        # Assumption: Array = (along-track, across-track)
         return transpose_if_xdim_less_than_ydim(
             variable[:].filled(fill_value=fill_value)
         )
