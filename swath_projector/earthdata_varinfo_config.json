@@ -1,7 +1,10 @@
 {
   "Identification": "Swath Projector VarInfo configuration",
   "Version": 4,
-  "CollectionShortNamePath": ["ShortName", "collection_shortname"],
+  "CollectionShortNamePath": [
+    "ShortName",
+    "collection_shortname"
+  ],
   "Mission": {
     "VNP10": "VIIRS",
     "TEMPO_O3TOT_L2": "TEMPO"

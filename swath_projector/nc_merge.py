@@ -13,7 +13,6 @@ import numpy as np
 from netCDF4 import Dataset, Variable
 from varinfo import VarInfoFromNetCDF4
 
-from swath_projector.exceptions import MissingReprojectedDataError
 from swath_projector.utilities import get_variable_file_path, variable_in_dataset
 
 # Values needed for history_json attribute
@@ -96,8 +95,6 @@ def create_output(
             else:
                 logger.error(f'Cannot find "{dataset_file}".')
                 # QuickFix (DAS-2216) Ignore missing reprojections
-                logger.error(f'Not Including "{variable_name}" in "{output_file}".')
-                # raise MissingReprojectedDataError(variable_name)
 
 
 def set_output_attributes(
