@@ -366,7 +366,7 @@ class TestUtilities(TestCase):
 class TestTransposeIfXdimLessThanYdim(TestCase):
 
     def test_wider_than_tall(self):
-        # Test case where x dim <  y dim and should transpose
+        """Test case where x dim <  y dim and should transpose."""
         input_array = np.ma.array([[1, 2, 3], [4, 5, 6]])
         expected_output = np.ma.array([[1, 4], [2, 5], [3, 6]])
         result = transpose_if_xdim_less_than_ydim(input_array)
@@ -374,33 +374,33 @@ class TestTransposeIfXdimLessThanYdim(TestCase):
         self.assertEqual(result.shape, (3, 2))
 
     def test_taller_than_wide(self):
-        # Test case where x < y and should not transpose.
+        """Test case where x < y and should not transpose."""
         input_array = np.ma.array([[1, 2], [3, 4], [5, 6]])
         result = transpose_if_xdim_less_than_ydim(input_array)
         np.testing.assert_array_equal(result, input_array)
         self.assertEqual(result.shape, (3, 2))
 
     def test_square_array(self):
-        # test where y dim == x dim and should not transpose.
+        """Test case where y dim == x dim and should not transpose."""
         input_array = np.ma.array([[1, 2], [3, 4]])
         result = transpose_if_xdim_less_than_ydim(input_array)
         np.testing.assert_array_equal(result, input_array)
         self.assertEqual(result.shape, (2, 2))
 
     def test_1d_array(self):
-        # Test case with a 1D array
+        """Test case with a 1D array"""
         input_array = np.ma.array([1, 2, 3])
         with self.assertRaisesRegex(ValueError, 'variable must be 2 dimensional'):
             transpose_if_xdim_less_than_ydim(input_array)
 
     def test_3d_array(self):
-        # Test case with a 3D array
+        """Test case with a 3D array"""
         input_array = np.ma.array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         with self.assertRaisesRegex(ValueError, 'variable must be 2 dimensional'):
             transpose_if_xdim_less_than_ydim(input_array)
 
     def test_masked_array(self):
-        # Test case with a masked array
+        """Test case with a masked array"""
         input_array = np.ma.array(
             [[1, 2, 3], [4, 5, 6]], mask=[[True, False, False], [False, True, False]]
         )

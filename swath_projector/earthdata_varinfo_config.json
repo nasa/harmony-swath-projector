@@ -9,6 +9,27 @@
     "VNP10": "VIIRS",
     "TEMPO_O3TOT_L2": "TEMPO"
   },
+  "ExcludedScienceVariables": [
+    {
+      "Applicability": {
+        "Mission": "TEMPO",
+        "ShortNamePath": "TEMPO_O3TOT_L2"
+      },
+      "VariablePattern": [
+        "/support_data/a_priori_layer_o3",
+        "/support_data/cal_adjustment",
+        "/support_data/dNdR",
+        "/support_data/layer_efficiency",
+        "/support_data/lut_wavelength",
+        "/support_data/N_value",
+        "/support_data/N_value_residual",
+        "/support_data/ozone_sensitivity_ratio",
+        "/support_data/step_1_N_value_residual",
+        "/support_data/step_2_N_value_residual",
+        "/support_data/temp_sensitivity_ratio"
+      ]
+    }
+  ],
   "MetadataOverrides": [
     {
       "Applicability": {
@@ -28,7 +49,7 @@
       "Applicability": {
         "Mission": "TEMPO",
         "ShortNamePath": "TEMPO_O3TOT_L2",
-        "VariablePattern": "/product/.*|/support_data/.*"
+        "VariablePattern": "^/product/.*|^/support_data/.*"
       },
       "Attributes": [
         {
@@ -36,7 +57,7 @@
           "Value": "/geolocation/latitude, /geolocation/longitude"
         }
       ],
-      "_Description": "TEMPO variables only have simple, single names for coordinates, but need full paths."
+      "_Description": "TEMPO_O3TOT_L2 variables only contain basenames for coordinates, which are found in sibling hierarchical groups. This rule fully qualifies the paths to these coordinates."
     }
   ]
 }

@@ -31,7 +31,8 @@ def get_variable_values(
     As the variable data are returned as a `numpy.ma.MaskedArray`, the will
     return no data in the filled pixels. To ensure that the data are
     correctly handled, the fill value is applied to masked pixels using the
-    `filled` method.
+    `filled` method. The variable values are transposed if the `along-track`
+    dimension size is less than the `across-track` dimension size.
 
     """
     # TODO: Remove in favour of apply2D or process_subdimension.
