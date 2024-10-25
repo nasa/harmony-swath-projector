@@ -44,23 +44,25 @@ def get_variable_values(
         return make_array_two_dimensional(variable[:])
     elif 'time' in input_file.variables and 'time' in variable.dimensions:
         # Assumption: Array = (time, along-track, across-track)
-        return transpose_if_xdim_less_than_ydim(
-            variable[0][:].filled(fill_value=fill_value)
+        return transpose_if_xdim_less_than_ydim(variable[0][:]).filled(
+            fill_value=fill_value
         )
     else:
         # Assumption: Array = (along-track, across-track)
-        return transpose_if_xdim_less_than_ydim(
-            variable[:].filled(fill_value=fill_value)
+        return transpose_if_xdim_less_than_ydim(variable[:]).filled(
+            fill_value=fill_value
         )
 
 
 def get_coordinate_variable(
     dataset: Dataset, coordinates_tuple: Tuple[str], coordinate_substring
-) -> Optional[Variable]:
+) -> Optional[np.ma.MaskedArray]:
     """Search the coordinate dataset names for a match to the substring,
     which will be either "lat" or "lon". Return the corresponding variable
-    from the dataset. Only the base variable name is used, as the group
-    path may contain either of the strings as part of other words.
+    data from the dataset. Only the base variable name is used, as the group
+    path may contain either of the strings as part of other words. The
+    coordinate variables are transposed if the `along-track`dimension size is
+    less than the `across-track` dimension size.
 
     """
     for coordinate in coordinates_tuple:
@@ -69,9 +71,9 @@ def get_coordinate_variable(
         ):
             # QuickFix (DAS-2216) for short and wide swaths
             if dataset[coordinate].ndim == 1:
-                return dataset[coordinate]
+                return dataset[coordinate][:]
 
-            return transpose_if_xdim_less_than_ydim(dataset[coordinate])
+            return transpose_if_xdim_less_than_ydim(dataset[coordinate][:])
 
     raise MissingCoordinatesError(coordinates_tuple)
 
@@ -228,21 +230,19 @@ def make_array_two_dimensional(one_dimensional_array: np.ndarray) -> np.ndarray:
     return np.expand_dims(one_dimensional_array, 1)
 
 
-def transpose_if_xdim_less_than_ydim(variable: np.ndarray) -> np.ndarray:
+def transpose_if_xdim_less_than_ydim(
+    variable_values: np.ma.MaskedArray,
+) -> np.ma.MaskedArray:
     """Return transposed variable when variable is wider than tall.
 
     QuickFix (DAS-2216): We presume that a swath has more rows than columns and
     if that's not the case we transpose it so that it does.
     """
-    if variable.ndim != 2:
+    if len(variable_values.shape) != 2:
         raise ValueError(
-            f'Input variable must be 2 dimensional, but got {variable.ndim} dimensions.'
+            f'Input variable must be 2 dimensional, but got {len(variable_values.shape)} dimensions.'
         )
-    if variable.shape[0] < variable.shape[1]:
-        transposed_variable = np.ma.transpose(variable).copy()
-        if hasattr(variable, 'mask'):
-            transposed_variable.mask = np.ma.transpose(variable[:].mask)
+    if variable_values.shape[0] < variable_values.shape[1]:
+        return np.ma.transpose(variable_values).copy()
 
-        return transposed_variable
-
-    return variable
+    return variable_values

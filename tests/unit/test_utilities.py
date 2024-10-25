@@ -138,7 +138,7 @@ class TestUtilities(TestCase):
                     dataset, coordinates_tuple, coordinate
                 )
 
-                self.assertIsInstance(coordinates, Variable)
+                self.assertIsInstance(coordinates, np.ma.MaskedArray)
 
         with self.subTest(
             'Non existent coordinate variable "latitude" returns MissingCoordinatesError'

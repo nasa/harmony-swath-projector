@@ -57,7 +57,7 @@
           "Value": "/geolocation/latitude, /geolocation/longitude"
         }
       ],
-      "_Description": "TEMPO_O3TOT_L2 variables only contain basenames for coordinates, which are found in sibling hierarchical groups. This rule fully qualifies the paths to these coordinates."
+      "_Description": "TEMPO_O3TOT_L2 variables only contain basenames for coordinates, which are found in sibling hierarchical groups. This rule fully qualifies the paths to these coordinates. Some variables in these groups are excluded via 'ExcludedScienceVariables'"
     }
   ]
 }

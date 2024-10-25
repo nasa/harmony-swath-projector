@@ -13,7 +13,7 @@ from pyproj import Proj
 
 
 def get_projected_resolution(
-    projection: Proj, longitudes: Variable, latitudes: Variable
+    projection: Proj, longitudes: np.ma.MaskedArray, latitudes: np.ma.MaskedArray
 ) -> Tuple[float]:
     """Find the resolution of the target grid in the projected coordinates, x
     and y. First the perimeter points are found. These are then projected
@@ -40,7 +40,7 @@ def get_projected_resolution(
 
 
 def get_extents_from_perimeter(
-    projection: Proj, longitudes: Variable, latitudes: Variable
+    projection: Proj, longitudes: np.ma.MaskedArray, latitudes: np.ma.MaskedArray
 ) -> Tuple[float]:
     """Find the swath extents in the target CRS. First the perimeter points of
     unfilled valid pixels are found. These are then projected to the target
@@ -59,19 +59,17 @@ def get_extents_from_perimeter(
 def get_projected_coordinates(
     coordinates_mask: np.ma.core.MaskedArray,
     projection: Proj,
-    longitudes: Variable,
-    latitudes: Variable,
+    longitudes: np.ma.MaskedArray,
+    latitudes: np.ma.MaskedArray,
 ) -> Tuple[np.ndarray]:
     """Get the required coordinate points projected in the target Coordinate
     Reference System (CRS).
 
     """
     if len(longitudes.shape) == 1:
-        coordinates = get_all_coordinates(longitudes[:], latitudes[:], coordinates_mask)
+        coordinates = get_all_coordinates(longitudes, latitudes, coordinates_mask)
     else:
-        coordinates = get_perimeter_coordinates(
-            longitudes[:], latitudes[:], coordinates_mask
-        )
+        coordinates = get_perimeter_coordinates(longitudes, latitudes, coordinates_mask)
 
     return reproject_coordinates(coordinates, projection)
 
@@ -135,7 +133,7 @@ def get_absolute_resolution(polygon_area: float, n_pixels: int) -> float:
 
 
 def get_valid_coordinates_mask(
-    longitudes: Variable, latitudes: Variable
+    longitudes: np.ma.MaskedArray, latitudes: np.ma.MaskedArray
 ) -> np.ma.core.MaskedArray:
     """Get a `numpy` N-d array containing boolean values (0 or 1) indicating
     whether the elements of both longitude and latitude are valid at that
