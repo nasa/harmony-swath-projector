@@ -49,7 +49,7 @@
       "Applicability": {
         "Mission": "TEMPO",
         "ShortNamePath": "TEMPO_O3TOT_L2",
-        "VariablePattern": "^/product/.*|^/support_data/.*"
+        "VariablePattern": "^/product/.*|^/support_data/.*|^/geolocation/(?!time$).*"
       },
       "Attributes": [
         {
