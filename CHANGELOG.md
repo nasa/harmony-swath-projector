@@ -5,7 +5,7 @@
 ### Changed
 
 - [[DAS-2216](https://bugs.earthdata.nasa.gov/browse/DAS-2216)]
-  The Swath Projector has been updated with quick fixes to add support for TEMPO level 2 data. These changes include optional transposing of arrays based on dimension sizes and updates to the configuration file for TEMPO_O3TOT_L2 to correctly locate coordinate variables and exclude science variables with dimensions that do no match those of the coordinate variables.
+  The Swath Projector has been updated with quick fixes to add support for TEMPO level 2 data. These changes include optional transposing of arrays based on dimension sizes, addition of rows_per_scan parameter for ewa interpolation, and updates to the configuration file for TEMPO_O3TOT_L2 to correctly locate coordinate variables and exclude science variables with dimensions that do no match those of the coordinate variables.
 
 ## [v1.1.1] - 2024-09-16
 

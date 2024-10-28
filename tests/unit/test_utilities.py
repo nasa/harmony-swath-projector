@@ -10,6 +10,7 @@ from swath_projector.utilities import (
     construct_absolute_path,
     create_coordinates_key,
     get_coordinate_variable,
+    get_rows_per_scan,
     get_scale_and_offset,
     get_variable_file_path,
     get_variable_numeric_fill_value,
@@ -411,3 +412,17 @@ class TestTransposeIfXdimLessThanYdim(TestCase):
         result = transpose_if_xdim_less_than_ydim(input_array)
         np.testing.assert_array_equal(result, expected_output)
         np.testing.assert_array_equal(result.mask, expected_output.mask)
+
+
+class TestGetRowsPerScan(TestCase):
+    def test_number_less_than_2(self):
+        self.assertEqual(get_rows_per_scan(1), 1)
+
+    def test_even_composite_number(self):
+        self.assertEqual(get_rows_per_scan(4), 2)
+
+    def test_odd_composite_number(self):
+        self.assertEqual(get_rows_per_scan(9), 3)
+
+    def test_prime_number(self):
+        self.assertEqual(get_rows_per_scan(3), 3)

@@ -246,3 +246,16 @@ def transpose_if_xdim_less_than_ydim(
         return np.ma.transpose(variable_values).copy()
 
     return variable_values
+
+
+def get_rows_per_scan(total_rows: int) -> int:
+    """
+    Finds the smallest divisor of the total number of rows. If no divisor is
+    found, return the total number of rows.
+    """
+    if total_rows < 2:
+        return 1
+    for row_number in range(2, int(total_rows**0.5) + 1):
+        if total_rows % row_number == 0:
+            return row_number
+    return total_rows
