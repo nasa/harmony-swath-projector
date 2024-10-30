@@ -65,8 +65,8 @@ class TestSwathGeometry(TestCase):
 
     def setUp(self):
         self.test_dataset = Dataset(self.test_path)
-        self.longitudes = self.test_dataset['lon']
-        self.latitudes = self.test_dataset['lat']
+        self.longitudes = self.test_dataset['lon'][:]
+        self.latitudes = self.test_dataset['lat'][:]
 
     def tearDown(self):
         self.test_dataset.close()
@@ -101,8 +101,8 @@ class TestSwathGeometry(TestCase):
         """Ensure the calculated one-dimensional resolution is correct."""
         resolution = get_projected_resolution(
             self.geographic_projection,
-            self.test_dataset['lon_1d'],
-            self.test_dataset['lat_1d'],
+            self.test_dataset['lon_1d'][:],
+            self.test_dataset['lat_1d'][:],
         )
 
         self.assertAlmostEqual(resolution, 5.0)
@@ -167,9 +167,7 @@ class TestSwathGeometry(TestCase):
             np.logical_not(valid_pixels), np.ones(self.longitudes.shape)
         )
 
-        coordinates = get_perimeter_coordinates(
-            self.longitudes[:], self.latitudes[:], mask
-        )
+        coordinates = get_perimeter_coordinates(self.longitudes, self.latitudes, mask)
 
         self.assertCountEqual(coordinates, expected_points)
 

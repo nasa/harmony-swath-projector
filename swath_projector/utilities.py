@@ -31,7 +31,8 @@ def get_variable_values(
     As the variable data are returned as a `numpy.ma.MaskedArray`, the will
     return no data in the filled pixels. To ensure that the data are
     correctly handled, the fill value is applied to masked pixels using the
-    `filled` method.
+    `filled` method. The variable values are transposed if the `along-track`
+    dimension size is less than the `across-track` dimension size.
 
     """
     # TODO: Remove in favour of apply2D or process_subdimension.
@@ -42,27 +43,38 @@ def get_variable_values(
     if len(variable[:].shape) == 1:
         return make_array_two_dimensional(variable[:])
     elif 'time' in input_file.variables and 'time' in variable.dimensions:
-        # Assumption: Array = (1, y, x)
-        return variable[0][:].filled(fill_value=fill_value)
+        # Assumption: Array = (time, along-track, across-track)
+        return transpose_if_xdim_less_than_ydim(variable[0][:]).filled(
+            fill_value=fill_value
+        )
     else:
-        # Assumption: Array = (y, x)
-        return variable[:].filled(fill_value=fill_value)
+        # Assumption: Array = (along-track, across-track)
+        return transpose_if_xdim_less_than_ydim(variable[:]).filled(
+            fill_value=fill_value
+        )
 
 
 def get_coordinate_variable(
     dataset: Dataset, coordinates_tuple: Tuple[str], coordinate_substring
-) -> Optional[Variable]:
+) -> Optional[np.ma.MaskedArray]:
     """Search the coordinate dataset names for a match to the substring,
     which will be either "lat" or "lon". Return the corresponding variable
-    from the dataset. Only the base variable name is used, as the group
-    path may contain either of the strings as part of other words.
+    data from the dataset. Only the base variable name is used, as the group
+    path may contain either of the strings as part of other words. The
+    coordinate variables are transposed if the `along-track`dimension size is
+    less than the `across-track` dimension size.
 
     """
     for coordinate in coordinates_tuple:
         if coordinate_substring in coordinate.split('/')[-1] and variable_in_dataset(
             coordinate, dataset
         ):
-            return dataset[coordinate]
+            # QuickFix (DAS-2216) for short and wide swaths
+            if dataset[coordinate].ndim == 1:
+                return dataset[coordinate][:]
+
+            return transpose_if_xdim_less_than_ydim(dataset[coordinate][:])
+
     raise MissingCoordinatesError(coordinates_tuple)
 
 
@@ -216,3 +228,34 @@ def make_array_two_dimensional(one_dimensional_array: np.ndarray) -> np.ndarray:
 
     """
     return np.expand_dims(one_dimensional_array, 1)
+
+
+def transpose_if_xdim_less_than_ydim(
+    variable_values: np.ma.MaskedArray,
+) -> np.ma.MaskedArray:
+    """Return transposed variable when variable is wider than tall.
+
+    QuickFix (DAS-2216): We presume that a swath has more rows than columns and
+    if that's not the case we transpose it so that it does.
+    """
+    if len(variable_values.shape) != 2:
+        raise ValueError(
+            f'Input variable must be 2 dimensional, but got {len(variable_values.shape)} dimensions.'
+        )
+    if variable_values.shape[0] < variable_values.shape[1]:
+        return np.ma.transpose(variable_values).copy()
+
+    return variable_values
+
+
+def get_rows_per_scan(total_rows: int) -> int:
+    """
+    Finds the smallest divisor of the total number of rows. If no divisor is
+    found, return the total number of rows.
+    """
+    if total_rows < 2:
+        return 1
+    for row_number in range(2, int(total_rows**0.5) + 1):
+        if total_rows % row_number == 0:
+            return row_number
+    return total_rows
