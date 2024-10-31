@@ -25,6 +25,7 @@ from swath_projector.swath_geometry import (
 from swath_projector.utilities import (
     create_coordinates_key,
     get_coordinate_variable,
+    get_rows_per_scan,
     get_scale_and_offset,
     get_variable_file_path,
     get_variable_numeric_fill_value,
@@ -268,6 +269,7 @@ def get_ewa_results(
         ewa_information['target_area'],
         variable['values'],
         maximum_weight_mode=maximum_weight_mode,
+        rows_per_scan=get_rows_per_scan(variable['values'].shape[0]),
     )
 
     if variable['fill_value'] is not None:
