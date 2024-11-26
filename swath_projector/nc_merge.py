@@ -62,6 +62,15 @@ def create_output(
                 input_dataset, output_dataset, metadata_variable, logger
             )
 
+        for dimension_variable in output_dataset.dimensions:
+            if (
+                dimension_variable in input_dataset.variables
+                and dimension_variable not in output_dataset.variables
+            ):
+                copy_metadata_variable(
+                    input_dataset, output_dataset, dimension_variable, logger
+                )
+
         output_extension = os.path.splitext(input_file)[1]
 
         for variable_name in science_variables:
