@@ -69,7 +69,7 @@ def reproject(
 
     # Loop through each dataset and reproject
     logger.debug('Using pyresample for reprojection.')
-    outputs = resample_all_variables(
+    outputs, failed_variables = resample_all_variables(
         parameters, science_variables, temp_dir, logger, var_info
     )
 
@@ -78,11 +78,12 @@ def reproject(
 
     # Now merge outputs (unless we only have one)
     metadata_variables = var_info.get_metadata_variables()
+    metadata_variables.update(failed_variables)
     nc_merge.create_output(
         parameters,
         output_file,
         temp_dir,
-        science_variables,
+        outputs,
         metadata_variables,
         logger,
         var_info,

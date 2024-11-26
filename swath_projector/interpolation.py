@@ -53,17 +53,20 @@ def resample_all_variables(
     temp_directory: str,
     logger: Logger,
     var_info: VarInfoFromNetCDF4,
-) -> List[str]:
+) -> Tuple[List[str], List[str]]:
     """Iterate through all science variables and reproject to the target
     coordinate grid.
 
     Returns:
         output_variables: A list of names of successfully reprojected
             variables.
+        failed_variables: A list of names of variables that failed
+            reprojection.
     """
     output_extension = os.path.splitext(message_parameters['input_file'])[-1]
     reprojection_cache = get_reprojection_cache(message_parameters)
     output_variables = []
+    failed_variables = []
 
     check_for_valid_interpolation(message_parameters, logger)
 
@@ -91,8 +94,9 @@ def resample_all_variables(
             # other error conditions.
             logger.error(f'Cannot reproject {variable}')
             logger.exception(error)
+            failed_variables.append(variable)
 
-    return output_variables
+    return output_variables, failed_variables
 
 
 def resample_variable(
