@@ -42,7 +42,7 @@ class TestNCMerge(TestCase):
             '/wind_speed',
         }
 
-        cls.metadata_variables = set()
+        cls.metadata_variables = {'/fake_var'}
         cls.var_info = VarInfoFromNetCDF4(
             cls.properties['input_file'],
             short_name='VIIRS_NPP-NAVO-L2P-v3.0',
@@ -70,9 +70,13 @@ class TestNCMerge(TestCase):
             for expected_variable in self.science_variables:
                 self.assertIn(expected_variable.lstrip('/'), output_dataset.variables)
 
-            # Output also has a CRS grid_mapping variable, and three dimensions:
+            # Output has all projected metadata variables:
+            for expected_variable in self.metadata_variables:
+                self.assertIn(expected_variable.lstrip('/'), output_dataset.variables)
+
+            # Output also has a CRS grid_mapping variable, and four dimensions:
             self.assertIn('latitude_longitude', output_dataset.variables)
-            for expected_dimension in {'lat', 'lon', 'time'}:
+            for expected_dimension in {'lat', 'lon', 'time', 'fake_dim'}:
                 self.assertIn(expected_dimension, output_dataset.variables)
 
     def test_same_dimensions(self):
