@@ -69,11 +69,11 @@ def reproject(
 
     # Loop through each dataset and reproject
     logger.debug('Using pyresample for reprojection.')
-    outputs, failed_variables = resample_all_variables(
+    resampled_variables, failed_variables = resample_all_variables(
         parameters, science_variables, temp_dir, logger, var_info
     )
 
-    if not outputs:
+    if not resampled_variables:
         raise Exception('No variables could be reprojected')
 
     # Now merge outputs (unless we only have one)
@@ -83,7 +83,7 @@ def reproject(
         parameters,
         output_file,
         temp_dir,
-        outputs,
+        resampled_variables,
         metadata_variables,
         logger,
         var_info,
