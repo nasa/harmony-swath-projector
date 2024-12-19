@@ -19,7 +19,7 @@ fi
 
 echo "Test Coverage Estimates"
 coverage report --omit="tests/*"
-coverage html --omit="tests/*" -d /home/test/coverage
+coverage html --omit="tests/*" -d /home/tests/coverage
 
 
 # Run pylint

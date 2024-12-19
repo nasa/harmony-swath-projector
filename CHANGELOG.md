@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.2.1] - 2024-11-26
+## [v1.3.0] - 2024-12-19
 
 ### Changed
 
@@ -60,7 +60,7 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
-[v1.2.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.1)
+[v1.3.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.3.0)
 [v1.2.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.0)
 [v1.1.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.1.1)
 [v1.1.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.1.0)
