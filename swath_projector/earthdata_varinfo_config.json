@@ -9,27 +9,6 @@
     "VNP10": "VIIRS",
     "TEMPO_O3TOT_L2": "TEMPO"
   },
-  "ExcludedScienceVariables": [
-    {
-      "Applicability": {
-        "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_O3TOT_L2"
-      },
-      "VariablePattern": [
-        "/support_data/a_priori_layer_o3",
-        "/support_data/cal_adjustment",
-        "/support_data/dNdR",
-        "/support_data/layer_efficiency",
-        "/support_data/lut_wavelength",
-        "/support_data/N_value",
-        "/support_data/N_value_residual",
-        "/support_data/ozone_sensitivity_ratio",
-        "/support_data/step_1_N_value_residual",
-        "/support_data/step_2_N_value_residual",
-        "/support_data/temp_sensitivity_ratio"
-      ]
-    }
-  ],
   "MetadataOverrides": [
     {
       "Applicability": {

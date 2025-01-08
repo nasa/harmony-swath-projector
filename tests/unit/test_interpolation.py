@@ -91,11 +91,11 @@ class TestInterpolation(TestCase):
             self.var_info,
         )
 
-        expected_output = ['/red_var', '/green_var', '/blue_var', '/alpha_var']
+        expected_output = (['/red_var', '/green_var', '/blue_var', '/alpha_var'], [])
         self.assertEqual(output_variables, expected_output)
         self.assertEqual(mock_resample_variable.call_count, 4)
 
-        for variable in expected_output:
+        for variable in expected_output[0]:
             variable_output_path = f'/tmp/01234{variable}.nc'
             mock_resample_variable.assert_any_call(
                 parameters,
@@ -125,11 +125,13 @@ class TestInterpolation(TestCase):
             self.var_info,
         )
 
-        expected_output = ['/green_var', '/blue_var', '/alpha_var']
+        reprojectable_variables = ['/green_var', '/blue_var', '/alpha_var']
+        non_reprojectable_variables = ['/red_var']
+        expected_output = (reprojectable_variables, non_reprojectable_variables)
         self.assertEqual(output_variables, expected_output)
         self.assertEqual(mock_resample_variable.call_count, 4)
 
-        all_variables = expected_output + ['/red_var']
+        all_variables = reprojectable_variables + non_reprojectable_variables
 
         for variable in all_variables:
             variable_output_path = f'/tmp/01234{variable}.nc'
