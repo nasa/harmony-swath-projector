@@ -22,11 +22,12 @@ def create_coordinates_key(variable: VariableFromNetCDF4) -> Tuple[str]:
 
 
 def get_variable_values(
-    input_file: Dataset, variable: Variable, fill_value: Optional
+    variable: Variable,
+    fill_value: Optional,
+    ordered_track_dimensions,
 ) -> np.ndarray:
     """A helper function to retrieve the values of a specified dataset. This
-    function accounts for 2-D and 3-D datasets based on whether the time
-    variable is present in the dataset.
+    function accounts for 2-D and 3-D datasets.
 
     As the variable data are returned as a `numpy.ma.MaskedArray`, the will
     return no data in the filled pixels. To ensure that the data are
@@ -35,21 +36,13 @@ def get_variable_values(
     dimension size is less than the `across-track` dimension size.
 
     """
-    # TODO: Remove in favour of apply2D or process_subdimension.
-    #       The coordinate dimensions should be determined, and a slice of data
-    #       in the longitude-latitude plane should be used to determine 2-D
-    #       reprojection information. This information should then also be
-    #       applied across the other preceding or following dimensions.
     if len(variable[:].shape) == 1:
         return make_array_two_dimensional(variable[:])
-    elif 'time' in input_file.variables and 'time' in variable.dimensions:
-        # Assumption: Array = (time, along-track, across-track)
-        return transpose_if_xdim_less_than_ydim(variable[0][:]).filled(
-            fill_value=fill_value
-        )
+
+    if variable.dimensions == ordered_track_dimensions:
+        return variable[:].filled(fill_value=fill_value)
     else:
-        # Assumption: Array = (along-track, across-track)
-        return transpose_if_xdim_less_than_ydim(variable[:]).filled(
+        return transpose_variable(variable, ordered_track_dimensions).filled(
             fill_value=fill_value
         )
 
@@ -59,21 +52,14 @@ def get_coordinate_variable(
 ) -> Optional[np.ma.MaskedArray]:
     """Search the coordinate dataset names for a match to the substring,
     which will be either "lat" or "lon". Return the corresponding variable
-    data from the dataset. Only the base variable name is used, as the group
-    path may contain either of the strings as part of other words. The
-    coordinate variables are transposed if the `along-track`dimension size is
-    less than the `across-track` dimension size.
-
+    from the dataset. Only the base variable name is used, as the group
+    path may contain either of the strings as part of other words.
     """
     for coordinate in coordinates_tuple:
         if coordinate_substring in coordinate.split('/')[-1] and variable_in_dataset(
             coordinate, dataset
         ):
-            # QuickFix (DAS-2216) for short and wide swaths
-            if dataset[coordinate].ndim == 1:
-                return dataset[coordinate][:]
-
-            return transpose_if_xdim_less_than_ydim(dataset[coordinate][:])
+            return dataset[coordinate]
 
     raise MissingCoordinatesError(coordinates_tuple)
 
@@ -230,22 +216,36 @@ def make_array_two_dimensional(one_dimensional_array: np.ndarray) -> np.ndarray:
     return np.expand_dims(one_dimensional_array, 1)
 
 
-def transpose_if_xdim_less_than_ydim(
-    variable_values: np.ma.MaskedArray,
+def transpose_variable(
+    variable: Variable, track_dimensions: Tuple[str]
 ) -> np.ma.MaskedArray:
-    """Return transposed variable when variable is wider than tall.
+    """Return transposed variable with the track dimensions
+    as the last two dimensions.
 
-    QuickFix (DAS-2216): We presume that a swath has more rows than columns and
-    if that's not the case we transpose it so that it does.
     """
-    if len(variable_values.shape) != 2:
-        raise ValueError(
-            f'Input variable must be 2 dimensional, but got {len(variable_values.shape)} dimensions.'
-        )
-    if variable_values.shape[0] < variable_values.shape[1]:
-        return np.ma.transpose(variable_values).copy()
+    target_axes = get_transposal_target_axes(variable.dimensions, track_dimensions)
+    return np.ma.transpose(variable[:], axes=target_axes).copy()
 
-    return variable_values
+
+def get_transposal_target_axes(
+    variable_dimensions: Tuple[str], track_dimensions: Tuple[str]
+) -> Tuple[int]:
+    """Determines the target axes order for transposing a variable's dimensions
+    such that the along-track and across-track dimensions are placed in the
+    last two positions of the resulting order.
+
+    """
+    i = 0
+    target_axes = [-1] * len(variable_dimensions)
+    for idx, dim in enumerate(variable_dimensions):
+        if dim == track_dimensions[0]:
+            target_axes[-2] = idx
+        elif dim == track_dimensions[1]:
+            target_axes[-1] = idx
+        else:
+            target_axes[i] = idx
+            i += 1
+    return tuple(target_axes)
 
 
 def get_rows_per_scan(total_rows: int) -> int:
@@ -259,3 +259,14 @@ def get_rows_per_scan(total_rows: int) -> int:
         if total_rows % row_number == 0:
             return row_number
     return total_rows
+
+
+def get_non_track_dimensions(variable, track_dimensions) -> list[Dict]:
+    """
+    Populates a list of dictionaries contain
+    """
+    non_track_dimensions = []
+    for i, dimension in enumerate(variable.dimensions):
+        if dimension not in track_dimensions:
+            non_track_dimensions.append({"name": dimension, "size": variable.shape[i]})
+    return non_track_dimensions

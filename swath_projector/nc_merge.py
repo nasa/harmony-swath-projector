@@ -54,9 +54,6 @@ def create_output(
         logger.info('Copying input file attributes to output file.')
         set_output_attributes(input_dataset, output_dataset, request_parameters)
 
-        if 'time' in input_dataset.dimensions:
-            copy_time_dimension(input_dataset, output_dataset, logger)
-
         for metadata_variable in metadata_variables:
             copy_metadata_variable(
                 input_dataset, output_dataset, metadata_variable, logger
@@ -91,6 +88,16 @@ def create_output(
                         ):
                             copy_metadata_variable(
                                 data, output_dataset, variable_key, logger
+                            )
+
+                    # Copy any other dimension variables (e.g., time)
+                    for dimension in data[variable_name].dimensions:
+                        if (
+                            dimension in input_dataset.variables
+                            and dimension not in output_dataset.variables
+                        ):
+                            copy_dimension_variables(
+                                input_dataset, output_dataset, dimension, logger
                             )
 
             else:
@@ -211,17 +218,25 @@ def read_attrs(dataset: Union[Dataset, Variable]) -> Dict:
     return dataset.__dict__
 
 
-def copy_time_dimension(
-    input_dataset: Dataset, output_dataset: Dataset, logger: logging.Logger
+def copy_dimension_variables(
+    input_dataset: Dataset,
+    output_dataset: Dataset,
+    variable_name: str,
+    logger: logging.Logger,
 ) -> None:
-    """Add time dimension to the output file. This will first add a dimension,
-    before creating the corresponding variable in the output dataset.
+    """Copy dimension variable (e.g., "time") to the output file."""
+    logger.info(f'Adding dimension variable "{variable_name}" to the output')
+    attributes = read_attrs(input_dataset[variable_name])
+    output_dataset.createVariable(
+        variable_name,
+        input_dataset[variable_name].datatype,
+        dimensions=input_dataset[variable_name].dimensions,
+        zlib=True,
+        complevel=6,
+    )
 
-    """
-    logger.info('Adding "time" dimension.')
-    time_variable = input_dataset['time']
-    output_dataset.createDimension('time', time_variable.size)
-    copy_metadata_variable(input_dataset, output_dataset, 'time', logger)
+    output_dataset[variable_name][:] = input_dataset[variable_name][:]
+    output_dataset[variable_name].setncatts(attributes)
 
 
 def set_dimensions(input_dataset: Dataset, output_dataset: Dataset) -> None:
@@ -374,12 +389,7 @@ def get_science_variable_dimensions(
     a dimension of the reprojected variable.
 
     """
-    if 'time' not in input_dataset.dimensions:
-        dimensions = single_band_dataset[variable_name].dimensions
-    else:
-        dimensions = ('time',) + single_band_dataset[variable_name].dimensions
-
-    return dimensions
+    return single_band_dataset[variable_name].dimensions
 
 
 def check_coor_valid(

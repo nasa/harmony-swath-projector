@@ -61,22 +61,34 @@ def write_single_band_output(
     variable_output_path: str,
     reprojection_cache: Dict,
     attributes: Dict,
+    non_spatial_dimensions: list[Dict],
 ) -> None:
     """The main interface for this module. Each single band output file
     will contain the following properties:
 
-    - A reprojected, 2-dimensional  science variable.
+    - A reprojected, n-dimensional  science variable.
     - Projected x and y dimensions.
-    - A 1-dimensional variable for each of the associated dimensions. The
-      science variable should use these as its dimensions.
+    - A 1-dimensional variable for each of the associated spatial dimensions.
+      The science variable should use these as its dimensions.
     - A grid mapping variable, with metadata conforming to the CF
       Conventions. The science variable should refer to this in its
       metadata.
 
     """
     with Dataset(variable_output_path, 'w', format='NETCDF4') as output_file:
-        dimensions = write_dimensions(output_file, target_area, reprojection_cache)
-        grid_mapping_name = write_grid_mapping(output_file, target_area, dimensions)
+        spatial_dimensions = write_spatial_dimensions(
+            output_file, target_area, reprojection_cache
+        )
+        write_non_spatial_dimensions(output_file, non_spatial_dimensions)
+
+        dimensions = (
+            tuple(dimension["name"] for dimension in non_spatial_dimensions)
+            + spatial_dimensions
+        )
+
+        grid_mapping_name = write_grid_mapping(
+            output_file, target_area, spatial_dimensions
+        )
         write_science_variable(
             output_file,
             reprojected_data,
@@ -85,10 +97,10 @@ def write_single_band_output(
             grid_mapping_name,
             attributes,
         )
-        write_dimension_variables(output_file, dimensions, target_area)
+        write_dimension_variables(output_file, spatial_dimensions, target_area)
 
 
-def write_dimensions(
+def write_spatial_dimensions(
     dataset: Dataset, target_area: AreaDefinition, cache: Dict
 ) -> Tuple[str]:
     """Derive the dimension names using the target area definition and the
@@ -153,6 +165,17 @@ def write_dimensions(
     dataset.createDimension(x_dim, size=target_area.shape[1])
 
     return (y_dim, x_dim)
+
+
+def write_non_spatial_dimensions(
+    dataset: Dataset,
+    non_spatial_dimensions: list[Dict],
+):
+    """
+    Write the non-spatial dimensions to the output dataset.
+    """
+    for dimension in non_spatial_dimensions:
+        dataset.createDimension(dimension["name"], size=dimension["size"])
 
 
 def write_grid_mapping(

@@ -25,12 +25,14 @@ from swath_projector.swath_geometry import (
 from swath_projector.utilities import (
     create_coordinates_key,
     get_coordinate_variable,
+    get_non_track_dimensions,
     get_rows_per_scan,
     get_scale_and_offset,
     get_variable_file_path,
     get_variable_numeric_fill_value,
     get_variable_values,
     make_array_two_dimensional,
+    transpose_variable,
 )
 
 # In nearest neighbour interpolation, the distance to a found value is
@@ -126,9 +128,31 @@ def resample_variable(
         logger.debug(
             'Retrieving previous interpolation information for ' f'{full_variable}'
         )
-        reprojection_information = reprojection_cache[coordinates_key]
+        reprojection_information = reprojection_cache[coordinates_key][
+            "reprojection_information"
+        ]
+        track_dimensions = reprojection_cache[coordinates_key]["track_dimensions"]
     else:
         logger.debug(f'Deriving interpolation information for {full_variable}')
+        latitudes = get_coordinate_variable(dataset, coordinates_key, 'lat')
+        longitudes = get_coordinate_variable(dataset, coordinates_key, 'lon')
+
+        track_dimensions = (
+            (latitudes.dimensions[0], latitudes.dimensions[1])
+            if latitudes.shape[0] >= latitudes.shape[1]
+            else (latitudes.dimensions[1], latitudes.dimensions[0])
+        )
+
+        latitudes_values = (
+            transpose_variable(latitudes, track_dimensions)
+            if track_dimensions != latitudes.dimensions
+            else latitudes[:]
+        )
+        longitudes_values = (
+            transpose_variable(longitudes, track_dimensions)
+            if track_dimensions != longitudes.dimensions
+            else longitudes[:]
+        )
 
         if HARMONY_TARGET in reprojection_cache:
             logger.debug('Using target area defined in Harmony message.')
@@ -136,10 +160,14 @@ def resample_variable(
         else:
             logger.debug('Deriving target area from associated coordinates.')
             target_area = get_target_area(
-                message_parameters, dataset, coordinates_key, logger
+                message_parameters,
+                latitudes_values,
+                longitudes_values,
+                coordinates_key,
+                logger,
             )
 
-        swath_definition = get_swath_definition(dataset, coordinates_key)
+        swath_definition = get_swath_definition(latitudes_values, longitudes_values)
 
         reprojection_information = interpolation_functions['get_information'](
             swath_definition, target_area
@@ -150,20 +178,35 @@ def resample_variable(
         # cached within the coordinate key entry will only be a reference to
         # the Harmony message target area objects, not copies of the objects
         # themselves.
-        reprojection_cache[coordinates_key] = reprojection_information
+        reprojection_cache[coordinates_key] = {
+            "reprojection_information": reprojection_information,
+            "track_dimensions": track_dimensions,
+        }
 
     # Use a dictionary to store input variable values and fill value. This
     # allows the same function signature to retrieve results from all
     # interpolation methods.
     fill_value = get_variable_numeric_fill_value(variable)
+    variable_values = get_variable_values(
+        variable,
+        fill_value,
+        track_dimensions,
+    )
     variable_information = {
-        'values': get_variable_values(dataset, variable, fill_value),
+        'values': variable_values,
         'fill_value': fill_value,
     }
 
-    results = interpolation_functions['get_results'](
-        variable_information, reprojection_information
-    )
+    non_track_dimensions = get_non_track_dimensions(variable, track_dimensions)
+
+    if len(variable.shape) == 3:
+        results = get_three_dimensional_results(
+            variable_information, reprojection_information, interpolation_functions
+        )
+    else:
+        results = interpolation_functions['get_results'](
+            variable_information, reprojection_information
+        )
     results = results.astype(variable.dtype)
 
     attributes = get_scale_and_offset(variable)
@@ -174,6 +217,7 @@ def resample_variable(
         variable_output_path,
         reprojection_cache,
         attributes,
+        non_track_dimensions,
     )
 
     dataset.close()
@@ -324,7 +368,6 @@ def get_near_results(variable: Dict, near_information) -> np.ndarray:
     if len(results.shape) == 3:
         # Occurs when pyresample thinks the results are banded.
         results = np.squeeze(results, axis=2)
-
     return results
 
 
@@ -377,15 +420,14 @@ def check_for_valid_interpolation(message_parameters: Dict, logger: Logger) -> N
         )
 
 
-def get_swath_definition(dataset: Dataset, coordinates: Tuple[str]) -> SwathDefinition:
+def get_swath_definition(
+    latitudes: np.ma.MaskedArray, longitudes: np.ma.MaskedArray
+) -> SwathDefinition:
     """Define the swath as specified by the associated longitude and latitude
     datasets. Note, the longitudes must be wrapped to the range:
     -180 < longitude < 180.
 
     """
-    latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
-    longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
-
     wrapped_lons, wrapped_lats = check_and_wrap(longitudes[:], latitudes[:])
 
     # EWA ll2cr requires 2-dimensional arrays for the swath coordinates:
@@ -435,7 +477,11 @@ def get_reprojection_cache(parameters: Dict) -> Dict:
 
 
 def get_target_area(
-    parameters: Dict, dataset: Dataset, coordinates: Tuple[str], logger: Logger
+    parameters: Dict,
+    latitudes: np.ma.MaskedArray,
+    longitudes: np.ma.MaskedArray,
+    coordinates: Tuple[str],
+    logger: Logger,
 ) -> AreaDefinition:
     """Define the target area as specified by either a complete set of message
     parameters, or supplemented with coordinate variables as referred to in
@@ -448,8 +494,6 @@ def get_target_area(
     dimensions = get_parameters_tuple(parameters, ['height', 'width'])
     resolutions = get_parameters_tuple(parameters, ['xres', 'yres'])
     projection_string = parameters['projection'].definition_string()
-    latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
-    longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
 
     if grid_extents is not None:
         logger.info(
@@ -518,3 +562,25 @@ def get_parameters_tuple(
         output_values = None
 
     return output_values
+
+
+def get_three_dimensional_results(
+    variable_information, reprojection_information, interpolation_functions
+):
+    """Reproject each 2D slice of the 3D variable to the target grid and return
+    the results
+    """
+
+    results = np.empty(
+        (
+            variable_information["values"].shape[0],
+            *reprojection_information['target_area'].shape,
+        )
+    )
+    variable_slice_information = {'fill_value': variable_information['fill_value']}
+    for idx in range(variable_information["values"].shape[0]):
+        variable_slice_information['values'] = variable_information['values'][idx, :, :]
+        results[idx] = interpolation_functions['get_results'](
+            variable_slice_information, reprojection_information
+        )
+    return results
