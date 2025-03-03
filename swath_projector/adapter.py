@@ -1,4 +1,4 @@
-""" Data Services Swath Projector service for Harmony. """
+"""Data Services Swath Projector service for Harmony."""
 
 import mimetypes
 import os

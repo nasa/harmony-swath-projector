@@ -1,6 +1,6 @@
-""" Reprojection support for merging single-dataset NetCDF-4 files, produced by
-    `pyresample`, back into a single output file with all the necessary
-    attributes.
+"""Reprojection support for merging single-dataset NetCDF-4 files, produced by
+`pyresample`, back into a single output file with all the necessary
+attributes.
 """
 
 import json
