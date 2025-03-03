@@ -1,5 +1,5 @@
-""" This module contains functions to perform interpolation on the science
-    datasets within a file, using the pyresample Python package.
+"""This module contains functions to perform interpolation on the science
+datasets within a file, using the pyresample Python package.
 
 """
 
