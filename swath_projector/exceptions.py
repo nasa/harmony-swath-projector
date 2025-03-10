@@ -1,6 +1,6 @@
-""" This module contains custom exceptions specific to the Harmony Swath
-    Projector. These exceptions are intended to allow for easier debugging of
-    the expected errors that may occur during an invocation of the service.
+"""This module contains custom exceptions specific to the Harmony Swath
+Projector. These exceptions are intended to allow for easier debugging of
+the expected errors that may occur during an invocation of the service.
 
 """
 

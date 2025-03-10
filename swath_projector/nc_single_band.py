@@ -1,25 +1,25 @@
-""" This module contains functionality to produce a NetCDF-4 file that should
-    contain a single science variable and it's associated projected
-    coordinates. The format of each file should be:
+"""This module contains functionality to produce a NetCDF-4 file that should
+contain a single science variable and it's associated projected
+coordinates. The format of each file should be:
 
-    Groups:
+Groups:
 
-    - All non-science variables should be in the root group of the NetCDF-4
-      dataset.
-    - The science variable should be in the same location within the output
-      dataset as the original input variable was within its dataset.
+- All non-science variables should be in the root group of the NetCDF-4
+  dataset.
+- The science variable should be in the same location within the output
+  dataset as the original input variable was within its dataset.
 
-    Variables:
+Variables:
 
-    - science variable.
-    - crs (named according to the CF Conventions).
-    - x (or lon if geographic).
-    - y (or lat if geographic).
+- science variable.
+- crs (named according to the CF Conventions).
+- x (or lon if geographic).
+- y (or lat if geographic).
 
-    Dimensions:
+Dimensions:
 
-    - x (or lon if geographic).
-    - y (or lat if geographic).
+- x (or lon if geographic).
+- y (or lat if geographic).
 
 """
 

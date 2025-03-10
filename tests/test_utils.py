@@ -1,4 +1,4 @@
-""" Utility classes used to extend the unittest capabilities. """
+"""Utility classes used to extend the unittest capabilities."""
 
 from os import sep
 from os.path import basename
