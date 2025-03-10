@@ -1,70 +1,70 @@
-""" A utility function to run the Swath Projector source code on a locally
-    hosted granule, without requiring a full Docker image. This function will
-    also mock the `shutil.rmtree` function used in file clean-up by the
-    `HarmonyAdapter`, so that the NetCDF-4 output can be inspected. The path of
-    this temporary directory should be printed to the terminal in green.
+"""A utility function to run the Swath Projector source code on a locally
+hosted granule, without requiring a full Docker image. This function will
+also mock the `shutil.rmtree` function used in file clean-up by the
+`HarmonyAdapter`, so that the NetCDF-4 output can be inspected. The path of
+this temporary directory should be printed to the terminal in green.
 
-    2021-07-29
+2021-07-29
 
-    Prerequisites:
+Prerequisites:
 
-    * The `harmony-service-lib-py` package must be installed, via Pip, in the
-      current Python environment (e.g., conda environment or virtualenv).
-    * Python v3.11 or higher.
+* The `harmony-service-lib-py` package must be installed, via Pip, in the
+  current Python environment (e.g., conda environment or virtualenv).
+* Python v3.11 or higher.
 
-    Usage:
+Usage:
 
-    * Navigate to the root directory of this repository,
-      `harmony-swath-projector`.
-    * Begin a local Python session.
-    * Run: the following:
+* Navigate to the root directory of this repository,
+  `harmony-swath-projector`.
+* Begin a local Python session.
+* Run: the following:
 
-    ```
-    from bin.project_local_granule import project_granule
+```
+from bin.project_local_granule import project_granule
 
-    project_granule(<path to local file>)
-    ```
+project_granule(<path to local file>)
+```
 
-    More complicated messages:
+More complicated messages:
 
-    The Swath Projector can read a number of parameters from the `format`
-    attribute of a Harmony message. A more complicated example would be:
+The Swath Projector can read a number of parameters from the `format`
+attribute of a Harmony message. A more complicated example would be:
 
-    ```
-    message = Message({
-        'callback': 'https://example.com/callback',
-        'stagingLocation': 's3://example-bucket/example-path',
-        'sources': [{
-            'granules': [{
-                'url': local_file_path,
-                'temporal': {
-                    'start': '2021-01-03T23:45:00.000Z',
-                    'end': '2020-01-04T00:00:00.000Z',
-                },
-                'bbox': [-180, -90, 180, 90],
-            }],
+```
+message = Message({
+    'callback': 'https://example.com/callback',
+    'stagingLocation': 's3://example-bucket/example-path',
+    'sources': [{
+        'granules': [{
+            'url': local_file_path,
+            'temporal': {
+                'start': '2021-01-03T23:45:00.000Z',
+                'end': '2020-01-04T00:00:00.000Z',
+            },
+            'bbox': [-180, -90, 180, 90],
         }],
-        'format': {'crs': 'EPSG:4326',
-                   'interpolation': 'near',
-                   'height': 100,
-                   'width': 100,
-                   'scaleExtent': {'x': {'min': -180, 'max': -150},
-                                   'y': {'min': 20, 'max': 30}}}
-    })
-    ```
+    }],
+    'format': {'crs': 'EPSG:4326',
+               'interpolation': 'near',
+               'height': 100,
+               'width': 100,
+               'scaleExtent': {'x': {'min': -180, 'max': -150},
+                               'y': {'min': 20, 'max': 30}}}
+})
+```
 
-    Note, `scaleSize` can also be specified in the `format` attribute:
+Note, `scaleSize` can also be specified in the `format` attribute:
 
-    ```
-    `format`: {'scaleSize': {'x': 0.1, 'y': 0.1}}
-    ```
+```
+`format`: {'scaleSize': {'x': 0.1, 'y': 0.1}}
+```
 
-    However, this property cannot be specified in conjunction with both the
-    output grid dimensions and the output grid extents, as all three sets of
-    properties must be consistent with one another.
+However, this property cannot be specified in conjunction with both the
+output grid dimensions and the output grid extents, as all three sets of
+properties must be consistent with one another.
 
-    For local testing of a more complicated example, the message content in the
-    function below can be edited.
+For local testing of a more complicated example, the message content in the
+function below can be edited.
 
 """
 
