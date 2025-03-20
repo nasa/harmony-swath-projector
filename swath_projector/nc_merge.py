@@ -240,7 +240,8 @@ def set_metadata_dimensions(
     """Iterate through the dimensions of the metadata variable, and ensure
     that all are present in the reprojected output file. This function is
     necessary if any of the metadata variables, that aren't to be projected
-    use the swath-based dimensions from the input granule.
+    use the swath-based dimensions from the input granule. If the dimension
+    exists as a variable in the source file, copy it to the output file.
 
     """
     for dimension in source_dataset[metadata_variable].dimensions:
@@ -248,6 +249,21 @@ def set_metadata_dimensions(
             output_dataset.createDimension(
                 dimension, source_dataset.dimensions[dimension].size
             )
+            if dimension in source_dataset.variables:
+                attributes = read_attrs(source_dataset[dimension])
+                fill_value = get_fill_value_from_attributes(attributes)
+
+                output_dataset.createVariable(
+                    dimension,
+                    source_dataset[dimension].datatype,
+                    dimensions=source_dataset[dimension].dimensions,
+                    fill_value=fill_value,
+                    zlib=True,
+                    complevel=6,
+                )
+
+                output_dataset[dimension][:] = source_dataset[dimension][:]
+                output_dataset[dimension].setncatts(attributes)
 
 
 def copy_metadata_variable(
