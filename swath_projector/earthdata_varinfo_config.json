@@ -7,7 +7,7 @@
   ],
   "Mission": {
     "VNP10": "VIIRS",
-    "TEMPO_O3TOT_L2": "TEMPO"
+    "TEMPO_.*_L2": "TEMPO"
   },
   "ExcludedScienceVariables": [
     {
@@ -27,6 +27,29 @@
         "/support_data/step_1_N_value_residual",
         "/support_data/step_2_N_value_residual",
         "/support_data/temp_sensitivity_ratio"
+      ]
+    },
+    {
+      "Applicability": {
+        "Mission": "TEMPO",
+        "ShortNamePath": "TEMPO_NO2_L2"
+      },
+      "VariablePattern": [
+        "/support_data/gas_profile",
+        "/support_data/scattering_weights",
+        "/support_data/scattering_weights_clear_sky",
+        "/support_data/temperature_profile"
+      ]
+    },
+    {
+      "Applicability": {
+        "Mission": "TEMPO",
+        "ShortNamePath": "TEMPO_NO2_L2_NRT"
+      },
+      "VariablePattern": [
+        "/support_data/gas_profile",
+        "/support_data/scattering_weights",
+        "/support_data/temperature_profile"
       ]
     }
   ],
@@ -48,8 +71,8 @@
     {
       "Applicability": {
         "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_O3TOT_L2",
-        "VariablePattern": "^/product/.*|^/support_data/.*|^/geolocation/(?!time$).*"
+        "ShortNamePath": "TEMPO_.*_L2",
+        "VariablePattern": "^/(product|support_data|geolocation|qa_statistics)/(?!time$).*"
       },
       "Attributes": [
         {
@@ -57,7 +80,7 @@
           "Value": "/geolocation/latitude, /geolocation/longitude"
         }
       ],
-      "_Description": "TEMPO_O3TOT_L2 variables only contain basenames for coordinates, which are found in sibling hierarchical groups. This rule fully qualifies the paths to these coordinates. Some variables in these groups are excluded via 'ExcludedScienceVariables'"
+      "_Description": "TEMPO L2 variables only contain basenames for coordinates, which are found in sibling hierarchical groups. This rule fully qualifies the paths to these coordinates. Some variables in these groups are excluded via 'ExcludedScienceVariables'"
     }
   ]
 }
