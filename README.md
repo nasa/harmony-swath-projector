@@ -41,7 +41,7 @@ installed, as specified in their requirements files.
 
 ```
 conda create --name=swathprojector python=3.11 -q \
-    --channel conda-forge --channel defaults -y
+    --channel conda-forge  --override-channels -y
 conda activate swathprojector
 pip install -r pip_requirements.txt
 ```
