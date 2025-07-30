@@ -51,6 +51,28 @@
         "/support_data/scattering_weights",
         "/support_data/temperature_profile"
       ]
+    },
+    {
+      "Applicability": {
+        "Mission": "TEMPO",
+        "ShortNamePath": "TEMPO_HCHO_L2"
+      },
+      "VariablePattern": [
+        "/support_data/gas_profile",
+        "/support_data/scattering_weights",
+        "/support_data/temperature_profile"
+      ]
+    },
+    {
+      "Applicability": {
+        "Mission": "TEMPO",
+        "ShortNamePath": "TEMPO_HCHO_L2_NRT"
+      },
+      "VariablePattern": [
+        "/support_data/gas_profile",
+        "/support_data/scattering_weights",
+        "/support_data/temperature_profile"
+      ]
     }
   ],
   "MetadataOverrides": [
