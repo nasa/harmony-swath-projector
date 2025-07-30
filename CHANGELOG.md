@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.2.2] - 2025-07-30
+
+### Changed
+
+- [[DAS-2400](https://bugs.earthdata.nasa.gov/browse/DAS-2400)]
+  The `earthdata-varinfo` configuration file used by the Swath Projector has
+  been updated to support TEMPO_NO2_L2 and TEMPO_NO2_L2_NRT products.
+
 ## [v1.2.1] - 2025-05-09
 
 ### Changed
@@ -62,6 +70,7 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
+[v1.2.2]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.2)
 [v1.2.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.1)
 [v1.2.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.0)
 [v1.1.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.1.1)
