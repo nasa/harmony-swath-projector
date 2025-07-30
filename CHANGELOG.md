@@ -6,7 +6,7 @@
 
 - [[DAS-2400](https://bugs.earthdata.nasa.gov/browse/DAS-2400)]
   The `earthdata-varinfo` configuration file used by the Swath Projector has
-  been updated to support TEMPO_NO2_L2 and TEMPO_NO2_L2_NRT products.
+  been updated to support TEMPO_HCHO_L2 and TEMPO_HCHO_L2_NRT products.
 
 ## [v1.2.1] - 2025-05-09
 
