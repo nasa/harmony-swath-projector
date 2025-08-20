@@ -73,6 +73,43 @@
         "/support_data/scattering_weights",
         "/support_data/temperature_profile"
       ]
+    },
+    {
+      "Applicability": {
+        "Mission": "TEMPO",
+        "ShortNamePath": "TEMPO_O3PROF_L2"
+      },
+      "VariablePattern": [
+        "/product/ozone_profile",
+        "/product/nongas_param",
+        "/product/nongas_param_error",
+        "/product/nongas_param_precision",
+        "/product/other_gas_column",
+        "/product/other_gas_column_error",
+        "/product/other_gas_column_precision",
+        "/product/ozone_profile",
+        "/product/ozone_profile_error",
+        "/product/ozone_profile_precision",
+        "/support_data/num_wavelengths_in_fit_windows",
+        "/support_data/correlation_upper_triangular_matrix",
+        "/support_data/nongas_param_apriori",
+        "/support_data/nongas_param_apriori_error",
+        "/support_data/nongas_param_names",
+        "/support_data/nongas_param_units",
+        "/support_data/other_gas_apriori_column",
+        "/support_data/other_gas_apriori_error",
+        "/support_data/other_gas_names",
+        "/support_data/ozone_apriori_profile",
+        "/support_data/ozone_apriori_profile_error",
+        "/support_data/ozone_averaging_kernel",
+        "/support_data/ozone_profile_altitude",
+        "/support_data/ozone_profile_altitude_bounds",
+        "/support_data/ozone_profile_pressure",
+        "/support_data/ozone_profile_pressure_bounds",
+        "/support_data/ozone_profile_temperature",
+        "/qa_statistics/avg_residuals",
+        "/qa_statistics/fit_RMS"
+      ]
     }
   ],
   "MetadataOverrides": [
