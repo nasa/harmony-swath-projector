@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.2.3] - 2025-08-20
+
+### Changed
+
+- [[DAS-2404](https://bugs.earthdata.nasa.gov/browse/DAS-2404)]
+  The `earthdata-varinfo` configuration file used by the Swath Projector has
+  been updated to exclude unsupported TEMPO_O3PROF_L2 variables.
+
 ## [v1.2.2] - 2025-07-30
 
 ### Changed
@@ -70,6 +78,7 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
+[v1.2.3]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.3)
 [v1.2.2]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.2)
 [v1.2.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.1)
 [v1.2.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.0)
