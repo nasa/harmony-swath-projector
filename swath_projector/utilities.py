@@ -2,7 +2,7 @@ import os
 from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
-from netCDF4 import Dataset, Variable
+from netCDF4 import Dataset, Dimension, Variable
 from varinfo import VariableFromNetCDF4
 
 from swath_projector.exceptions import MissingCoordinatesError
@@ -22,7 +22,7 @@ def create_coordinates_key(variable: VariableFromNetCDF4) -> Tuple[str]:
 
 
 def get_variable_values(
-    input_file: Dataset, variable: Variable, fill_value: Optional
+    variable: Variable, fill_value: FillValueType, ordered_dims: Tuple[str]
 ) -> np.ndarray:
     """A helper function to retrieve the values of a specified dataset. This
     function accounts for 2-D and 3-D datasets based on whether the time
@@ -35,47 +35,54 @@ def get_variable_values(
     dimension size is less than the `across-track` dimension size.
 
     """
-    # TODO: Remove in favour of apply2D or process_subdimension.
-    #       The coordinate dimensions should be determined, and a slice of data
-    #       in the longitude-latitude plane should be used to determine 2-D
-    #       reprojection information. This information should then also be
-    #       applied across the other preceding or following dimensions.
     if len(variable[:].shape) == 1:
         return make_array_two_dimensional(variable[:])
-    elif 'time' in input_file.variables and 'time' in variable.dimensions:
-        # Assumption: Array = (time, along-track, across-track)
-        return transpose_if_xdim_less_than_ydim(variable[0][:]).filled(
-            fill_value=fill_value
-        )
-    else:
-        # Assumption: Array = (along-track, across-track)
-        return transpose_if_xdim_less_than_ydim(variable[:]).filled(
-            fill_value=fill_value
+
+    # If the dimensions have been reordered, transpose the variable
+    if variable.dimensions != ordered_dims:
+        axes = get_axes_permutation(variable.dimensions, ordered_dims)
+        return (
+            np.ma.transpose(variable[:], axes=axes).copy().filled(fill_value=fill_value)
         )
 
+    return variable[:]
 
-def get_coordinate_variable(
+
+def get_coordinate_matching_substring(
     dataset: Dataset, coordinates_tuple: Tuple[str], coordinate_substring
-) -> Optional[np.ma.MaskedArray]:
+) -> Variable:
     """Search the coordinate dataset names for a match to the substring,
     which will be either "lat" or "lon". Return the corresponding variable
-    data from the dataset. Only the base variable name is used, as the group
-    path may contain either of the strings as part of other words. The
-    coordinate variables are transposed if the `along-track`dimension size is
-    less than the `across-track` dimension size.
+    from the dataset. Only the base variable name is used, as the group
+    path may contain either of the strings as part of other words.
 
     """
     for coordinate in coordinates_tuple:
         if coordinate_substring in coordinate.split('/')[-1] and variable_in_dataset(
             coordinate, dataset
         ):
-            # QuickFix (DAS-2216) for short and wide swaths
-            if dataset[coordinate].ndim == 1:
-                return dataset[coordinate][:]
-
-            return transpose_if_xdim_less_than_ydim(dataset[coordinate][:])
-
+            return dataset[coordinate]
     raise MissingCoordinatesError(coordinates_tuple)
+
+
+def get_coordinate_data(
+    dataset: Dataset, coordinates_tuple: Tuple[str], coordinate_substring
+) -> np.ma.MaskedArray:
+    """Return the corresponding coordinate variable data.
+
+    If the variable's track dimensions are determined to require reordering,
+    the transposed coordinate variable data is returned.
+    """
+    coordinate = get_coordinate_matching_substring(
+        dataset, coordinates_tuple, coordinate_substring
+    )
+    if coordinate.ndim == 1:
+        return coordinate[:]
+
+    if coordinate_requires_transpose(coordinate):
+        return np.ma.transpose(coordinate[:]).copy()
+    else:
+        return coordinate[:]
 
 
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
@@ -230,24 +237,6 @@ def make_array_two_dimensional(one_dimensional_array: np.ndarray) -> np.ndarray:
     return np.expand_dims(one_dimensional_array, 1)
 
 
-def transpose_if_xdim_less_than_ydim(
-    variable_values: np.ma.MaskedArray,
-) -> np.ma.MaskedArray:
-    """Return transposed variable when variable is wider than tall.
-
-    QuickFix (DAS-2216): We presume that a swath has more rows than columns and
-    if that's not the case we transpose it so that it does.
-    """
-    if len(variable_values.shape) != 2:
-        raise ValueError(
-            f'Input variable must be 2 dimensional, but got {len(variable_values.shape)} dimensions.'
-        )
-    if variable_values.shape[0] < variable_values.shape[1]:
-        return np.ma.transpose(variable_values).copy()
-
-    return variable_values
-
-
 def get_rows_per_scan(total_rows: int) -> int:
     """
     Finds the smallest divisor of the total number of rows. If no divisor is
@@ -259,3 +248,72 @@ def get_rows_per_scan(total_rows: int) -> int:
         if total_rows % row_number == 0:
             return row_number
     return total_rows
+
+
+def get_preferred_ordered_dimensions_info(
+    variable: Variable, coordinates: Tuple[str], dataset: Dataset
+) -> Tuple[tuple[str], list[Dimension]]:
+    """Return the variable's dimensions in the preferred order.
+
+    Ensure the track dimensions are the last two dimensions in the tuple and in the
+    order of ascending size. Any additional dimensions are placed at the front of the
+    tuple maintaining the oringinal relative order between themselves.
+    """
+    # Either 'lat' or 'lon' could be used as the substring here
+    coordinate_var = get_coordinate_matching_substring(dataset, coordinates, 'lat')
+    ordered_track_dims = get_ordered_track_dims(coordinate_var)
+
+    current_dims = variable.dimensions
+
+    # Ensure both required dims are present
+    if not all(dim in current_dims for dim in ordered_track_dims):
+        raise Exception(f"Invalid dimensions {current_dims} for reprojection")
+
+    ordered_non_track_dims = [
+        dim for dim in current_dims if dim not in ordered_track_dims
+    ]
+
+    all_ordered_dims = (*ordered_non_track_dims, *ordered_track_dims)
+
+    ordered_non_track_dim_objs = [
+        dataset.dimensions[dim] for dim in ordered_non_track_dims
+    ]
+
+    return all_ordered_dims, ordered_non_track_dim_objs
+
+
+def get_ordered_track_dims(coordinate_var: Variable) -> Tuple[str]:
+    """
+    Return track dimensions in order of descending size.
+    """
+    if not coordinate_var.ndim == 2:
+        raise Exception('Unsupported coordinate variable shape')
+    if coordinate_requires_transpose(coordinate_var):
+        return coordinate_var.dimensions[::-1]
+    else:
+        return coordinate_var.dimensions
+
+
+def get_axes_permutation(old_dims: Tuple[str], new_dims: Tuple[str]) -> Tuple[int]:
+    """
+    Compute the axis permutation required to reorder dimension array.
+    """
+    axes = []
+    used = [False] * len(old_dims)
+
+    for new_dim in new_dims:
+        for i, old_dim in enumerate(old_dims):
+            if old_dim == new_dim and not used[i]:
+                axes.append(i)
+                used[i] = True
+                break
+    return axes
+
+
+def coordinate_requires_transpose(coordinate: Variable) -> bool:
+    """
+    Determine if the given coordinate requires transposal before resampling.
+
+    If a swath has more rows than columns, it should be transposed.
+    """
+    return coordinate.shape[0] < coordinate.shape[1]

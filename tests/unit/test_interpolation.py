@@ -1,9 +1,9 @@
 from logging import Logger
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
-from netCDF4 import Dataset
+from netCDF4 import Dataset, Dimension
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition
 from varinfo import VarInfoFromNetCDF4
@@ -11,12 +11,14 @@ from varinfo import VarInfoFromNetCDF4
 from swath_projector.interpolation import (
     EPSILON,
     RADIUS_OF_INFLUENCE,
+    allocate_target_array,
     check_for_valid_interpolation,
     get_parameters_tuple,
     get_reprojection_cache,
     get_swath_definition,
     get_target_area,
     resample_all_variables,
+    resample_layer,
     resample_variable,
 )
 from swath_projector.nc_single_band import HARMONY_TARGET
@@ -1073,7 +1075,7 @@ class TestInterpolation(TestCase):
 
     @patch('swath_projector.interpolation.get_projected_resolution')
     @patch('swath_projector.interpolation.get_extents_from_perimeter')
-    @patch('swath_projector.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_coordinate_data')
     def test_get_target_area_minimal(
         self, mock_get_coordinates, mock_get_extents, mock_get_resolution
     ):
@@ -1123,7 +1125,7 @@ class TestInterpolation(TestCase):
 
     @patch('swath_projector.interpolation.get_projected_resolution')
     @patch('swath_projector.interpolation.get_extents_from_perimeter')
-    @patch('swath_projector.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_coordinate_data')
     def test_get_target_area_extents(
         self, mock_get_coordinates, mock_get_extents, mock_get_resolution
     ):
@@ -1172,7 +1174,7 @@ class TestInterpolation(TestCase):
 
     @patch('swath_projector.interpolation.get_projected_resolution')
     @patch('swath_projector.interpolation.get_extents_from_perimeter')
-    @patch('swath_projector.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_coordinate_data')
     def test_get_target_area_extents_resolutions(
         self, mock_get_coordinates, mock_get_extents, mock_get_resolution
     ):
@@ -1223,7 +1225,7 @@ class TestInterpolation(TestCase):
 
     @patch('swath_projector.interpolation.get_projected_resolution')
     @patch('swath_projector.interpolation.get_extents_from_perimeter')
-    @patch('swath_projector.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_coordinate_data')
     def test_get_target_area_extents_dimensions(
         self, mock_get_coordinates, mock_get_extents, mock_get_resolution
     ):
@@ -1273,7 +1275,7 @@ class TestInterpolation(TestCase):
 
     @patch('swath_projector.interpolation.get_projected_resolution')
     @patch('swath_projector.interpolation.get_extents_from_perimeter')
-    @patch('swath_projector.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_coordinate_data')
     def test_get_target_area_dimensions(
         self, mock_get_coordinates, mock_get_extents, mock_get_resolution
     ):
@@ -1319,7 +1321,7 @@ class TestInterpolation(TestCase):
 
     @patch('swath_projector.interpolation.get_projected_resolution')
     @patch('swath_projector.interpolation.get_extents_from_perimeter')
-    @patch('swath_projector.interpolation.get_coordinate_variable')
+    @patch('swath_projector.interpolation.get_coordinate_data')
     def test_get_target_area_resolutions(
         self, mock_get_coordinates, mock_get_extents, mock_get_resolution
     ):
@@ -1386,3 +1388,36 @@ class TestInterpolation(TestCase):
                 self.assertEqual(
                     get_parameters_tuple(input_parameters, keys), expected_output
                 )
+
+    def test_resample_layer(self):
+        """Ensure that the resample is called with the correct parameters"""
+        # Example input data.
+        source_layer = np.array([[1, 2], [3, 4]])
+        fill_value = -9999
+        reprojection_information = {'target_shape': (3, 3)}
+
+        mocked_resample_result = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        mock_resampler = Mock(return_value=mocked_resample_result)
+        result = resample_layer(
+            source_layer, fill_value, reprojection_information, mock_resampler
+        )
+        mock_resampler.assert_called_once_with(
+            {'values': source_layer, 'fill_value': fill_value},
+            reprojection_information,
+        )
+        np.testing.assert_array_equal(result, mocked_resample_result)
+
+    def test_allocate_target_array(self):
+        """Ensure the target array is returned in the correct shape and datatype"""
+
+        dim1 = Mock(spec=Dimension, size=5)
+        dim2 = Mock(spec=Dimension, size=10)
+
+        non_track_dims = [dim1, dim2]
+        target_area_shape = (2, 3)
+        dtype = np.float32
+
+        result = allocate_target_array(non_track_dims, target_area_shape, dtype)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.float32)
+        self.assertTupleEqual(result.shape, (5, 10, 2, 3))

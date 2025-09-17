@@ -4,15 +4,16 @@ from unittest import TestCase
 from unittest.mock import Mock
 
 import numpy as np
-from netCDF4 import Dataset
+from netCDF4 import Dataset, Dimension
 from pyproj.crs import CRS
 from pyresample.geometry import AreaDefinition
 
 from swath_projector.nc_single_band import (
     HARMONY_TARGET,
     write_dimension_variables,
-    write_dimensions,
     write_grid_mapping,
+    write_horizontal_dimensions,
+    write_non_horizontal_dimensions,
     write_science_variable,
     write_single_band_output,
 )
@@ -62,56 +63,123 @@ class TestNCSingleBand(TestCase):
 
         """
         output_path = f'{self.temp_dir}/overall_test.nc'
-        write_single_band_output(
-            self.area_definition,
-            self.reprojected_data,
-            self.variable_name,
-            output_path,
-            self.cache,
-            {},
-        )
-
-        with Dataset(output_path) as saved_output:
-            # Check dimensions
-            self.assertTupleEqual(tuple(saved_output.dimensions.keys()), ('lat', 'lon'))
-            self.assertEqual(saved_output.dimensions['lat'].size, 2)
-            self.assertEqual(saved_output.dimensions['lon'].size, 4)
-
-            # Check all variables are present
-            self.assertSetEqual(
-                set(saved_output.variables.keys()),
-                {'lat', 'lon', 'latitude_longitude', self.variable_name},
+        with self.subTest("Test 2D variable"):
+            write_single_band_output(
+                self.area_definition,
+                self.reprojected_data,
+                self.variable_name,
+                output_path,
+                self.cache,
+                {},
+                [],
             )
 
-            # Check science variable
-            np.testing.assert_array_equal(
-                saved_output[self.variable_name][:], self.reprojected_data
-            )
-            self.assertTupleEqual(
-                saved_output[self.variable_name].dimensions, ('lat', 'lon')
-            )
-            self.assertListEqual(
-                saved_output[self.variable_name].ncattrs(), ['grid_mapping']
-            )
-            self.assertEqual(
-                saved_output[self.variable_name].getncattr('grid_mapping'),
-                'latitude_longitude',
-            )
+            with Dataset(output_path) as saved_output:
+                # Check dimensions
+                self.assertTupleEqual(
+                    tuple(saved_output.dimensions.keys()), ('lat', 'lon')
+                )
+                self.assertEqual(saved_output.dimensions['lat'].size, 2)
+                self.assertEqual(saved_output.dimensions['lon'].size, 4)
 
-            # Check grid_mapping:
-            grid_attributes = saved_output['latitude_longitude'].__dict__
-            for attribute_name, attribute_value in grid_attributes.items():
-                self.assertEqual(
-                    attribute_value, self.geographic_mapping_attributes[attribute_name]
+                # Check all variables are present
+                self.assertSetEqual(
+                    set(saved_output.variables.keys()),
+                    {'lat', 'lon', 'latitude_longitude', self.variable_name},
                 )
 
-            # Check dimension variables
-            self.assertTupleEqual(saved_output['lat'].dimensions, ('lat',))
-            self.assertTupleEqual(saved_output['lon'].dimensions, ('lon',))
-            np.testing.assert_array_equal(saved_output['lat'][:], self.lat_values)
-            np.testing.assert_array_equal(saved_output['lon'][:], self.lon_values)
+                # Check science variable
+                np.testing.assert_array_equal(
+                    saved_output[self.variable_name][:], self.reprojected_data
+                )
+                self.assertTupleEqual(
+                    saved_output[self.variable_name].dimensions, ('lat', 'lon')
+                )
+                self.assertListEqual(
+                    saved_output[self.variable_name].ncattrs(), ['grid_mapping']
+                )
+                self.assertEqual(
+                    saved_output[self.variable_name].getncattr('grid_mapping'),
+                    'latitude_longitude',
+                )
 
-    def test_write_dimensions(self):
+                # Check grid_mapping:
+                grid_attributes = saved_output['latitude_longitude'].__dict__
+                for attribute_name, attribute_value in grid_attributes.items():
+                    self.assertEqual(
+                        attribute_value,
+                        self.geographic_mapping_attributes[attribute_name],
+                    )
+
+                # Check dimension variables
+                self.assertTupleEqual(saved_output['lat'].dimensions, ('lat',))
+                self.assertTupleEqual(saved_output['lon'].dimensions, ('lon',))
+                np.testing.assert_array_equal(saved_output['lat'][:], self.lat_values)
+                np.testing.assert_array_equal(saved_output['lon'][:], self.lon_values)
+
+        with self.subTest("Test 3D variable"):
+            reprojected_data_3d = np.array(
+                [[[1, 2, 3, 4], [5, 6, 7, 8]], [[1, 2, 3, 4], [5, 6, 7, 8]]]
+            )
+            non_horizontal_dim = Mock(spec=Dimension)
+            non_horizontal_dim.name = "third_dim"
+            non_horizontal_dim.size = 2
+
+            write_single_band_output(
+                self.area_definition,
+                reprojected_data_3d,
+                self.variable_name,
+                output_path,
+                self.cache,
+                {},
+                [non_horizontal_dim],
+            )
+            with Dataset(output_path) as saved_output:
+                # Check dimensions
+                self.assertTupleEqual(
+                    tuple(saved_output.dimensions.keys()), ('lat', 'lon', 'third_dim')
+                )
+                self.assertEqual(saved_output.dimensions['lat'].size, 2)
+                self.assertEqual(saved_output.dimensions['lon'].size, 4)
+                self.assertEqual(saved_output.dimensions['third_dim'].size, 2)
+
+                # Check all variables are present
+                self.assertSetEqual(
+                    set(saved_output.variables.keys()),
+                    {'lat', 'lon', 'latitude_longitude', self.variable_name},
+                )
+
+                # Check science variable
+                np.testing.assert_array_equal(
+                    saved_output[self.variable_name][:], reprojected_data_3d
+                )
+                self.assertTupleEqual(
+                    saved_output[self.variable_name].dimensions,
+                    ('third_dim', 'lat', 'lon'),
+                )
+                self.assertListEqual(
+                    saved_output[self.variable_name].ncattrs(), ['grid_mapping']
+                )
+                self.assertEqual(
+                    saved_output[self.variable_name].getncattr('grid_mapping'),
+                    'latitude_longitude',
+                )
+
+                # Check grid_mapping:
+                grid_attributes = saved_output['latitude_longitude'].__dict__
+                for attribute_name, attribute_value in grid_attributes.items():
+                    self.assertEqual(
+                        attribute_value,
+                        self.geographic_mapping_attributes[attribute_name],
+                    )
+
+                # Check dimension variables
+                self.assertTupleEqual(saved_output['lat'].dimensions, ('lat',))
+                self.assertTupleEqual(saved_output['lon'].dimensions, ('lon',))
+                np.testing.assert_array_equal(saved_output['lat'][:], self.lat_values)
+                np.testing.assert_array_equal(saved_output['lon'][:], self.lon_values)
+
+    def test_write_horizontal_dimensions(self):
         """Ensure dimensions are written with the correct names. The subtests
         should establish whether geographic projections are identified,
         whether pre-existing information in the cache is used and, if
@@ -121,7 +189,9 @@ class TestNCSingleBand(TestCase):
         with self.subTest('Geographic, Harmony defined area.'):
             cache = {HARMONY_TARGET: {'reprojection': 'information'}}
             with Dataset('test.nc', 'w', diskless=True) as dataset:
-                dimensions = write_dimensions(dataset, self.area_definition, cache)
+                dimensions = write_horizontal_dimensions(
+                    dataset, self.area_definition, cache
+                )
 
                 self.assertTupleEqual(dimensions, ('lat', 'lon'))
                 self.assertSetEqual(set(dataset.dimensions.keys()), {'lat', 'lon'})
@@ -130,16 +200,22 @@ class TestNCSingleBand(TestCase):
             cache = {HARMONY_TARGET: {'reprojection': 'information'}}
 
             with Dataset('test.nc', 'w', diskless=True) as dataset:
-                dimensions = write_dimensions(dataset, self.non_geographic_area, cache)
+                dimensions = write_horizontal_dimensions(
+                    dataset, self.non_geographic_area, cache
+                )
 
                 self.assertTupleEqual(dimensions, ('y', 'x'))
                 self.assertSetEqual(set(dataset.dimensions.keys()), {'y', 'x'})
 
         with self.subTest('Geographic, retrieve dimensions from cache.'):
-            cache = {('lat', 'lon'): {'dimensions': ('saved_lat', 'saved_lon')}}
+            cache = {
+                ('lat', 'lon'): {'horizontal_dimensions': ('saved_lat', 'saved_lon')}
+            }
 
             with Dataset('test.nc', 'w', diskless=True) as dataset:
-                dimensions = write_dimensions(dataset, self.area_definition, cache)
+                dimensions = write_horizontal_dimensions(
+                    dataset, self.area_definition, cache
+                )
 
                 self.assertTupleEqual(dimensions, ('saved_lat', 'saved_lon'))
                 self.assertSetEqual(
@@ -150,7 +226,9 @@ class TestNCSingleBand(TestCase):
             cache = {('lat', 'lon'): {'reprojection': 'information'}}
 
             with Dataset('test.nc', 'w', diskless=True) as dataset:
-                dimensions = write_dimensions(dataset, self.area_definition, cache)
+                dimensions = write_horizontal_dimensions(
+                    dataset, self.area_definition, cache
+                )
 
                 self.assertTupleEqual(dimensions, ('lat', 'lon'))
                 self.assertSetEqual(set(dataset.dimensions.keys()), {'lat', 'lon'})
@@ -163,7 +241,9 @@ class TestNCSingleBand(TestCase):
             }
 
             with Dataset('test.nc', 'w', diskless=True) as dataset:
-                dimensions = write_dimensions(dataset, self.area_definition, cache)
+                dimensions = write_horizontal_dimensions(
+                    dataset, self.area_definition, cache
+                )
 
                 self.assertTupleEqual(dimensions, ('lat_2', 'lon_2'))
                 self.assertSetEqual(set(dataset.dimensions.keys()), {'lat_2', 'lon_2'})
@@ -322,3 +402,31 @@ class TestNCSingleBand(TestCase):
             # The data values are correct.
             np.testing.assert_array_equal(dataset['lat_1'][:], self.lat_values)
             np.testing.assert_array_equal(dataset['lon_1'][:], self.lon_values)
+
+    def test_write_non_horizontal_dimensions(self):
+        """Ensure non-horizontal dimensions are written to the dataset correctly"""
+        with self.subTest("create non-horizontal dimensions"):
+            with Dataset("test.nc", "w", diskless=True) as dataset:
+                dim1 = Mock(spec=Dimension)
+                dim1.name = "time"
+                dim1.size = 5
+
+                dim2 = Mock(spec=Dimension)
+                dim2.name = "layer"
+                dim2.size = 10
+                write_non_horizontal_dimensions(dataset, [dim1, dim2])
+                self.assertIn("time", dataset.dimensions)
+                self.assertIn("layer", dataset.dimensions)
+                self.assertEqual(len(dataset.dimensions["time"]), 5)
+                self.assertEqual(len(dataset.dimensions["layer"]), 10)
+
+        with self.subTest("duplicate non-horizontal dimensions handled correctly"):
+            with Dataset("test.nc", "w", diskless=True) as dataset:
+                dim1 = Mock(spec=Dimension)
+                dim1.name = "layer"
+                dim1.size = 10
+
+                write_non_horizontal_dimensions(dataset, [dim1, dim1])
+                self.assertIn("layer", dataset.dimensions)
+                self.assertEqual(len(dataset.dimensions["layer"]), 10)
+                self.assertEqual(len(dataset.dimensions), 1)
