@@ -144,6 +144,8 @@ class TestInterpolation(TestCase):
                 self.var_info,
             )
 
+    @patch('swath_projector.interpolation.allocate_target_array')
+    @patch('swath_projector.interpolation.get_preferred_ordered_dimensions_info')
     @patch('swath_projector.interpolation.write_single_band_output')
     @patch('swath_projector.interpolation.get_swath_definition')
     @patch('swath_projector.interpolation.get_target_area')
@@ -158,6 +160,8 @@ class TestInterpolation(TestCase):
         mock_get_target_area,
         mock_get_swath,
         mock_write_output,
+        mock_get_preferred_ordered_dimensions_info,
+        mock_allocate_target_array,
     ):
         """The bilinear interpolation should call both get_bil_info and
         get_sample_from_bil_info if there are no matching entries for the
@@ -175,9 +179,18 @@ class TestInterpolation(TestCase):
         mock_get_sample.return_value = results
         mock_get_swath.return_value = 'swath'
         ravel_data = np.ones((3,))
-        mock_values = MagicMock(**{'ravel.return_value': ravel_data})
+
+        mock_values = MagicMock()
+        mock_values.__getitem__.return_value.ravel.return_value = ravel_data
         mock_get_values.return_value = mock_values
+
         mock_get_target_area.return_value = self.mock_target_area
+
+        mock_ordered_non_track_dim_objs = MagicMock()
+        mock_get_preferred_ordered_dimensions_info.return_value = (
+            None,
+            mock_ordered_non_track_dim_objs,
+        )
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'bilinear'
@@ -222,6 +235,7 @@ class TestInterpolation(TestCase):
                 output_path,
                 expected_cache,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
         with self.subTest('Pre-existing bilinear information'):
@@ -264,6 +278,7 @@ class TestInterpolation(TestCase):
                 output_path,
                 bilinear_information,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
         with self.subTest('Harmony message defines target area'):
@@ -324,9 +339,12 @@ class TestInterpolation(TestCase):
                 output_path,
                 expected_cache,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
             mock_get_target_area.assert_not_called()
 
+    @patch('swath_projector.interpolation.allocate_target_array')
+    @patch('swath_projector.interpolation.get_preferred_ordered_dimensions_info')
     @patch('swath_projector.interpolation.write_single_band_output')
     @patch('swath_projector.interpolation.get_swath_definition')
     @patch('swath_projector.interpolation.get_target_area')
@@ -341,6 +359,8 @@ class TestInterpolation(TestCase):
         mock_get_target_area,
         mock_get_swath,
         mock_write_output,
+        mock_get_preferred_ordered_dimensions_info,
+        mock_allocate_target_array,
     ):
         """EWA interpolation should call both ll2cr and fornav if there are
         no matching entries for the coordinates in the reprojection
@@ -352,9 +372,19 @@ class TestInterpolation(TestCase):
         results = np.array([6.0])
         mock_fornav.return_value = ('', results)
         mock_get_swath.return_value = 'swath'
-        mock_values = np.ones((2, 3))
+
+        mock_values_data = np.ones((2, 3))
+        mock_values = MagicMock()
+        mock_values.__getitem__.return_value = mock_values_data
         mock_get_values.return_value = mock_values
+
         mock_get_target_area.return_value = self.mock_target_area
+
+        mock_ordered_non_track_dim_objs = MagicMock()
+        mock_get_preferred_ordered_dimensions_info.return_value = (
+            None,
+            mock_ordered_non_track_dim_objs,
+        )
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'ewa'
@@ -384,7 +414,7 @@ class TestInterpolation(TestCase):
                 'columns',
                 'rows',
                 self.mock_target_area,
-                mock_values,
+                mock_values[:],
                 maximum_weight_mode=False,
                 rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
@@ -395,6 +425,7 @@ class TestInterpolation(TestCase):
                 output_path,
                 expected_cache,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
         with self.subTest('Pre-existing EWA information'):
@@ -424,7 +455,7 @@ class TestInterpolation(TestCase):
                 'old_columns',
                 'old_rows',
                 self.mock_target_area,
-                mock_values,
+                mock_values[:],
                 maximum_weight_mode=False,
                 rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
@@ -435,8 +466,11 @@ class TestInterpolation(TestCase):
                 output_path,
                 ewa_information,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
+    @patch('swath_projector.interpolation.allocate_target_array')
+    @patch('swath_projector.interpolation.get_preferred_ordered_dimensions_info')
     @patch('swath_projector.interpolation.write_single_band_output')
     @patch('swath_projector.interpolation.get_swath_definition')
     @patch('swath_projector.interpolation.get_target_area')
@@ -451,6 +485,8 @@ class TestInterpolation(TestCase):
         mock_get_target_area,
         mock_get_swath,
         mock_write_output,
+        mock_get_preferred_ordered_dimensions_info,
+        mock_allocate_target_array,
     ):
         """EWA-NN interpolation should call both ll2cr and fornav if there are
         no matching entries for the coordinates in the reprojection
@@ -461,9 +497,19 @@ class TestInterpolation(TestCase):
         results = np.array([5.0])
         mock_fornav.return_value = ('', results)
         mock_get_swath.return_value = 'swath'
-        mock_values = np.ones((2, 3))
+
+        mock_values_data = np.ones((2, 3))
+        mock_values = MagicMock()
+        mock_values.__getitem__.return_value = mock_values_data
         mock_get_values.return_value = mock_values
+
         mock_get_target_area.return_value = self.mock_target_area
+
+        mock_ordered_non_track_dim_objs = MagicMock()
+        mock_get_preferred_ordered_dimensions_info.return_value = (
+            None,
+            mock_ordered_non_track_dim_objs,
+        )
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'ewa-nn'
@@ -493,7 +539,7 @@ class TestInterpolation(TestCase):
                 'columns',
                 'rows',
                 self.mock_target_area,
-                mock_values,
+                mock_values[:],
                 maximum_weight_mode=True,
                 rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
@@ -504,6 +550,7 @@ class TestInterpolation(TestCase):
                 output_path,
                 expected_cache,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
         with self.subTest('Pre-existing EWA-NN information'):
@@ -533,7 +580,7 @@ class TestInterpolation(TestCase):
                 'old_columns',
                 'old_rows',
                 self.mock_target_area,
-                mock_values,
+                mock_values[:],
                 maximum_weight_mode=True,
                 rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
@@ -544,6 +591,7 @@ class TestInterpolation(TestCase):
                 output_path,
                 ewa_nn_information,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
         with self.subTest('Harmony message defines target area'):
@@ -585,7 +633,7 @@ class TestInterpolation(TestCase):
                 'columns',
                 'rows',
                 harmony_target_area,
-                mock_values,
+                mock_values[:],
                 maximum_weight_mode=True,
                 rows_per_scan=2,  # Added in QuickFix DAS-2216 to be fixed in DAS-2220
             )
@@ -598,9 +646,12 @@ class TestInterpolation(TestCase):
                 output_path,
                 expected_cache,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
             mock_get_target_area.assert_not_called()
 
+    @patch('swath_projector.interpolation.allocate_target_array')
+    @patch('swath_projector.interpolation.get_preferred_ordered_dimensions_info')
     @patch('swath_projector.interpolation.write_single_band_output')
     @patch('swath_projector.interpolation.get_swath_definition')
     @patch('swath_projector.interpolation.get_target_area')
@@ -615,6 +666,8 @@ class TestInterpolation(TestCase):
         mock_get_target_area,
         mock_get_swath,
         mock_write_output,
+        mock_get_preferred_ordered_dimensions_info,
+        mock_allocate_target_array,
     ):
         """Nearest neighbour interpolation should call both get_neighbour_info
         and get_sample_from_neighbour_info if there are no matching entries
@@ -631,9 +684,19 @@ class TestInterpolation(TestCase):
         results = np.array([4.0])
         mock_get_sample.return_value = results
         mock_get_swath.return_value = 'swath'
-        mock_values = np.ones((2, 3))
+
+        mock_values_data = np.ones((2, 3))
+        mock_values = MagicMock()
+        mock_values.__getitem__.return_value = mock_values_data
         mock_get_values.return_value = mock_values
+
         mock_get_target_area.return_value = self.mock_target_area
+
+        mock_ordered_non_track_dim_objs = MagicMock()
+        mock_get_preferred_ordered_dimensions_info.return_value = (
+            None,
+            mock_ordered_non_track_dim_objs,
+        )
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'near'
@@ -671,7 +734,7 @@ class TestInterpolation(TestCase):
             mock_get_sample.assert_called_once_with(
                 'nn',
                 'ta_shape',
-                mock_values,
+                mock_values[:],
                 'valid_input_index',
                 'valid_output_index',
                 'index_array',
@@ -685,6 +748,7 @@ class TestInterpolation(TestCase):
                 output_path,
                 expected_cache,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
         with self.subTest('Pre-existing nearest neighbour information'):
@@ -715,7 +779,7 @@ class TestInterpolation(TestCase):
             mock_get_sample.assert_called_once_with(
                 'nn',
                 'ta_shape',
-                mock_values,
+                mock_values[:],
                 'old_valid_input',
                 'old_valid_output',
                 'old_index_array',
@@ -729,6 +793,7 @@ class TestInterpolation(TestCase):
                 output_path,
                 nearest_information,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
         with self.subTest('Harmony message defines target area'):
@@ -778,7 +843,7 @@ class TestInterpolation(TestCase):
             mock_get_sample.assert_called_once_with(
                 'nn',
                 'harmony_shape',
-                mock_values,
+                mock_values[:],
                 'valid_input_index',
                 'valid_output_index',
                 'index_array',
@@ -794,8 +859,11 @@ class TestInterpolation(TestCase):
                 output_path,
                 expected_cache,
                 {},
+                mock_ordered_non_track_dim_objs,
             )
 
+    @patch('swath_projector.interpolation.allocate_target_array')
+    @patch('swath_projector.interpolation.get_preferred_ordered_dimensions_info')
     @patch('swath_projector.interpolation.write_single_band_output')
     @patch('swath_projector.interpolation.get_swath_definition')
     @patch('swath_projector.interpolation.get_target_area')
@@ -810,6 +878,8 @@ class TestInterpolation(TestCase):
         mock_get_target_area,
         mock_get_swath,
         mock_write_output,
+        mock_get_preferred_ordered_dimensions_info,
+        mock_allocate_target_array,
     ):
         """Ensure that an input variable that contains scaling attributes,
         `add_offset` and `scale_factor` passes those attributes to the
@@ -826,9 +896,19 @@ class TestInterpolation(TestCase):
         results = np.array([4.0])
         mock_get_sample.return_value = results
         mock_get_swath.return_value = 'swath'
-        mock_values = np.ones((2, 3))
+
+        mock_values_data = np.ones((2, 3))
+        mock_values = MagicMock()
+        mock_values.__getitem__.return_value = mock_values_data
         mock_get_values.return_value = mock_values
+
         mock_get_target_area.return_value = self.mock_target_area
+
+        mock_ordered_non_track_dim_objs = MagicMock()
+        mock_get_preferred_ordered_dimensions_info.return_value = (
+            None,
+            mock_ordered_non_track_dim_objs,
+        )
 
         message_parameters = self.message_parameters
         message_parameters['interpolation'] = 'near'
@@ -866,7 +946,7 @@ class TestInterpolation(TestCase):
         mock_get_sample.assert_called_once_with(
             'nn',
             'ta_shape',
-            mock_values,
+            mock_values[:],
             'valid_input_index',
             'valid_output_index',
             'index_array',
@@ -880,6 +960,7 @@ class TestInterpolation(TestCase):
             output_path,
             expected_cache,
             expected_scaling,
+            mock_ordered_non_track_dim_objs,
         )
 
     def test_check_for_valid_interpolation(self):
