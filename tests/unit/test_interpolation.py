@@ -20,6 +20,7 @@ from swath_projector.interpolation import (
     resample_all_variables,
     resample_layer,
     resample_variable,
+    resample_variable_data,
 )
 from swath_projector.nc_single_band import HARMONY_TARGET
 from swath_projector.reproject import CF_CONFIG_FILE
@@ -1469,6 +1470,67 @@ class TestInterpolation(TestCase):
                 self.assertEqual(
                     get_parameters_tuple(input_parameters, keys), expected_output
                 )
+
+    @patch('swath_projector.interpolation.resample_layer')
+    def test_resample_variable_data(self, mock_resample_layer):
+        """Test the recursive resampling of n-dimensional variables"""
+        resampler = Mock()
+
+        with self.subTest("2D variable resampling"):
+            s_var_2d = np.ones((1, 2))
+            t_var_2d = np.empty((2, 4))
+            mock_resample_layer.return_value = np.ones((2, 4))
+            expected_2d = np.ones((2, 4))
+            results = resample_variable_data(s_var_2d, t_var_2d, -9999, {}, resampler)
+            np.testing.assert_array_equal(expected_2d, results)
+
+        with self.subTest("3D variable resampling"):
+            s_var_3d = np.ones((2, 1, 2))
+            t_var_3d = np.empty((2, 2, 4))
+            layer_values = [1, 2]
+            mock_resample_layer.side_effect = [
+                np.ones((2, 4)) * val for val in layer_values
+            ]
+            expected_3d = np.stack(
+                [
+                    np.ones((2, 4)) * 1,
+                    np.ones((2, 4)) * 2,
+                ]
+            )
+            results = resample_variable_data(s_var_3d, t_var_3d, -9999, {}, resampler)
+            np.testing.assert_array_equal(expected_3d, results)
+
+        with self.subTest("4D variable resampling"):
+            s_var_4d = np.ones((3, 2, 1, 2))
+            t_var_4d = np.empty((3, 2, 2, 4))
+            layer_values = [1, 2, 3, 4, 5, 6]
+            mock_resample_layer.side_effect = [
+                np.ones((2, 4)) * val for val in layer_values
+            ]
+            expected_4d = np.stack(
+                [
+                    np.stack(
+                        [
+                            np.ones((2, 4)) * 1,
+                            np.ones((2, 4)) * 2,
+                        ]
+                    ),
+                    np.stack(
+                        [
+                            np.ones((2, 4)) * 3,
+                            np.ones((2, 4)) * 4,
+                        ]
+                    ),
+                    np.stack(
+                        [
+                            np.ones((2, 4)) * 5,
+                            np.ones((2, 4)) * 6,
+                        ]
+                    ),
+                ]
+            )
+            results = resample_variable_data(s_var_4d, t_var_4d, -9999, {}, resampler)
+            np.testing.assert_array_equal(expected_4d, results)
 
     def test_resample_layer(self):
         """Ensure that the resample is called with the correct parameters"""
