@@ -16,7 +16,8 @@
         "ShortNamePath": "TEMPO_O3TOT_L2"
       },
       "VariablePattern": [
-        "/support_data/cal_adjustment"
+        "/support_data/cal_adjustment",
+        "/support_data/lut_wavelength"
       ]
     },
     {
