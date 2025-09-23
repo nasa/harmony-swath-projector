@@ -119,11 +119,15 @@ class TestNCSingleBand(TestCase):
 
         with self.subTest("Test 3D variable"):
             reprojected_data_3d = np.array(
-                [[[1, 2, 3, 4], [5, 6, 7, 8]], [[1, 2, 3, 4], [5, 6, 7, 8]]]
+                [
+                    [[1, 2, 3, 4], [5, 6, 7, 8]],
+                    [[1, 2, 3, 4], [5, 6, 7, 8]],
+                    [[1, 2, 3, 4], [5, 6, 7, 8]],
+                ]
             )
             non_horizontal_dim = Mock(spec=Dimension)
             non_horizontal_dim.name = "third_dim"
-            non_horizontal_dim.size = 2
+            non_horizontal_dim.size = 3
 
             write_single_band_output(
                 self.area_definition,
@@ -141,7 +145,7 @@ class TestNCSingleBand(TestCase):
                 )
                 self.assertEqual(saved_output.dimensions['lat'].size, 2)
                 self.assertEqual(saved_output.dimensions['lon'].size, 4)
-                self.assertEqual(saved_output.dimensions['third_dim'].size, 2)
+                self.assertEqual(saved_output.dimensions['third_dim'].size, 3)
 
                 # Check all variables are present
                 self.assertSetEqual(

@@ -442,7 +442,7 @@ def get_swath_definition(dataset: Dataset, coordinates: Tuple[str]) -> SwathDefi
     """
     latitudes = get_coordinate_data(dataset, coordinates, 'lat')
     longitudes = get_coordinate_data(dataset, coordinates, 'lon')
-    wrapped_lons, wrapped_lats = check_and_wrap(longitudes[:], latitudes[:])
+    wrapped_lons, wrapped_lats = check_and_wrap(longitudes, latitudes)
 
     # EWA ll2cr requires 2-dimensional arrays for the swath coordinates:
     if len(wrapped_lons.shape) == 1:

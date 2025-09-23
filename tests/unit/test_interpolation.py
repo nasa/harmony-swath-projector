@@ -1483,8 +1483,13 @@ class TestInterpolation(TestCase):
             expected_2d = np.ones((2, 4))
             results = resample_variable_data(s_var_2d, t_var_2d, -9999, {}, resampler)
             np.testing.assert_array_equal(expected_2d, results)
+            mock_resample_layer.assert_called_once()
+            args = mock_resample_layer.call_args
+            np.testing.assert_array_equal(args[0][0], s_var_2d[:])
+            self.assertEqual(args[0][1:], (-9999, {}, resampler))
 
         with self.subTest("3D variable resampling"):
+            mock_resample_layer.reset_mock()
             s_var_3d = np.ones((2, 1, 2))
             t_var_3d = np.empty((2, 2, 4))
             layer_values = [1, 2]
@@ -1500,7 +1505,14 @@ class TestInterpolation(TestCase):
             results = resample_variable_data(s_var_3d, t_var_3d, -9999, {}, resampler)
             np.testing.assert_array_equal(expected_3d, results)
 
+            self.assertEqual(mock_resample_layer.call_count, 2)
+            call_args_list = mock_resample_layer.call_args_list
+            for i, call_args in enumerate(call_args_list):
+                np.testing.assert_array_equal(call_args.args[0], s_var_3d[i, :])
+                self.assertEqual(call_args[0][1:], (-9999, {}, resampler))
+
         with self.subTest("4D variable resampling"):
+            mock_resample_layer.reset_mock()
             s_var_4d = np.ones((3, 2, 1, 2))
             t_var_4d = np.empty((3, 2, 2, 4))
             layer_values = [1, 2, 3, 4, 5, 6]
@@ -1531,6 +1543,15 @@ class TestInterpolation(TestCase):
             )
             results = resample_variable_data(s_var_4d, t_var_4d, -9999, {}, resampler)
             np.testing.assert_array_equal(expected_4d, results)
+
+            self.assertEqual(mock_resample_layer.call_count, 6)
+            call_args_list = mock_resample_layer.call_args_list
+            for i in range(3):
+                for j in range(2):
+                    call_index = i * 2 + j
+                    call_args = call_args_list[call_index]
+                    np.testing.assert_array_equal(call_args[0][0], s_var_4d[i, j, :])
+                    self.assertEqual(call_args[0][1:], (-9999, {}, resampler))
 
     def test_resample_layer(self):
         """Ensure that the resample is called with the correct parameters"""

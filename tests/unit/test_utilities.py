@@ -126,6 +126,25 @@ class TestUtilities(TestCase):
                 self.assertIsInstance(returned_data, np.ndarray)
                 np.testing.assert_array_equal(input_data, returned_data)
 
+        with self.subTest('3-D variable, reordering required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension("mirror_step", size=2)
+                dataset.createDimension("xtrack", size=3)
+                dataset.createDimension("layer", size=5)
+                input_data = np.ones((2, 3, 5))
+                variable = dataset.createVariable(
+                    'data',
+                    input_data.dtype,
+                    dimensions=('mirror_step', 'xtrack', 'layer'),
+                )
+                variable[:] = input_data[:]
+
+                reordered_dims = ("layer", "xtrack", "mirror_step")
+                returned_data = get_variable_values(variable, None, reordered_dims)
+
+                self.assertIsInstance(returned_data, np.ndarray)
+                self.assertEqual(returned_data.shape, (5, 3, 2))
+
     def test_get_coordinate_matching_substring(self):
         """Ensure the longitude or latitude coordinate variable, is retrieved
         when requested.

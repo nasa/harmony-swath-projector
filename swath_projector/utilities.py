@@ -256,7 +256,7 @@ def get_preferred_ordered_dimensions_info(
     """Return the variable's dimensions in the preferred order.
 
     Ensure the track dimensions are the last two dimensions in the tuple and in the
-    order of ascending size. Any additional dimensions are placed at the front of the
+    order of descending size. Any additional dimensions are placed at the front of the
     tuple maintaining the oringinal relative order between themselves.
     """
     # Either 'lat' or 'lon' could be used as the substring here
