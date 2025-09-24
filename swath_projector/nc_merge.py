@@ -54,9 +54,6 @@ def create_output(
         logger.info('Copying input file attributes to output file.')
         set_output_attributes(input_dataset, output_dataset, request_parameters)
 
-        if 'time' in input_dataset.dimensions:
-            copy_time_dimension(input_dataset, output_dataset, logger)
-
         for metadata_variable in metadata_variables:
             copy_metadata_variable(
                 input_dataset, output_dataset, metadata_variable, logger
@@ -92,6 +89,17 @@ def create_output(
                             copy_metadata_variable(
                                 data, output_dataset, variable_key, logger
                             )
+
+                    # Copy dimension variables from the input that were not created
+                    # as variables in the single band output.
+                    copy_dimension_variables(
+                        input_dataset,
+                        output_dataset,
+                        data,
+                        variable_name,
+                        logger,
+                        var_info,
+                    )
 
             else:
                 logger.error(f'Cannot find "{dataset_file}".')
@@ -211,19 +219,6 @@ def read_attrs(dataset: Union[Dataset, Variable]) -> Dict:
     return dataset.__dict__
 
 
-def copy_time_dimension(
-    input_dataset: Dataset, output_dataset: Dataset, logger: logging.Logger
-) -> None:
-    """Add time dimension to the output file. This will first add a dimension,
-    before creating the corresponding variable in the output dataset.
-
-    """
-    logger.info('Adding "time" dimension.')
-    time_variable = input_dataset['time']
-    output_dataset.createDimension('time', time_variable.size)
-    copy_metadata_variable(input_dataset, output_dataset, 'time', logger)
-
-
 def set_dimensions(input_dataset: Dataset, output_dataset: Dataset) -> None:
     """Read the dimensions in the single band intermediate file. Add each
     dimension to the output dataset that is not already present.
@@ -232,6 +227,42 @@ def set_dimensions(input_dataset: Dataset, output_dataset: Dataset) -> None:
     for name, dimension in input_dataset.dimensions.items():
         if name not in output_dataset.dimensions:
             output_dataset.createDimension(name, dimension.size)
+
+
+def copy_dimension_variables(
+    input_dataset: Dataset,
+    output_dataset: Dataset,
+    single_band_dataset: Dataset,
+    variable_name: str,
+    logger: logging.Logger,
+    var_info: VarInfoFromNetCDF4,
+) -> None:
+    """Copy dimension variables from the input dataset into the output dataset.
+
+    For each dimension in the single-band dataset, check if it exists as a
+    variable in the input dataset. Dimensions are first checked at the root
+    level, and if not found, then at the group level of the science variable
+    associated with the single-band dataset. If found, the corresponding
+    variable is copied into the output dataset.
+    """
+    all_input_variables = var_info.get_all_variables()
+    all_input_variables = var_info.get_all_variables()
+    group_name = single_band_dataset[variable_name].group().name
+
+    for dim in single_band_dataset.dimensions:
+        # Skip dimensions that have already been copied over. This also ensures that
+        # we do not overwrite any 'lat' or 'lon' variables that have been copied
+        # from the single-band dataset
+        if dim in output_dataset.variables:
+            continue
+
+        if f"/{dim}" in all_input_variables:
+            copy_metadata_variable(input_dataset, output_dataset, dim, logger)
+            continue
+
+        grouped_dim = f"{group_name.rstrip('/')}/{dim}"
+        if grouped_dim in all_input_variables:
+            copy_metadata_variable(input_dataset, output_dataset, grouped_dim, logger)
 
 
 def set_metadata_dimensions(
@@ -303,9 +334,8 @@ def copy_science_variable(
     """
     logger.info(f'Adding reprojected "{variable_name}" to the output')
 
-    dimensions = get_science_variable_dimensions(
-        input_dataset, single_band_dataset, variable_name
-    )
+    dimensions = single_band_dataset[variable_name].dimensions
+
     attributes = get_science_variable_attributes(
         input_dataset, single_band_dataset, variable_name, var_info
     )
@@ -333,10 +363,7 @@ def copy_science_variable(
     filled_data = np.where(raw_data == fill_value)
     packed_data[filled_data] = fill_value
 
-    if 'time' in variable.dimensions:
-        variable[0, :] = packed_data
-    else:
-        variable[:] = packed_data
+    variable[:] = packed_data
 
     variable.setncatts(attributes)
 
@@ -364,22 +391,6 @@ def get_science_variable_attributes(
         del variable_attributes['coordinates']
 
     return variable_attributes
-
-
-def get_science_variable_dimensions(
-    input_dataset: Dataset, single_band_dataset: Dataset, variable_name: str
-) -> Tuple[str]:
-    """Retrieve the dimensions from the single-band reprojected dataset. If
-    the original input dataset has a 'time' dimension, then include that as
-    a dimension of the reprojected variable.
-
-    """
-    if 'time' not in input_dataset.dimensions:
-        dimensions = single_band_dataset[variable_name].dimensions
-    else:
-        dimensions = ('time',) + single_band_dataset[variable_name].dimensions
-
-    return dimensions
 
 
 def check_coor_valid(
