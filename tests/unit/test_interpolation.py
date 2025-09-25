@@ -18,7 +18,6 @@ from swath_projector.interpolation import (
     get_swath_definition,
     get_target_area,
     resample_all_variables,
-    resample_layer,
     resample_variable,
     resample_variable_data,
 )
@@ -1552,24 +1551,6 @@ class TestInterpolation(TestCase):
                     call_args = call_args_list[call_index]
                     np.testing.assert_array_equal(call_args[0][0], s_var_4d[i, j, :])
                     self.assertEqual(call_args[0][1:], (-9999, {}, resampler))
-
-    def test_resample_layer(self):
-        """Ensure that the resample is called with the correct parameters"""
-        # Example input data.
-        source_layer = np.array([[1, 2], [3, 4]])
-        fill_value = -9999
-        reprojection_information = {'target_shape': (3, 3)}
-
-        mocked_resample_result = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-        mock_resampler = Mock(return_value=mocked_resample_result)
-        result = resample_layer(
-            source_layer, fill_value, reprojection_information, mock_resampler
-        )
-        mock_resampler.assert_called_once_with(
-            {'values': source_layer, 'fill_value': fill_value},
-            reprojection_information,
-        )
-        np.testing.assert_array_equal(result, mocked_resample_result)
 
     def test_allocate_target_array(self):
         """Ensure the target array is returned in the correct shape and datatype"""
