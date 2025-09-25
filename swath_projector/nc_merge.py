@@ -239,13 +239,11 @@ def copy_dimension_variables(
 ) -> None:
     """Copy dimension variables from the input dataset into the output dataset.
 
-    For each dimension in the single-band dataset, check if it exists as a
-    variable in the input dataset. Dimensions are first checked at the root
-    level, and if not found, then at the group level of the science variable
-    associated with the single-band dataset. If found, the corresponding
-    variable is copied into the output dataset.
+    Each dimension in the single-band dataset is checked against variables in
+    the input dataset. The function first looks for the dimension at the root
+    level, then within the group of the science variable. If found, the
+    corresponding variable is copied into the output dataset.
     """
-    all_input_variables = var_info.get_all_variables()
     all_input_variables = var_info.get_all_variables()
     group_name = single_band_dataset[variable_name].group().name
 
@@ -256,7 +254,8 @@ def copy_dimension_variables(
         if dim in output_dataset.variables:
             continue
 
-        if f"/{dim}" in all_input_variables:
+        root_dim = f"/{dim}"
+        if root_dim in all_input_variables:
             copy_metadata_variable(input_dataset, output_dataset, dim, logger)
             continue
 
