@@ -16,62 +16,8 @@
         "ShortNamePath": "TEMPO_O3TOT_L2"
       },
       "VariablePattern": [
-        "/support_data/a_priori_layer_o3",
         "/support_data/cal_adjustment",
-        "/support_data/dNdR",
-        "/support_data/layer_efficiency",
-        "/support_data/lut_wavelength",
-        "/support_data/N_value",
-        "/support_data/N_value_residual",
-        "/support_data/ozone_sensitivity_ratio",
-        "/support_data/step_1_N_value_residual",
-        "/support_data/step_2_N_value_residual",
-        "/support_data/temp_sensitivity_ratio"
-      ]
-    },
-    {
-      "Applicability": {
-        "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_NO2_L2"
-      },
-      "VariablePattern": [
-        "/support_data/gas_profile",
-        "/support_data/scattering_weights",
-        "/support_data/scattering_weights_clear_sky",
-        "/support_data/temperature_profile"
-      ]
-    },
-    {
-      "Applicability": {
-        "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_NO2_L2_NRT"
-      },
-      "VariablePattern": [
-        "/support_data/gas_profile",
-        "/support_data/scattering_weights",
-        "/support_data/temperature_profile"
-      ]
-    },
-    {
-      "Applicability": {
-        "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_HCHO_L2"
-      },
-      "VariablePattern": [
-        "/support_data/gas_profile",
-        "/support_data/scattering_weights",
-        "/support_data/temperature_profile"
-      ]
-    },
-    {
-      "Applicability": {
-        "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_HCHO_L2_NRT"
-      },
-      "VariablePattern": [
-        "/support_data/gas_profile",
-        "/support_data/scattering_weights",
-        "/support_data/temperature_profile"
+        "/support_data/lut_wavelength"
       ]
     },
     {
@@ -80,35 +26,9 @@
         "ShortNamePath": "TEMPO_O3PROF_L2"
       },
       "VariablePattern": [
-        "/product/ozone_profile",
-        "/product/nongas_param",
-        "/product/nongas_param_error",
-        "/product/nongas_param_precision",
-        "/product/other_gas_column",
-        "/product/other_gas_column_error",
-        "/product/other_gas_column_precision",
-        "/product/ozone_profile",
-        "/product/ozone_profile_error",
-        "/product/ozone_profile_precision",
-        "/support_data/num_wavelengths_in_fit_windows",
-        "/support_data/correlation_upper_triangular_matrix",
-        "/support_data/nongas_param_apriori",
-        "/support_data/nongas_param_apriori_error",
         "/support_data/nongas_param_names",
         "/support_data/nongas_param_units",
-        "/support_data/other_gas_apriori_column",
-        "/support_data/other_gas_apriori_error",
-        "/support_data/other_gas_names",
-        "/support_data/ozone_apriori_profile",
-        "/support_data/ozone_apriori_profile_error",
-        "/support_data/ozone_averaging_kernel",
-        "/support_data/ozone_profile_altitude",
-        "/support_data/ozone_profile_altitude_bounds",
-        "/support_data/ozone_profile_pressure",
-        "/support_data/ozone_profile_pressure_bounds",
-        "/support_data/ozone_profile_temperature",
-        "/qa_statistics/avg_residuals",
-        "/qa_statistics/fit_RMS"
+        "/support_data/other_gas_names"
       ]
     }
   ],
