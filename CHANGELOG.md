@@ -1,5 +1,20 @@
 # Changelog
 
+## [vX.Y.Z] - Unreleased
+
+### Changed
+
+- Release notes for the Swath Projector will now include the commit history for
+  that release.
+
+## [v1.3.0] - 2025-09-16
+
+### Changed
+
+- [[DAS-2221](https://bugs.earthdata.nasa.gov/browse/DAS-2221)]
+  This update adds support for the reprojection of variables with 3 or more
+  dimensions.
+
 ## [v1.2.3] - 2025-08-20
 
 ### Changed
@@ -78,6 +93,7 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
+[v1.3.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.3.0)
 [v1.2.3]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.3)
 [v1.2.2]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.2)
 [v1.2.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.1)

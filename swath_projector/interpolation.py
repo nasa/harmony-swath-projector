@@ -6,10 +6,10 @@ datasets within a file, using the pyresample Python package.
 import os
 from functools import partial
 from logging import Logger
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
-from netCDF4 import Dataset
+from netCDF4 import Dataset, Dimension
 from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
 from pyresample.geometry import AreaDefinition, SwathDefinition
@@ -23,8 +23,10 @@ from swath_projector.swath_geometry import (
     get_projected_resolution,
 )
 from swath_projector.utilities import (
+    FillValueType,
     create_coordinates_key,
-    get_coordinate_variable,
+    get_coordinate_data,
+    get_preferred_ordered_dimensions_info,
     get_rows_per_scan,
     get_scale_and_offset,
     get_variable_file_path,
@@ -152,17 +154,24 @@ def resample_variable(
         # themselves.
         reprojection_cache[coordinates_key] = reprojection_information
 
-    # Use a dictionary to store input variable values and fill value. This
-    # allows the same function signature to retrieve results from all
-    # interpolation methods.
     fill_value = get_variable_numeric_fill_value(variable)
-    variable_information = {
-        'values': get_variable_values(dataset, variable, fill_value),
-        'fill_value': fill_value,
-    }
+    all_ordered_dims, ordered_non_track_dim_objs = (
+        get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
+    )
 
-    results = interpolation_functions['get_results'](
-        variable_information, reprojection_information
+    s_var = get_variable_values(variable, fill_value, all_ordered_dims)
+    t_var = allocate_target_array(
+        ordered_non_track_dim_objs,
+        reprojection_information['target_area'].shape,
+        s_var.dtype,
+    )
+
+    results = resample_variable_data(
+        s_var,
+        t_var,
+        fill_value,
+        reprojection_information,
+        interpolation_functions['get_results'],
     )
     results = results.astype(variable.dtype)
 
@@ -174,6 +183,7 @@ def resample_variable(
         variable_output_path,
         reprojection_cache,
         attributes,
+        ordered_non_track_dim_objs,
     )
 
     dataset.close()
@@ -181,6 +191,54 @@ def resample_variable(
     logger.debug(
         f'Saved {full_variable} output to temporary file: ' f'{variable_output_path}'
     )
+
+
+def resample_variable_data(
+    s_var: np.ndarray,
+    t_var: np.ndarray,
+    fill_value: FillValueType,
+    reprojection_information: Dict,
+    resampler: Callable,
+) -> np.ndarray:
+    """Recursively resample variable data in N-dimensions.
+
+    A recursive function that reduces an N-dimensional variable to the base
+    case of a 2-D layer representing a horizontal spatial slice. This slice
+    is resampled with the supplied resampler.
+    """
+    if len(s_var.shape) <= 2:
+        return resample_layer(s_var[:], fill_value, reprojection_information, resampler)
+
+    for layer_index in range(s_var.shape[0]):
+        t_var[layer_index, ...] = resample_variable_data(
+            s_var[layer_index, ...],
+            t_var[layer_index, ...],
+            fill_value,
+            reprojection_information,
+            resampler,
+        )
+
+    return t_var
+
+
+def resample_layer(
+    source_values_layer: np.ndarray,
+    fill_value: FillValueType,
+    reprojection_information: Dict,
+    resampler: Callable,
+) -> np.ndarray:
+    """Resample a 2-D layer and return the results.
+
+    This function uses a dictionary to store input variable values and fill value. This
+    allows the same function signature to retrieve results from all interpolation
+    methods.
+    """
+
+    variable_information = {
+        'values': source_values_layer,
+        'fill_value': fill_value,
+    }
+    return resampler(variable_information, reprojection_information)
 
 
 def get_bilinear_information(
@@ -383,10 +441,9 @@ def get_swath_definition(dataset: Dataset, coordinates: Tuple[str]) -> SwathDefi
     -180 < longitude < 180.
 
     """
-    latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
-    longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
-
-    wrapped_lons, wrapped_lats = check_and_wrap(longitudes[:], latitudes[:])
+    latitudes = get_coordinate_data(dataset, coordinates, 'lat')
+    longitudes = get_coordinate_data(dataset, coordinates, 'lon')
+    wrapped_lons, wrapped_lats = check_and_wrap(longitudes, latitudes)
 
     # EWA ll2cr requires 2-dimensional arrays for the swath coordinates:
     if len(wrapped_lons.shape) == 1:
@@ -448,8 +505,8 @@ def get_target_area(
     dimensions = get_parameters_tuple(parameters, ['height', 'width'])
     resolutions = get_parameters_tuple(parameters, ['xres', 'yres'])
     projection_string = parameters['projection'].definition_string()
-    latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
-    longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
+    latitudes = get_coordinate_data(dataset, coordinates, 'lat')
+    longitudes = get_coordinate_data(dataset, coordinates, 'lon')
 
     if grid_extents is not None:
         logger.info(
@@ -518,3 +575,16 @@ def get_parameters_tuple(
         output_values = None
 
     return output_values
+
+
+def allocate_target_array(
+    ordered_non_track_dim_objs: list[Dimension], target_area_shape: Tuple[int], dtype
+) -> np.ndarray:
+    """Initialize the target variable array.
+
+    The target array is created with shape corresponding to the sizes of
+    the non-track dimensions followed by the shape of the target area.
+    """
+    non_track_dim_shapes = [dim.size for dim in ordered_non_track_dim_objs]
+    t_var_shape = (*non_track_dim_shapes, *target_area_shape)
+    return np.empty(t_var_shape, dtype=dtype)
