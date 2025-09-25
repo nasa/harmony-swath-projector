@@ -206,18 +206,19 @@ def resample_variable_data(
     case of a 2-D layer representing a horizontal spatial slice. This slice
     is resampled with the supplied resampler.
     """
-    if len(s_var.shape) > 2:
-        for layer_index in range(s_var.shape[0]):
-            t_var[layer_index, ...] = resample_variable_data(
-                s_var[layer_index, ...],
-                t_var[layer_index, ...],
-                fill_value,
-                reprojection_information,
-                resampler,
-            )
-        return t_var
+    if len(s_var.shape) <= 2:
+        return resample_layer(s_var[:], fill_value, reprojection_information, resampler)
 
-    return resample_layer(s_var[:], fill_value, reprojection_information, resampler)
+    for layer_index in range(s_var.shape[0]):
+        t_var[layer_index, ...] = resample_variable_data(
+            s_var[layer_index, ...],
+            t_var[layer_index, ...],
+            fill_value,
+            reprojection_information,
+            resampler,
+        )
+
+    return t_var
 
 
 def resample_layer(
