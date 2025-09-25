@@ -1,5 +1,12 @@
 # Changelog
 
+## [vX.Y.Z] - Unreleased
+
+### Changed
+
+- Release notes for the Swath Projector will now include the commit history for
+  that release.
+
 ## [v1.3.0] - 2025-09-16
 
 ### Changed
