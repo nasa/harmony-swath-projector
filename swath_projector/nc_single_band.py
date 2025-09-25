@@ -26,7 +26,7 @@ Dimensions:
 from typing import Dict, Tuple
 
 import numpy as np
-from netCDF4 import Dataset
+from netCDF4 import Dataset, Dimension
 from pyresample.geometry import AreaDefinition
 
 DIMENSION_METADATA = {
@@ -61,13 +61,14 @@ def write_single_band_output(
     variable_output_path: str,
     reprojection_cache: Dict,
     attributes: Dict,
+    non_horizontal_dims: list[Dimension],
 ) -> None:
     """The main interface for this module. Each single band output file
     will contain the following properties:
 
-    - A reprojected, 2-dimensional  science variable.
+    - A reprojected, n-dimensional science variable.
     - Projected x and y dimensions.
-    - A 1-dimensional variable for each of the associated dimensions. The
+    - A 1-dimensional variable for each of the associated horizontal dimensions. The
       science variable should use these as its dimensions.
     - A grid mapping variable, with metadata conforming to the CF
       Conventions. The science variable should refer to this in its
@@ -75,20 +76,26 @@ def write_single_band_output(
 
     """
     with Dataset(variable_output_path, 'w', format='NETCDF4') as output_file:
-        dimensions = write_dimensions(output_file, target_area, reprojection_cache)
-        grid_mapping_name = write_grid_mapping(output_file, target_area, dimensions)
+        horizontal_dims = write_horizontal_dimensions(
+            output_file, target_area, reprojection_cache
+        )
+        write_non_horizontal_dimensions(output_file, non_horizontal_dims)
+        grid_mapping_name = write_grid_mapping(
+            output_file, target_area, horizontal_dims
+        )
+        all_dims = (*[dim.name for dim in non_horizontal_dims], *horizontal_dims)
         write_science_variable(
             output_file,
             reprojected_data,
             variable_name,
-            dimensions,
+            all_dims,
             grid_mapping_name,
             attributes,
         )
-        write_dimension_variables(output_file, dimensions, target_area)
+        write_dimension_variables(output_file, horizontal_dims, target_area)
 
 
-def write_dimensions(
+def write_horizontal_dimensions(
     dataset: Dataset, target_area: AreaDefinition, cache: Dict
 ) -> Tuple[str]:
     """Derive the dimension names using the target area definition and the
@@ -126,7 +133,7 @@ def write_dimensions(
     # Determine whether a suffix is required (e.g. multiple target grids).
     if HARMONY_TARGET not in cache:
         # Use any cached dimensions
-        cached_dimensions = cache[coordinates_key].get('dimensions')
+        cached_dimensions = cache[coordinates_key].get('horizontal_dimensions')
 
         if cached_dimensions is not None:
             y_dim, x_dim = cached_dimensions
@@ -147,7 +154,7 @@ def write_dimensions(
             y_dim += dimension_suffix
 
             # Save the dimension information in the cache:
-            cache[coordinates_key]['dimensions'] = (y_dim, x_dim)
+            cache[coordinates_key]['horizontal_dimensions'] = (y_dim, x_dim)
 
     dataset.createDimension(y_dim, size=target_area.shape[0])
     dataset.createDimension(x_dim, size=target_area.shape[1])
@@ -254,3 +261,12 @@ def write_dimension_variables(
         )
 
         variable.setncatts(attributes)
+
+
+def write_non_horizontal_dimensions(
+    dataset: Dataset, non_horizontal_dims: list[Dimension]
+) -> None:
+    """Write the non-horizontal dimensions to the output dataset."""
+    for dim in non_horizontal_dims:
+        if dim.name not in dataset.dimensions:
+            dataset.createDimension(dim.name, size=dim.size)

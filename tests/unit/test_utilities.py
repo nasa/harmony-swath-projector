@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import numpy as np
 from netCDF4 import Dataset, Variable
@@ -8,8 +8,13 @@ from varinfo import VarInfoFromNetCDF4
 from swath_projector.exceptions import MissingCoordinatesError
 from swath_projector.utilities import (
     construct_absolute_path,
+    coordinate_requires_transpose,
     create_coordinates_key,
-    get_coordinate_variable,
+    get_axes_permutation,
+    get_coordinate_data,
+    get_coordinate_matching_substring,
+    get_ordered_track_dims,
+    get_preferred_ordered_dimensions_info,
     get_rows_per_scan,
     get_scale_and_offset,
     get_variable_file_path,
@@ -17,7 +22,6 @@ from swath_projector.utilities import (
     get_variable_values,
     make_array_two_dimensional,
     qualify_reference,
-    transpose_if_xdim_less_than_ydim,
     variable_in_dataset,
 )
 
@@ -58,32 +62,10 @@ class TestUtilities(TestCase):
                 )
 
     def test_get_variable_values(self):
-        """Ensure values for a variable are retrieved, respecting the absence
-        or presence of a time variable in the dataset.
+        """Ensure values for a variable are retrieved and transposed if the provided
+        dimension order requires it.
 
         """
-
-        with self.subTest('3-D variable, with time.'):
-            with Dataset('tests/data/africa.nc') as dataset:
-                red_var = dataset['red_var']
-                self.assertEqual(len(red_var.shape), 3)
-
-                red_var_values = get_variable_values(dataset, red_var, None)
-                self.assertIsInstance(red_var_values, np.ndarray)
-                self.assertEqual(len(red_var_values.shape), 2)
-                self.assertEqual(red_var_values.shape, red_var.shape[-2:])
-
-        with self.subTest('2-D variable, no time.'):
-            with Dataset('tests/data/test_tmp/wind_speed.nc') as dataset:
-                wind_speed = dataset['wind_speed']
-                self.assertEqual(len(wind_speed.shape), 2)
-
-                wind_speed_values = get_variable_values(dataset, wind_speed, None)
-                self.assertIsInstance(wind_speed_values, np.ndarray)
-                self.assertEqual(len(wind_speed_values.shape), 2)
-                self.assertEqual(
-                    wind_speed_values.shape, np.ma.transpose(wind_speed).shape
-                )
 
         with self.subTest('Masked values are set to fill value.'):
             fill_value = 210
@@ -101,7 +83,7 @@ class TestUtilities(TestCase):
                 self.assertTrue(dataset['data'][:].mask[0, 1])
 
                 returned_data = get_variable_values(
-                    dataset, dataset['data'], fill_value
+                    dataset['data'], fill_value, dataset['data'].dimensions
                 )
 
                 # Check the output is an array, not a masked array.
@@ -109,23 +91,79 @@ class TestUtilities(TestCase):
                 # Check the output matches all the input data
                 np.testing.assert_array_equal(input_data, returned_data)
 
-        with self.subTest('2-D variable, time in dataset, but not variable'):
+        with self.subTest('2-D variable, no reordering required'):
             with Dataset('test.nc', 'w', diskless=True) as dataset:
-                dataset.createDimension('time', size=1)
-                dataset.createDimension('lat', size=2)
-                dataset.createDimension('lon', size=2)
-                input_data = np.array([[1, 2], [3, 4]])
+                dataset.createDimension('mirror_step', size=3)
+                dataset.createDimension('xtrack', size=2)
+                input_data = np.ones((3, 2))
                 variable = dataset.createVariable(
-                    'data', input_data.dtype, dimensions=('lat', 'lon')
+                    'data', input_data.dtype, dimensions=('mirror_step', 'xtrack')
                 )
                 variable[:] = input_data[:]
 
-                returned_data = get_variable_values(dataset, variable, None)
+                reordered_dims = ('mirror_step', 'xtrack')
+                returned_data = get_variable_values(variable, None, reordered_dims)
 
                 self.assertIsInstance(returned_data, np.ndarray)
-                np.testing.assert_array_equal(input_data, returned_data)
+                self.assertEqual(returned_data.shape, (3, 2))
 
-    def test_get_coordinate_variables(self):
+        with self.subTest('2-D variable, reordering required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('mirror_step', size=2)
+                dataset.createDimension('xtrack', size=3)
+                input_data = np.ones((2, 3))
+                variable = dataset.createVariable(
+                    'data',
+                    input_data.dtype,
+                    dimensions=('mirror_step', 'xtrack'),
+                )
+                variable[:] = input_data[:]
+
+                reordered_dims = ('xtrack', 'mirror_step')
+                returned_data = get_variable_values(variable, None, reordered_dims)
+
+                self.assertIsInstance(returned_data, np.ndarray)
+                self.assertEqual(returned_data.shape, (3, 2))
+
+        with self.subTest('3-D variable, no reordering required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('mirror_step', size=2)
+                dataset.createDimension('xtrack', size=3)
+                dataset.createDimension('layer', size=5)
+                input_data = np.ones((5, 3, 2))
+                variable = dataset.createVariable(
+                    'data',
+                    input_data.dtype,
+                    dimensions=('layer', 'xtrack', 'mirror_step'),
+                )
+                variable[:] = input_data[:]
+
+                reordered_dims = ('layer', 'xtrack', 'mirror_step')
+                returned_data = get_variable_values(variable, None, reordered_dims)
+
+                self.assertIsInstance(returned_data, np.ndarray)
+                self.assertEqual(returned_data.shape, (5, 3, 2))
+
+        with self.subTest('3-D variable, reordering required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('mirror_step', size=2)
+                dataset.createDimension('xtrack', size=3)
+                dataset.createDimension('layer', size=5)
+                input_data = np.ones((2, 3, 5))
+                variable = dataset.createVariable(
+                    'data',
+                    input_data.dtype,
+                    dimensions=('mirror_step', 'xtrack', 'layer'),
+                )
+                variable[:] = input_data[:]
+
+                reordered_dims = ('layer', 'xtrack', 'mirror_step')
+                returned_data = get_variable_values(variable, None, reordered_dims)
+
+                self.assertIsInstance(returned_data, np.ndarray)
+                self.assertEqual(returned_data.shape, (5, 3, 2))
+
+    def test_get_coordinate_matching_substring(self):
         """Ensure the longitude or latitude coordinate variable, is retrieved
         when requested.
 
@@ -135,18 +173,18 @@ class TestUtilities(TestCase):
 
         for coordinate in coordinates_tuple:
             with self.subTest(coordinate):
-                coordinates = get_coordinate_variable(
+                coordinates = get_coordinate_matching_substring(
                     dataset, coordinates_tuple, coordinate
                 )
 
-                self.assertIsInstance(coordinates, np.ma.MaskedArray)
+                self.assertIsInstance(coordinates, Variable)
 
         with self.subTest(
             'Non existent coordinate variable "latitude" returns MissingCoordinatesError'
         ):
             absent_coordinates_tuple = ['latitude']
             with self.assertRaises(MissingCoordinatesError):
-                coordinates = get_coordinate_variable(
+                coordinates = get_coordinate_matching_substring(
                     dataset, absent_coordinates_tuple, absent_coordinates_tuple[0]
                 )
 
@@ -363,55 +401,191 @@ class TestUtilities(TestCase):
         self.assertEqual(len(output_array.shape), 2)
         np.testing.assert_array_equal(output_array, expected_output)
 
+    def test_coordinate_requires_transpose(self):
+        """Ensure correct determination of when a coordinate requires transposition"""
 
-class TestTransposeIfXdimLessThanYdim(TestCase):
+        test_args = [
+            ['Tall swath (no transpose)', (10, 5), False],
+            ['Wide swath (needs transpose)', (5, 10), True],
+            ['Square swath (no transpose)', (5, 5), False],
+        ]
 
-    def test_wider_than_tall(self):
-        """Test case where x dim <  y dim and should transpose."""
-        input_array = np.ma.array([[1, 2, 3], [4, 5, 6]])
-        expected_output = np.ma.array([[1, 4], [2, 5], [3, 6]])
-        result = transpose_if_xdim_less_than_ydim(input_array)
-        np.testing.assert_array_equal(result, expected_output)
-        self.assertEqual(result.shape, (3, 2))
+        for description, shape, expected_result in test_args:
+            with self.subTest(description):
+                mock_coordinate = MagicMock()
+                mock_coordinate.shape = shape
+                self.assertEqual(
+                    coordinate_requires_transpose(mock_coordinate), expected_result
+                )
+        return
 
-    def test_taller_than_wide(self):
-        """Test case where x < y and should not transpose."""
-        input_array = np.ma.array([[1, 2], [3, 4], [5, 6]])
-        result = transpose_if_xdim_less_than_ydim(input_array)
-        np.testing.assert_array_equal(result, input_array)
-        self.assertEqual(result.shape, (3, 2))
+    def test_get_axes_permutation(self):
+        """Ensure that axis permutations are computed correctly when reordering dimensions"""
+        test_args = [
+            [
+                'simple reordering',
+                ('xtrack', 'mirror_step', 'layer'),
+                ('layer', 'xtrack', 'mirror_step'),
+                [2, 0, 1],
+            ],
+            [
+                'no reorder',
+                ('xtrack', 'mirror_step', 'layer'),
+                ('xtrack', 'mirror_step', 'layer'),
+                [0, 1, 2],
+            ],
+            [
+                'includes duplicate dimension',
+                ('xtrack', 'mirror_step', 'layer', 'layer'),
+                ('layer', 'layer', 'xtrack', 'mirror_step'),
+                [2, 3, 0, 1],
+            ],
+        ]
 
-    def test_square_array(self):
-        """Test case where y dim == x dim and should not transpose."""
-        input_array = np.ma.array([[1, 2], [3, 4]])
-        result = transpose_if_xdim_less_than_ydim(input_array)
-        np.testing.assert_array_equal(result, input_array)
-        self.assertEqual(result.shape, (2, 2))
+        for description, old_dims, new_dims, expected_result in test_args:
+            with self.subTest(description):
+                self.assertEqual(
+                    get_axes_permutation(old_dims, new_dims), expected_result
+                )
 
-    def test_1d_array(self):
-        """Test case with a 1D array"""
-        input_array = np.ma.array([1, 2, 3])
-        with self.assertRaisesRegex(ValueError, 'variable must be 2 dimensional'):
-            transpose_if_xdim_less_than_ydim(input_array)
+    def test_get_coordinate_data(self):
+        """Ensure coordinate data can be retrieved and is transposed when required."""
 
-    def test_3d_array(self):
-        """Test case with a 3D array"""
-        input_array = np.ma.array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
-        with self.assertRaisesRegex(ValueError, 'variable must be 2 dimensional'):
-            transpose_if_xdim_less_than_ydim(input_array)
+        with self.subTest('2D coordinate, transpose not required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('xtrack', size=3)
+                dataset.createDimension('mirror_step', size=2)
+                lat_var = dataset.createVariable(
+                    'latitude', float, ('xtrack', 'mirror_step')
+                )
+                lat_var[:] = np.ones((3, 2))
 
-    def test_masked_array(self):
-        """Test case with a masked array"""
-        input_array = np.ma.array(
-            [[1, 2, 3], [4, 5, 6]], mask=[[True, False, False], [False, True, False]]
-        )
-        expected_output = np.ma.array(
-            [[1, 4], [2, 5], [3, 6]],
-            mask=[[True, False], [False, True], [False, False]],
-        )
-        result = transpose_if_xdim_less_than_ydim(input_array)
-        np.testing.assert_array_equal(result, expected_output)
-        np.testing.assert_array_equal(result.mask, expected_output.mask)
+                expected_data = lat_var[:]
+                result = get_coordinate_data(dataset, ('latitude',), 'lat')
+                np.testing.assert_array_equal(result, expected_data)
+
+        with self.subTest('2D coordinate, transpose required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('xtrack', size=2)
+                dataset.createDimension('mirror_step', size=3)
+                lat_var = dataset.createVariable(
+                    'latitude', float, ('xtrack', 'mirror_step')
+                )
+                lat_var[:] = np.ones((2, 3))
+
+                expected_data = np.ma.transpose(lat_var[:])
+                result = get_coordinate_data(dataset, ('latitude',), 'lat')
+                np.testing.assert_array_equal(result, expected_data)
+
+    def test_get_ordered_track_dims(self):
+        """Ensure track dimensions are returned in the correct order depending on
+        whether transpose is required, and errors are raised for invalid shapes"""
+
+        with self.subTest('transpose required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('mirror_step', size=2)
+                dataset.createDimension('xtrack', size=3)
+                dataset.createDimension('time', size=5)
+                values = np.ones((2, 3))
+                dims = ('mirror_step', 'xtrack')
+                var = dataset.createVariable('/test-coordinate', float, dimensions=dims)
+                var[:] = values
+                expected_results = ('xtrack', 'mirror_step')
+                results = get_ordered_track_dims(var)
+                self.assertEqual(results, expected_results)
+
+        with self.subTest('transpose not required'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('mirror_step', size=3)
+                dataset.createDimension('xtrack', size=2)
+                dataset.createDimension('time', size=5)
+                values = np.ones((3, 2))
+                dims = ('mirror_step', 'xtrack')
+                var = dataset.createVariable('/test-coordinate', float, dimensions=dims)
+                var[:] = values
+                expected_results = ('mirror_step', 'xtrack')
+                results = get_ordered_track_dims(var)
+                self.assertEqual(results, expected_results)
+
+        with self.subTest('invalid number of dimensions'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('mirror_step', size=3)
+                dataset.createDimension('xtrack', size=2)
+                dataset.createDimension('time', size=5)
+                values = np.ones((3,))
+                dims = 'mirror_step'
+                var = dataset.createVariable('/test-coordinate', float, dimensions=dims)
+                var[:] = values
+                with self.assertRaises(Exception):
+                    get_ordered_track_dims(var)
+
+    def test_get_preferred_ordered_dimensions_info(self):
+        """Ensure variable dimensions are reordered correctly."""
+        with self.subTest('correct order track dims, no non-track dims'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('xtrack', 3)
+                dataset.createDimension('mirror_step', 2)
+                dataset.createVariable('latitude', float, ('xtrack', 'mirror_step'))
+                dataset.createVariable('longitude', float, ('xtrack', 'mirror_step'))
+                var = dataset.createVariable(
+                    'science_var', float, ('xtrack', 'mirror_step')
+                )
+                result = get_preferred_ordered_dimensions_info(
+                    var, ('latitude', 'longitude'), dataset
+                )
+                expected = (('xtrack', 'mirror_step'), [])
+                self.assertEqual(result, expected)
+
+        with self.subTest('reverse order track dims, no non-track dims'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('xtrack', 2)
+                dataset.createDimension('mirror_step', 3)
+                dataset.createVariable('latitude', float, ('xtrack', 'mirror_step'))
+                dataset.createVariable('longitude', float, ('xtrack', 'mirror_step'))
+                var = dataset.createVariable(
+                    'science_var', float, ('xtrack', 'mirror_step')
+                )
+                result = get_preferred_ordered_dimensions_info(
+                    var, ('latitude', 'longitude'), dataset
+                )
+                expected = (('mirror_step', 'xtrack'), [])
+                self.assertEqual(result, expected)
+
+        with self.subTest('correct order track dims, non-track dim at end'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('xtrack', 3)
+                dataset.createDimension('mirror_step', 2)
+                layer_dim = dataset.createDimension('layer', 5)
+                dataset.createVariable('latitude', float, ('xtrack', 'mirror_step'))
+                dataset.createVariable('longitude', float, ('xtrack', 'mirror_step'))
+                var = dataset.createVariable(
+                    'science_var', float, ('xtrack', 'mirror_step', 'layer')
+                )
+                result = get_preferred_ordered_dimensions_info(
+                    var, ('latitude', 'longitude'), dataset
+                )
+                expected = (('layer', 'xtrack', 'mirror_step'), [layer_dim])
+                self.assertEqual(result, expected)
+
+        with self.subTest('reverse order track dims, non-track dims on both ends'):
+            with Dataset('test.nc', 'w', diskless=True) as dataset:
+                dataset.createDimension('xtrack', 2)
+                dataset.createDimension('mirror_step', 3)
+                time_dim = dataset.createDimension('time', 5)
+                layer_dim = dataset.createDimension('layer', 5)
+                dataset.createVariable('latitude', float, ('xtrack', 'mirror_step'))
+                dataset.createVariable('longitude', float, ('xtrack', 'mirror_step'))
+                var = dataset.createVariable(
+                    'science_var', float, ('time', 'xtrack', 'mirror_step', 'layer')
+                )
+                result = get_preferred_ordered_dimensions_info(
+                    var, ('latitude', 'longitude'), dataset
+                )
+                expected = (
+                    ('time', 'layer', 'mirror_step', 'xtrack'),
+                    [time_dim, layer_dim],
+                )
+                self.assertEqual(result, expected)
 
 
 class TestGetRowsPerScan(TestCase):

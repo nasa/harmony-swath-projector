@@ -15,7 +15,6 @@ from swath_projector.nc_merge import (
     create_output,
     get_fill_value_from_attributes,
     get_science_variable_attributes,
-    get_science_variable_dimensions,
     read_attrs,
 )
 from swath_projector.reproject import CF_CONFIG_FILE
@@ -263,29 +262,6 @@ class TestNCMerge(TestCase):
                     self.var_info, '/wind_speed', second_dataset, single_band_dataset
                 )
             )
-
-    def test_get_science_variable_dimensions(self):
-        """Ensure that the retrieved dimensions match those in the single band
-        dataset. If the input dataset includes a time dimension, that
-        should be included in the returned tuple.
-
-        """
-        variable_name = 'sea_surface_temperature'
-        single_band_dataset = Dataset(f'{self.tmp_dir}{variable_name}.nc')
-        input_dataset = Dataset(self.properties['input_file'])
-
-        with self.subTest('Input dataset has time dimension.'):
-            dimensions = get_science_variable_dimensions(
-                input_dataset, single_band_dataset, variable_name
-            )
-            self.assertTupleEqual(dimensions, ('time', 'lat', 'lon'))
-
-        with self.subTest('Input dataset has no time dimension.'):
-            # Using the single_band_dataset as input ensure no time dimension
-            dimensions = get_science_variable_dimensions(
-                single_band_dataset, single_band_dataset, 'lat'
-            )
-            self.assertTupleEqual(dimensions, ('lat',))
 
     @patch('swath_projector.nc_merge.check_coor_valid')
     def test_get_science_variable_attributes(self, mock_check_coord_valid):
