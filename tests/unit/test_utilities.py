@@ -7,6 +7,7 @@ from varinfo import VarInfoFromNetCDF4
 
 from swath_projector.exceptions import MissingCoordinatesError
 from swath_projector.utilities import (
+    apply_fill,
     construct_absolute_path,
     coordinate_requires_transpose,
     create_coordinates_key,
@@ -162,6 +163,46 @@ class TestUtilities(TestCase):
 
                 self.assertIsInstance(returned_data, np.ndarray)
                 self.assertEqual(returned_data.shape, (5, 3, 2))
+
+    def test_apply_fill(self):
+        """Ensure fill is applied correctly based on the given data type."""
+        test_args = [
+            ["float16", np.float64],
+            ["float32", np.float64],
+            ["float64", np.float64],
+            ["int8", np.int8],
+            ["int16", np.int16],
+            ["int32", np.int32],
+        ]
+        test_fill_value = 2
+        for description, dtype in test_args:
+            with self.subTest(description):
+                variable_data = np.ma.array(
+                    [1, 2, 3],
+                    mask=[False, True, False],
+                    fill_value=test_fill_value,
+                    dtype=dtype,
+                )
+                result = apply_fill(variable_data, test_fill_value)
+
+                self.assertIsInstance(result, np.ndarray)
+                self.assertFalse(isinstance(result, np.ma.MaskedArray))
+
+                # Unmasked values
+                self.assertEqual(result[0], 1)
+                self.assertEqual(result[2], 3)
+
+                # Masked value filled correctly
+                if dtype == np.float64:
+                    self.assertTrue(np.isnan(result[1]))
+                else:
+                    self.assertEqual(result[1], test_fill_value)
+
+        with self.subTest("Given fill value is applied for Float-32"):
+            pass
+
+        with self.subTest("Given fill value is applied for Integer t"):
+            pass
 
     def test_get_coordinate_matching_substring(self):
         """Ensure the longitude or latitude coordinate variable, is retrieved

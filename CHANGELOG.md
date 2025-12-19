@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.3.1] - 2025-12-19
+
+### Changed
+
+- [[DAS-2460](https://bugs.earthdata.nasa.gov/browse/DAS-2460)]
+  Fixes incorrect 'near-fill' values in TEMPO float64 variables.
+
 ## [vX.Y.Z] - Unreleased
 
 ### Changed
