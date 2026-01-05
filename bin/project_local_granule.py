@@ -71,8 +71,8 @@ function below can be edited.
 from os import environ
 from unittest.mock import patch
 
-from harmony.message import Message
-from harmony.util import config
+from harmony_service_lib.message import Message
+from harmony_service_lib.util import config
 
 from swath_projector.adapter import SwathProjectorAdapter
 

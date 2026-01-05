@@ -17,8 +17,9 @@ cd harmony-swath-projector
 
 * .snyk - A file used by the Snyk webhook to ensure the correct version of
   Python is used when installing the full dependency tree for the Swath
-  Projector. This file should be updated when the version of Python is updated
-  in the service Docker image.
+  Projector. This file is duplicated in each directory that contains a
+  requirements file. (`./docs`, `./tests`) **This file, and all copies, must be
+  updated when the version of Python is updated in the service Docker image.**
 * bin - A directory containing scripts to build and run Docker images. This
   includes the service and test Docker images.
 * docs - A directory containing documentations, primarily in Jupyter notebooks.

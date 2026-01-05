@@ -4,10 +4,9 @@ import functools
 import logging
 import os
 from tempfile import mkdtemp
-from typing import Dict
 
-from harmony.message import Message
-from harmony.message_utility import has_self_consistent_grid
+from harmony_service_lib.message import Message
+from harmony_service_lib.message_utility import has_self_consistent_grid
 from pyproj import Proj
 from varinfo import VarInfoFromNetCDF4
 
@@ -94,7 +93,7 @@ def reproject(
 
 def get_parameters_from_message(
     message: Message, granule_url: str, input_file: str
-) -> Dict:
+) -> dict:
     """A helper function to parse the input Harmony message and extract
     required information. If the message is missing parameters, then
     default values will be used. The `granule_url` is taken from the

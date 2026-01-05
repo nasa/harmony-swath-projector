@@ -1,11 +1,15 @@
 # Changelog
 
-## [vX.Y.Z] - Unreleased
+## [v1.3.1] - 2026-01-05
 
 ### Changed
 
-- Release notes for the Swath Projector will now include the commit history for
-  that release.
+- Python dependencies for service library upgraded.
+
+- Python dependencies upgraded for documentation notebook.
+
+- Release notes for the Swath Projector now include the commit history for
+  the release.
 
 ## [v1.3.0] - 2025-09-16
 
