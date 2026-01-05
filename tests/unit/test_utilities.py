@@ -200,7 +200,7 @@ class TestUtilities(TestCase):
         variable = Mock(spec=Variable)
 
         test_args = [
-            ['np.float128', np.float128, 4.0, 4.0],
+            ['np.longdouble', np.longdouble, 4.0, 4.0],
             ['np.float16', np.float16, 4.0, 4.0],
             ['np.float32', np.float32, 4.0, 4.0],
             ['np.float64', np.float64, 4.0, 4.0],

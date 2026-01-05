@@ -5,9 +5,14 @@ import os
 import shutil
 from tempfile import mkdtemp
 
-from harmony import BaseHarmonyAdapter
-from harmony.message import Source as HarmonySource
-from harmony.util import HarmonyException, download, generate_output_filename, stage
+from harmony_service_lib import BaseHarmonyAdapter
+from harmony_service_lib.message import Source as HarmonySource
+from harmony_service_lib.util import (
+    HarmonyException,
+    download,
+    generate_output_filename,
+    stage,
+)
 from pystac import Asset, Item
 
 from swath_projector.reproject import reproject
