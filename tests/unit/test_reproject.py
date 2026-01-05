@@ -1,7 +1,7 @@
 from logging import Logger
 from unittest import TestCase
 
-from harmony.message import Message
+from harmony_service_lib.message import Message
 from pyproj import Proj
 
 from swath_projector.reproject import CRS_DEFAULT, get_parameters_from_message, rgetattr
