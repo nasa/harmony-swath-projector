@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Python dependencies upgraded for documentation notebook.
+
 - Release notes for the Swath Projector will now include the commit history for
   that release.
 
