@@ -5,7 +5,7 @@ from harmony_service_lib.message import Message
 from harmony_service_lib.util import config
 
 from swath_projector.adapter import SwathProjectorAdapter
-from tests.test_utils import StringContains, download_side_effect
+from tests.test_utils import Granule, StringContains, create_stac, download_side_effect
 
 
 @patch('swath_projector.adapter.stage', return_value='https://example.com/data')
@@ -53,7 +53,17 @@ class TestPyResampleReproject(TestCase):
                     }
                 )
 
-                reprojector = SwathProjectorAdapter(test_data, config=config(False))
+                reprojector = SwathProjectorAdapter(
+                    test_data,
+                    config=config(False),
+                    catalog=create_stac(
+                        Granule(
+                            'tests/data/VOL2PSST_2017.nc',
+                            'application/x-netcdf',
+                            ['data'],
+                        )
+                    ),
+                )
                 reprojector.invoke()
 
                 mock_download.assert_called_once_with(
