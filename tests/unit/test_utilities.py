@@ -167,8 +167,8 @@ class TestUtilities(TestCase):
     def test_apply_fill(self):
         """Ensure fill is applied correctly based on the given data type."""
         test_args = [
-            ["float16", np.float64],
-            ["float32", np.float64],
+            ["float16", np.float16],
+            ["float32", np.float32],
             ["float64", np.float64],
             ["int8", np.int8],
             ["int16", np.int16],
