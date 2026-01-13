@@ -28,24 +28,36 @@ def get_variable_values(
     function accounts for 2-D and 3-D datasets based on whether the time
     variable is present in the dataset.
 
-    As the variable data are returned as a `numpy.ma.MaskedArray`, the will
-    return no data in the filled pixels. To ensure that the data are
-    correctly handled, the fill value is applied to masked pixels using the
-    `filled` method. The variable values are transposed if the `along-track`
+    The variable data are returned as a NumPy N‑dimensional array.
+    The variable values are transposed if the `along-track`
     dimension size is less than the `across-track` dimension size.
+    To ensure that the data are correctly handled, masked pixels are
+    replaced with the specified fill value using the filled method
+    within apply_fill.
 
     """
-    if len(variable[:].shape) == 1:
-        return make_array_two_dimensional(variable[:])
+    variable_data = variable[:]
+    if len(variable_data.shape) == 1:
+        return make_array_two_dimensional(variable_data)
 
     # If the dimensions have been reordered, transpose the variable
     if variable.dimensions != ordered_dims:
         axes = get_axes_permutation(variable.dimensions, ordered_dims)
-        return (
-            np.ma.transpose(variable[:], axes=axes).copy().filled(fill_value=fill_value)
-        )
+        variable_data = np.ma.transpose(variable_data, axes=axes)
 
-    return variable[:]
+    return apply_fill(variable_data, fill_value)
+
+
+def apply_fill(variable_data: np.ma.array, fill_value: FillValueType) -> np.ndarray:
+    """Apply fill data of either NaN or the variable's original fill_value.
+
+    A fill value of NaN is applied to Float-64 variables to account for suspected
+    issues in Pyresample with float64 fill values (see DAS-2460). For all other data
+    types, the original fill value is used.
+    """
+    if variable_data.dtype == 'float64':
+        return variable_data.filled(np.nan)
+    return variable_data.filled(fill_value)
 
 
 def get_coordinate_matching_substring(
