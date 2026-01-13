@@ -198,12 +198,6 @@ class TestUtilities(TestCase):
                 else:
                     self.assertEqual(result[1], test_fill_value)
 
-        with self.subTest("Given fill value is applied for Float-32"):
-            pass
-
-        with self.subTest("Given fill value is applied for Integer t"):
-            pass
-
     def test_get_coordinate_matching_substring(self):
         """Ensure the longitude or latitude coordinate variable, is retrieved
         when requested.

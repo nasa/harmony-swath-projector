@@ -28,11 +28,12 @@ def get_variable_values(
     function accounts for 2-D and 3-D datasets based on whether the time
     variable is present in the dataset.
 
-    As the variable data are returned as a `numpy.ma.MaskedArray`, the will
-    return no data in the filled pixels. To ensure that the data are
-    correctly handled, the fill value is applied to masked pixels using the
-    `filled` method. The variable values are transposed if the `along-track`
+    The variable data are returned as a NumPy N‑dimensional array.
+    The variable values are transposed if the `along-track`
     dimension size is less than the `across-track` dimension size.
+    To ensure that the data are correctly handled, masked pixels are
+    replaced with the specified fill value using the filled method
+    within apply_fill.
 
     """
     variable_data = variable[:]
