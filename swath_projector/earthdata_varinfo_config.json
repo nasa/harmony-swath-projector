@@ -7,7 +7,7 @@
   ],
   "Mission": {
     "VNP10": "VIIRS",
-    "TEMPO_O3TOT_L2": "TEMPO"
+    "TEMPO_.*_L2": "TEMPO"
   },
   "MetadataOverrides": [
     {
@@ -27,8 +27,8 @@
     {
       "Applicability": {
         "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_O3TOT_L2",
-        "VariablePattern": "^/product/.*|^/support_data/.*|^/geolocation/(?!time$).*"
+        "ShortNamePath": "TEMPO_.*_L2",
+        "VariablePattern": "^/(product|support_data|geolocation|qa_statistics)/(?!time$).*"
       },
       "Attributes": [
         {
@@ -36,7 +36,7 @@
           "Value": "/geolocation/latitude, /geolocation/longitude"
         }
       ],
-      "_Description": "TEMPO_O3TOT_L2 variables only contain basenames for coordinates, which are found in sibling hierarchical groups. This rule fully qualifies the paths to these coordinates. Some variables in these groups are excluded via 'ExcludedScienceVariables'"
+      "_Description": "TEMPO L2 variables only contain basenames for coordinates, which are found in sibling hierarchical groups. This rule fully qualifies the paths to these coordinates. Some variables in these groups are excluded via 'ExcludedScienceVariables'"
     }
   ]
 }

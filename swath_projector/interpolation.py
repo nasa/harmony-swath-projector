@@ -1,15 +1,15 @@
-""" This module contains functions to perform interpolation on the science
-    datasets within a file, using the pyresample Python package.
+"""This module contains functions to perform interpolation on the science
+datasets within a file, using the pyresample Python package.
 
 """
 
 import os
 from functools import partial
 from logging import Logger
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
-from netCDF4 import Dataset
+from netCDF4 import Dataset, Dimension
 from pyresample.bilinear import get_bil_info, get_sample_from_bil_info
 from pyresample.ewa import fornav, ll2cr
 from pyresample.geometry import AreaDefinition, SwathDefinition
@@ -17,14 +17,18 @@ from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_inf
 from pyresample.utils import check_and_wrap
 from varinfo import VarInfoFromNetCDF4
 
+from swath_projector.exceptions import NonProjectableVariableError
 from swath_projector.nc_single_band import HARMONY_TARGET, write_single_band_output
 from swath_projector.swath_geometry import (
     get_extents_from_perimeter,
     get_projected_resolution,
 )
 from swath_projector.utilities import (
+    FillValueType,
     create_coordinates_key,
-    get_coordinate_variable,
+    get_coordinate_data,
+    get_coordinate_matching_substring,
+    get_preferred_ordered_dimensions_info,
     get_rows_per_scan,
     get_scale_and_offset,
     get_variable_file_path,
@@ -47,30 +51,88 @@ NEIGHBOURS = 16
 RADIUS_OF_INFLUENCE = 50000
 
 
+def check_variable_projectability(
+    dataset: Dataset,
+    full_variable: str,
+    var_info: VarInfoFromNetCDF4,
+) -> Tuple[bool, Optional[str], Optional[str]]:
+    """Pre-validate whether a variable can be projected.
+
+    Checks for known non-projectable conditions before attempting projection:
+    1. Missing coordinate references
+    2. Get latitude coordinate and validate it exists
+    3. Dimension mismatch with coordinate variables
+
+    Returns:
+        Tuple of (is_projectable, error_message)
+        - is_projectable: True if variable can be projected
+        - error_message: Description of why variable is not projectable, else None
+    """
+    variable = dataset[full_variable]
+    variable_cf = var_info.get_variable(full_variable)
+
+    # Check 1: Missing coordinates
+    coordinates_key = create_coordinates_key(variable_cf)
+    if not coordinates_key or len(coordinates_key) == 0:
+        return (False, 'No coordinate variables found for this variable')
+
+    # Check 2: Get latitude coordinate and validate it exists
+    latitudes_coord = get_coordinate_matching_substring(dataset, coordinates_key, 'lat')
+
+    if not latitudes_coord.shape:
+        return (False, 'Latitude coordinate variable has no shape')
+
+    # Check 3: Dimension mismatch, variable's spatial dimensions must match coordinates
+    variable_dims = variable.shape[-len(latitudes_coord.shape) :]
+
+    if variable_dims != latitudes_coord.shape:
+        return (
+            False,
+            f'Variable shape {variable.shape} spatial dimensions '
+            f'{variable_dims} do not match coordinate shape {latitudes_coord.shape}',
+        )
+
+    return (True, None)
+
+
 def resample_all_variables(
     message_parameters: Dict,
     science_variables: List[str],
     temp_directory: str,
     logger: Logger,
     var_info: VarInfoFromNetCDF4,
-) -> Tuple[List[str], List[str]]:
+) -> Tuple[List[str], Dict[str, str]]:
     """Iterate through all science variables and reproject to the target
     coordinate grid.
 
     Returns:
         output_variables: A list of names of successfully reprojected
             variables.
-        failed_variables: A list of names of variables that failed
-            reprojection.
+        non_projectable_variables: A dictionary mapping variable names to
+            error messages describing why they could not be projected.
+            These variables will be copied as-is to output.
     """
     output_extension = os.path.splitext(message_parameters['input_file'])[-1]
     reprojection_cache = get_reprojection_cache(message_parameters)
     output_variables = []
-    failed_variables = []
+    non_projectable_variables = {}
 
     check_for_valid_interpolation(message_parameters, logger)
 
+    # Open dataset once for pre-validation
+    dataset = Dataset(message_parameters['input_file'])
+
     for variable in science_variables:
+        # Pre-validate variable projectability
+        is_projectable, error_message = check_variable_projectability(
+            dataset, variable, var_info
+        )
+
+        if not is_projectable:
+            logger.warning(f'Variable "{variable}" is non-projectable: {error_message}')
+            non_projectable_variables[variable] = error_message
+            continue
+
         try:
             variable_output_path = get_variable_file_path(
                 temp_directory, variable, output_extension
@@ -89,14 +151,23 @@ def resample_all_variables(
             )
 
             output_variables.append(variable)
+
+        except NonProjectableVariableError as error:
+            # Known non-projectable condition detected during reprojection
+            logger.warning(
+                f'Variable "{variable}" determined non-projectable during '
+                f'processing: {error.message}'
+            )
+            non_projectable_variables[variable] = error.message
         except Exception as error:
             # Assume for now variable cannot be reprojected. TBD add checks for
             # other error conditions.
             logger.error(f'Cannot reproject {variable}')
             logger.exception(error)
-            failed_variables.append(variable)
 
-    return output_variables, failed_variables
+    dataset.close()
+
+    return output_variables, non_projectable_variables
 
 
 def resample_variable(
@@ -115,6 +186,11 @@ def resample_variable(
     Reprojection information will be stored in a cache, enabling it to be
     recalled, rather than re-derived for subsequent science variables that
     share the same coordinate variables.
+
+    Raises:
+        NonProjectableVariableError: If the variable is determined to be
+            non-projectable during processing (known condition).
+        Exception: For unexpected errors that may indicate programming issues.
 
     """
     interpolation_functions = get_resampling_functions()[
@@ -156,17 +232,35 @@ def resample_variable(
         # themselves.
         reprojection_cache[coordinates_key] = reprojection_information
 
-    # Use a dictionary to store input variable values and fill value. This
-    # allows the same function signature to retrieve results from all
-    # interpolation methods.
     fill_value = get_variable_numeric_fill_value(variable)
-    variable_information = {
-        'values': get_variable_values(dataset, variable, fill_value),
-        'fill_value': fill_value,
-    }
 
-    results = interpolation_functions['get_results'](
-        variable_information, reprojection_information
+    # NonProjectableVariableError will propagate if dimensions are incompatible
+    all_ordered_dims, ordered_non_track_dim_objs = (
+        get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
+    )
+
+    s_var = get_variable_values(variable, fill_value, all_ordered_dims)
+
+    # Validate source variable shape against target area expectations
+    if len(s_var.shape) < 2:
+        dataset.close()
+        raise NonProjectableVariableError(
+            full_variable,
+            f"Variable has fewer than 2 dimensions (shape: {s_var.shape})",
+        )
+
+    t_var = allocate_target_array(
+        ordered_non_track_dim_objs,
+        reprojection_information['target_area'].shape,
+        s_var.dtype,
+    )
+
+    results = resample_variable_data(
+        s_var,
+        t_var,
+        fill_value,
+        reprojection_information,
+        interpolation_functions['get_results'],
     )
     results = results.astype(variable.dtype)
 
@@ -178,6 +272,7 @@ def resample_variable(
         variable_output_path,
         reprojection_cache,
         attributes,
+        ordered_non_track_dim_objs,
     )
 
     dataset.close()
@@ -185,6 +280,54 @@ def resample_variable(
     logger.debug(
         f'Saved {full_variable} output to temporary file: ' f'{variable_output_path}'
     )
+
+
+def resample_variable_data(
+    s_var: np.ndarray,
+    t_var: np.ndarray,
+    fill_value: FillValueType,
+    reprojection_information: Dict,
+    resampler: Callable,
+) -> np.ndarray:
+    """Recursively resample variable data in N-dimensions.
+
+    A recursive function that reduces an N-dimensional variable to the base
+    case of a 2-D layer representing a horizontal spatial slice. This slice
+    is resampled with the supplied resampler.
+    """
+    if len(s_var.shape) <= 2:
+        return resample_layer(s_var[:], fill_value, reprojection_information, resampler)
+
+    for layer_index in range(s_var.shape[0]):
+        t_var[layer_index, ...] = resample_variable_data(
+            s_var[layer_index, ...],
+            t_var[layer_index, ...],
+            fill_value,
+            reprojection_information,
+            resampler,
+        )
+
+    return t_var
+
+
+def resample_layer(
+    source_values_layer: np.ndarray,
+    fill_value: FillValueType,
+    reprojection_information: Dict,
+    resampler: Callable,
+) -> np.ndarray:
+    """Resample a 2-D layer and return the results.
+
+    This function uses a dictionary to store input variable values and fill value. This
+    allows the same function signature to retrieve results from all interpolation
+    methods.
+    """
+
+    variable_information = {
+        'values': source_values_layer,
+        'fill_value': fill_value,
+    }
+    return resampler(variable_information, reprojection_information)
 
 
 def get_bilinear_information(
@@ -387,10 +530,9 @@ def get_swath_definition(dataset: Dataset, coordinates: Tuple[str]) -> SwathDefi
     -180 < longitude < 180.
 
     """
-    latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
-    longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
-
-    wrapped_lons, wrapped_lats = check_and_wrap(longitudes[:], latitudes[:])
+    latitudes = get_coordinate_data(dataset, coordinates, 'lat')
+    longitudes = get_coordinate_data(dataset, coordinates, 'lon')
+    wrapped_lons, wrapped_lats = check_and_wrap(longitudes, latitudes)
 
     # EWA ll2cr requires 2-dimensional arrays for the swath coordinates:
     if len(wrapped_lons.shape) == 1:
@@ -452,8 +594,8 @@ def get_target_area(
     dimensions = get_parameters_tuple(parameters, ['height', 'width'])
     resolutions = get_parameters_tuple(parameters, ['xres', 'yres'])
     projection_string = parameters['projection'].definition_string()
-    latitudes = get_coordinate_variable(dataset, coordinates, 'lat')
-    longitudes = get_coordinate_variable(dataset, coordinates, 'lon')
+    latitudes = get_coordinate_data(dataset, coordinates, 'lat')
+    longitudes = get_coordinate_data(dataset, coordinates, 'lon')
 
     if grid_extents is not None:
         logger.info(
@@ -522,3 +664,16 @@ def get_parameters_tuple(
         output_values = None
 
     return output_values
+
+
+def allocate_target_array(
+    ordered_non_track_dim_objs: list[Dimension], target_area_shape: Tuple[int], dtype
+) -> np.ndarray:
+    """Initialize the target variable array.
+
+    The target array is created with shape corresponding to the sizes of
+    the non-track dimensions followed by the shape of the target area.
+    """
+    non_track_dim_shapes = [dim.size for dim in ordered_non_track_dim_objs]
+    t_var_shape = (*non_track_dim_shapes, *target_area_shape)
+    return np.empty(t_var_shape, dtype=dtype)

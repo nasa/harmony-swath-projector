@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-from harmony.message import Message
-from harmony.util import HarmonyException, config
+from harmony_service_lib.message import Message
+from harmony_service_lib.util import HarmonyException, config
 
 from swath_projector.adapter import SwathProjectorAdapter
 from swath_projector.reproject import reproject

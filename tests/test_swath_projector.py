@@ -5,12 +5,12 @@ from shutil import copy, rmtree
 from unittest import TestCase
 from unittest.mock import ANY, Mock, patch
 
-from harmony.message import Message
-from harmony.util import config
+from harmony_service_lib.message import Message
+from harmony_service_lib.util import config
 from netCDF4 import Dataset
 
 from swath_projector.adapter import SwathProjectorAdapter
-from tests.test_utils import StringContains, download_side_effect
+from tests.test_utils import Granule, StringContains, create_stac, download_side_effect
 
 
 @patch('swath_projector.nc_merge.datetime')
@@ -84,7 +84,13 @@ class TestSwathProjector(TestCase):
             }
         )
 
-        reprojector = SwathProjectorAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(
+            test_data,
+            config=config(False),
+            catalog=create_stac(
+                Granule(input_file_path, 'application/x-netcdf', ['data'])
+            ),
+        )
         reprojector.invoke()
 
         mock_download.assert_called_once_with(
@@ -138,7 +144,13 @@ class TestSwathProjector(TestCase):
             }
         )
 
-        reprojector = SwathProjectorAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(
+            test_data,
+            config=config(False),
+            catalog=create_stac(
+                Granule(input_file_path, 'application/x-netcdf', ['data'])
+            ),
+        )
         reprojector.invoke()
 
         mock_download.assert_called_once_with(
@@ -247,7 +259,13 @@ class TestSwathProjector(TestCase):
             }
         )
 
-        reprojector = SwathProjectorAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(
+            test_data,
+            config=config(False),
+            catalog=create_stac(
+                Granule(input_file_path, 'application/x-netcdf', ['data'])
+            ),
+        )
         reprojector.invoke()
 
         mock_download.assert_called_once_with(
@@ -353,7 +371,13 @@ class TestSwathProjector(TestCase):
             }
         )
 
-        reprojector = SwathProjectorAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(
+            test_data,
+            config=config(False),
+            catalog=create_stac(
+                Granule(input_file_path, 'application/x-netcdf', ['data'])
+            ),
+        )
         reprojector.invoke()
 
         mock_download.assert_called_once_with(
@@ -440,7 +464,13 @@ class TestSwathProjector(TestCase):
             }
         )
 
-        reprojector = SwathProjectorAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(
+            test_data,
+            config=config(False),
+            catalog=create_stac(
+                Granule(input_file_path, 'application/x-netcdf', ['data'])
+            ),
+        )
         reprojector.invoke()
 
         mock_download.assert_called_once_with(
@@ -540,7 +570,13 @@ class TestSwathProjector(TestCase):
                 },
             }
         )
-        reprojector = SwathProjectorAdapter(test_data, config=config(False))
+        reprojector = SwathProjectorAdapter(
+            test_data,
+            config=config(False),
+            catalog=create_stac(
+                Granule(input_file_path, 'application/x-netcdf', ['data'])
+            ),
+        )
         reprojector.invoke()
 
         mock_download.assert_called_once_with(

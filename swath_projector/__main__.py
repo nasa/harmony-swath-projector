@@ -1,9 +1,9 @@
-""" Run the Harmony Swath Projector adapter via the Harmony CLI. """
+"""Run the Harmony Swath Projector adapter via the Harmony CLI."""
 
 from argparse import ArgumentParser
 from sys import argv
 
-from harmony import is_harmony_cli, run_cli, setup_cli
+from harmony_service_lib import is_harmony_cli, run_cli, setup_cli
 
 from swath_projector.adapter import SwathProjectorAdapter
 

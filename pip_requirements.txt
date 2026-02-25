@@ -1,8 +1,8 @@
 # Open source packages available from PyPI:
-earthdata-varinfo ~= 3.0.0
-harmony-service-lib~=1.0.22
-netCDF4 ~= 1.6.4
+earthdata-varinfo ~= 3.3.1
+harmony-service-lib ~= 2.11.0
+netCDF4 ~= 1.7.2
 numpy ~= 1.24.2
 pyproj ~= 3.6.0
 pyresample ~= 1.27.1
-pystac ~= 0.5.6
+pystac ~= 1.14.2

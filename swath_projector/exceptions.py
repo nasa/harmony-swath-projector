@@ -1,6 +1,6 @@
-""" This module contains custom exceptions specific to the Harmony Swath
-    Projector. These exceptions are intended to allow for easier debugging of
-    the expected errors that may occur during an invocation of the service.
+"""This module contains custom exceptions specific to the Harmony Swath
+Projector. These exceptions are intended to allow for easier debugging of
+the expected errors that may occur during an invocation of the service.
 
 """
 
@@ -52,3 +52,13 @@ class InvalidTargetGrid(CustomError):
         super().__init__(
             'InvalidTargetGrid', 'Insufficient or invalid target grid parameters.'
         )
+
+
+class NonProjectableVariableError(CustomError):
+    """Exception raised when a variable is determined to be non-projectable.
+
+    This is a known/expected condition, not a programming error.
+    """
+
+    def __init__(self, variable_name, message):
+        super().__init__(f"Variable '{variable_name}' is non-projectable: {message}")

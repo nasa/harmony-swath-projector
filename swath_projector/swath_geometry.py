@@ -1,6 +1,6 @@
-""" The module contains functions designed to calculate and retrieve the
-    extents and resolution of data in the projected Coordinate Reference System
-    (CRS).
+"""The module contains functions designed to calculate and retrieve the
+extents and resolution of data in the projected Coordinate Reference System
+(CRS).
 
 """
 
