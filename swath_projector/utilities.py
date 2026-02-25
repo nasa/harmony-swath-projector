@@ -265,9 +265,6 @@ def get_rows_per_scan(total_rows: int) -> int:
     return total_rows
 
 
-from swath_projector.exceptions import NonProjectableVariableError
-
-
 def get_preferred_ordered_dimensions_info(
     variable: Variable, coordinates: Tuple[str], dataset: Dataset
 ) -> Tuple[tuple[str], list[Dimension]]:

@@ -57,7 +57,6 @@
   The `earthdata-varinfo` configuration file used by the Swath Projector has
   been updated to extend the coverage of TEMPO level 2 collections beyond
   TEMPO_O3_TOT_L2, primarily focusing on TEMPO_NO2_L2 and TEMPO_NO2_L2_NRT.
->>>>>>> 93d19670072c9c39bb4b8d1bc348886d41ecad0f
 
 ## [v1.2.0] - 2024-10-10
 
@@ -112,6 +111,7 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
+[v1.4.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.4.0)
 [v1.3.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.3.0)
 [v1.2.3]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.3)
 [v1.2.2]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.2)
