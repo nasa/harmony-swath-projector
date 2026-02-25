@@ -17,7 +17,6 @@ from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_inf
 from pyresample.utils import check_and_wrap
 from varinfo import VarInfoFromNetCDF4
 
-from swath_projector.exceptions import NonProjectableVariableError
 from swath_projector.nc_single_band import HARMONY_TARGET, write_single_band_output
 from swath_projector.swath_geometry import (
     get_extents_from_perimeter,
@@ -27,7 +26,6 @@ from swath_projector.utilities import (
     FillValueType,
     create_coordinates_key,
     get_coordinate_data,
-    get_coordinate_matching_substring,
     get_preferred_ordered_dimensions_info,
     get_rows_per_scan,
     get_scale_and_offset,
@@ -51,39 +49,87 @@ NEIGHBOURS = 16
 RADIUS_OF_INFLUENCE = 50000
 
 
+# Reasons for non-projectable variables
+class NonProjectableReason:
+    """Constants for categorizing why a variable cannot be projected."""
+    DIMENSION_MISMATCH = "dimension_mismatch"
+    NON_NUMERIC_DTYPE = "non_numeric_dtype"
+    MISSING_COORDINATES = "missing_coordinates"
+    UNEXPECTED_ERROR = "unexpected_error"
+
+
 def check_variable_projectability(
     dataset: Dataset,
     full_variable: str,
     var_info: VarInfoFromNetCDF4,
-) -> Tuple[bool, Optional[str]]:
+    logger: Logger,
+) -> Tuple[bool, Optional[str], Optional[str]]:
     """Pre-validate whether a variable can be projected.
-
+    
     Checks for known non-projectable conditions before attempting projection:
-    1. Missing coordinate references
-    2. Dimension compatibility with coordinate variables (validates that
-       the variable's dimensions include the required track dimensions
-       from the coordinate variables)
-
+    1. Dimension mismatch with coordinate variables
+    2. Non-numeric data types
+    3. Missing coordinate references
+    
     Returns:
-        Tuple of (is_projectable, error_message)
+        Tuple of (is_projectable, reason, details)
         - is_projectable: True if variable can be projected
-        - error_message: Description of why variable is not projectable, else None
+        - reason: NonProjectableReason constant if not projectable, else None
+        - details: Additional details about why variable is not projectable
     """
     variable = dataset[full_variable]
     variable_cf = var_info.get_variable(full_variable)
-
-    # Check 1: Missing coordinates
+    
+    # Check 1: Non-numeric data type
+    if not np.issubdtype(variable.dtype, np.number):
+        return (
+            False,
+            NonProjectableReason.NON_NUMERIC_DTYPE,
+            f"Variable dtype '{variable.dtype}' is not numeric"
+        )
+    
+    # Check 2: Missing coordinates
     coordinates_key = create_coordinates_key(variable_cf)
     if not coordinates_key or len(coordinates_key) == 0:
-        return (False, 'No coordinate variables found for this variable')
-
-    # Check 2: Validate dimension compatibility with coordinates
+        return (
+            False,
+            NonProjectableReason.MISSING_COORDINATES,
+            "No coordinate variables found for this variable"
+        )
+    
+    # Check 3: Dimension mismatch with coordinates
+    # Get coordinate dimensions and compare with variable dimensions
     try:
-        get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
-    except NonProjectableVariableError as error:
-        return (False, error.message)
-
-    return (True, None)
+        lat_coord = None
+        lon_coord = None
+        for coord in coordinates_key:
+            coord_lower = coord.lower()
+            if 'lat' in coord_lower:
+                lat_coord = coord
+            elif 'lon' in coord_lower:
+                lon_coord = coord
+        
+        if lat_coord and lon_coord:
+            lat_var = dataset[lat_coord]
+            lon_var = dataset[lon_coord]
+            coord_shape = lat_var.shape
+            
+            # Variable's last N dimensions should match coordinate shape
+            var_spatial_dims = variable.shape[-len(coord_shape):]
+            
+            if var_spatial_dims != coord_shape:
+                return (
+                    False,
+                    NonProjectableReason.DIMENSION_MISMATCH,
+                    f"Variable shape {variable.shape} spatial dimensions "
+                    f"{var_spatial_dims} do not match coordinate shape {coord_shape}"
+                )
+    except Exception as e:
+        logger.debug(f"Could not validate dimensions for {full_variable}: {e}")
+        # If we can't validate, assume it's projectable and let it fail naturally
+        pass
+    
+    return (True, None, None)
 
 
 def resample_all_variables(
@@ -92,20 +138,23 @@ def resample_all_variables(
     temp_directory: str,
     logger: Logger,
     var_info: VarInfoFromNetCDF4,
-) -> Tuple[List[str], Dict[str, str]]:
+) -> Tuple[List[str], List[str], Dict[str, Dict]]:
     """Iterate through all science variables and reproject to the target
     coordinate grid.
 
     Returns:
         output_variables: A list of names of successfully reprojected
             variables.
+        failed_variables: A list of names of variables that failed
+            reprojection (unexpected errors).
         non_projectable_variables: A dictionary mapping variable names to
-            error messages describing why they could not be projected.
-            These variables will be copied as-is to output.
+            their non-projectable reason and details. These are known
+            conditions (dimension mismatch, non-numeric type, etc.)
     """
     output_extension = os.path.splitext(message_parameters['input_file'])[-1]
     reprojection_cache = get_reprojection_cache(message_parameters)
     output_variables = []
+    failed_variables = []
     non_projectable_variables = {}
 
     check_for_valid_interpolation(message_parameters, logger)
@@ -115,13 +164,18 @@ def resample_all_variables(
 
     for variable in science_variables:
         # Pre-validate variable projectability
-        is_projectable, error_message = check_variable_projectability(
-            dataset, variable, var_info
+        is_projectable, reason, details = check_variable_projectability(
+            dataset, variable, var_info, logger
         )
-
+        
         if not is_projectable:
-            logger.warning(f'Variable "{variable}" is non-projectable: {error_message}')
-            non_projectable_variables[variable] = error_message
+            logger.warning(
+                f'Variable "{variable}" is non-projectable: {reason}. {details}'
+            )
+            non_projectable_variables[variable] = {
+                'reason': reason,
+                'details': details,
+            }
             continue
 
         try:
@@ -142,23 +196,57 @@ def resample_all_variables(
             )
 
             output_variables.append(variable)
-
-        except NonProjectableVariableError as error:
+            
+        except NonProjectableVariableError as np_error:
             # Known non-projectable condition detected during reprojection
             logger.warning(
                 f'Variable "{variable}" determined non-projectable during '
-                f'processing: {error.message}'
+                f'processing: {np_error.reason}. {np_error.details}'
             )
-            non_projectable_variables[variable] = error.message
+            non_projectable_variables[variable] = {
+                'reason': np_error.reason,
+                'details': np_error.details,
+            }
+            
         except Exception as error:
-            # Assume for now variable cannot be reprojected. TBD add checks for
-            # other error conditions.
-            logger.error(f'Cannot reproject {variable}')
+            # Unexpected error - this might indicate a programming issue
+            logger.error(
+                f'Unexpected error reprojecting "{variable}": {type(error).__name__}'
+            )
             logger.exception(error)
+            failed_variables.append(variable)
 
     dataset.close()
+    
+    # Log summary
+    _log_reprojection_summary(
+        logger, output_variables, failed_variables, non_projectable_variables
+    )
 
-    return output_variables, non_projectable_variables
+    return output_variables, failed_variables, non_projectable_variables
+
+
+def _log_reprojection_summary(
+    logger: Logger,
+    output_variables: List[str],
+    failed_variables: List[str],
+    non_projectable_variables: Dict[str, Dict],
+) -> None:
+    """Log a summary of the reprojection results."""
+    logger.info(
+        f'Reprojection summary: '
+        f'{len(output_variables)} succeeded, '
+        f'{len(non_projectable_variables)} non-projectable, '
+        f'{len(failed_variables)} failed'
+    )
+    
+    if non_projectable_variables:
+        logger.info('Non-projectable variables:')
+        for var_name, info in non_projectable_variables.items():
+            logger.info(f'  - {var_name}: {info["reason"]} ({info["details"]})')
+    
+    if failed_variables:
+        logger.warning(f'Variables with unexpected failures: {failed_variables}')
 
 
 def resample_variable(
@@ -177,7 +265,7 @@ def resample_variable(
     Reprojection information will be stored in a cache, enabling it to be
     recalled, rather than re-derived for subsequent science variables that
     share the same coordinate variables.
-
+    
     Raises:
         NonProjectableVariableError: If the variable is determined to be
             non-projectable during processing (known condition).
@@ -224,22 +312,31 @@ def resample_variable(
         reprojection_cache[coordinates_key] = reprojection_information
 
     fill_value = get_variable_numeric_fill_value(variable)
-
-    # NonProjectableVariableError will propagate if dimensions are incompatible
-    all_ordered_dims, ordered_non_track_dim_objs = (
-        get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
-    )
+    
+    try:
+        all_ordered_dims, ordered_non_track_dim_objs = (
+            get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
+        )
+    except ValueError as e:
+        # Dimension ordering issues indicate non-projectable variable
+        dataset.close()
+        raise NonProjectableVariableError(
+            full_variable,
+            NonProjectableReason.DIMENSION_MISMATCH,
+            f"Cannot determine dimension ordering: {e}"
+        )
 
     s_var = get_variable_values(variable, fill_value, all_ordered_dims)
-
+    
     # Validate source variable shape against target area expectations
     if len(s_var.shape) < 2:
         dataset.close()
         raise NonProjectableVariableError(
             full_variable,
-            f"Variable has fewer than 2 dimensions (shape: {s_var.shape})",
+            NonProjectableReason.DIMENSION_MISMATCH,
+            f"Variable has fewer than 2 dimensions (shape: {s_var.shape})"
         )
-
+    
     t_var = allocate_target_array(
         ordered_non_track_dim_objs,
         reprojection_information['target_area'].shape,

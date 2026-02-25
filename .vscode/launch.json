@@ -1,0 +1,20 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Swath Projector Unit Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "python": "/opt/homebrew/Caskroom/miniconda/base/envs/swathprojector/bin/python",
+            "args": [         
+                //"tests.unit.test_nc_merge.TestNCMerge.test_output_global_attributes",
+                "tests.test_input_file_download.TestInputFileDownload.test_local_tempo_03tot_l2_v2_das_2219",
+            ]
+
+        }
+    ]
+}

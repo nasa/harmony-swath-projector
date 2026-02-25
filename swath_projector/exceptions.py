@@ -61,4 +61,7 @@ class NonProjectableVariableError(CustomError):
     """
 
     def __init__(self, variable_name, message):
-        super().__init__(f"Variable '{variable_name}' is non-projectable: {message}")
+        super().__init__(
+            'NonProjectableVariableError',
+            f'Variable {variable_name} is non-projectable: {message}',
+        )
