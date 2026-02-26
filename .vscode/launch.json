@@ -10,9 +10,11 @@
             "request": "launch",
             "module": "unittest",
             "python": "/opt/homebrew/Caskroom/miniconda/base/envs/swathprojector/bin/python",
-            "args": [         
+            "args": [
+                //"tests.test_swath_projector.TestSwathProjector.test_single_band_input_reprojected_metres",
                 //"tests.unit.test_nc_merge.TestNCMerge.test_output_global_attributes",
-                "tests.test_input_file_download.TestInputFileDownload.test_local_tempo_03tot_l2_v2_das_2219",
+                "tests.unit.test_interpolation.TestInterpolation.test_resample_all_variables",
+                //"tests.test_input_file_download.TestInputFileDownload.test_local_tempo_03tot_l2_v2_das_2219",
             ]
 
         }
