@@ -113,9 +113,7 @@ def resample_all_variables(
 
     for variable in science_variables:
         # Pre-validate variable projectability
-        error_message = check_variable_projectability(
-            dataset, variable, var_info
-        )
+        error_message = check_variable_projectability(dataset, variable, var_info)
 
         if error_message:
             logger.warning(f'Variable "{variable}" is non-projectable: {error_message}')

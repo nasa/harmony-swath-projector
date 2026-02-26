@@ -1,4 +1,5 @@
-""" Utility functions to support swath projector processing """
+"""Utility functions to support swath projector processing"""
+
 import os
 from typing import Dict, Optional, Tuple, Union
 
