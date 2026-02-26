@@ -75,10 +75,9 @@ def reproject(
     if not resampled_variables:
         raise Exception('No variables could be reprojected')
 
-    # Non-projectable variables are treated as metadata (copied as-is)
+    # Now merge outputs (unless we only have one)
     metadata_variables = var_info.get_metadata_variables()
-    metadata_variables.update(set(non_projectable_variables.keys()))
-
+    metadata_variables.update(non_projectable_variables)
     nc_merge.create_output(
         parameters,
         output_file,

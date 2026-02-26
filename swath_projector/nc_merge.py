@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Dict, Optional, Set, Union
 
 import numpy as np
 from netCDF4 import Dataset, Variable

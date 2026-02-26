@@ -1,3 +1,4 @@
+""" Utility functions to support swath projector processing """
 import os
 from typing import Dict, Optional, Tuple, Union
 
@@ -96,8 +97,8 @@ def get_coordinate_data(
 
     if coordinate_requires_transpose(coordinate):
         return np.ma.transpose(coordinate[:]).copy()
-    else:
-        return coordinate[:]
+
+    return coordinate[:]
 
 
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
@@ -314,8 +315,8 @@ def get_ordered_track_dims(coordinate_var: Variable) -> Tuple[str]:
         raise Exception('Unsupported coordinate variable shape')
     if coordinate_requires_transpose(coordinate_var):
         return coordinate_var.dimensions[::-1]
-    else:
-        return coordinate_var.dimensions
+
+    return coordinate_var.dimensions
 
 
 def get_axes_permutation(old_dims: Tuple[str], new_dims: Tuple[str]) -> Tuple[int]:

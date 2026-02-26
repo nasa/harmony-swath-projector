@@ -27,7 +27,6 @@ from swath_projector.utilities import (
     FillValueType,
     create_coordinates_key,
     get_coordinate_data,
-    get_coordinate_matching_substring,
     get_preferred_ordered_dimensions_info,
     get_rows_per_scan,
     get_scale_and_offset,
@@ -55,7 +54,7 @@ def check_variable_projectability(
     dataset: Dataset,
     full_variable: str,
     var_info: VarInfoFromNetCDF4,
-) -> Tuple[bool, Optional[str]]:
+) -> Optional[str]:
     """Pre-validate whether a variable can be projected.
 
     Checks for known non-projectable conditions before attempting projection:
@@ -65,9 +64,8 @@ def check_variable_projectability(
        from the coordinate variables)
 
     Returns:
-        Tuple of (is_projectable, error_message)
-        - is_projectable: True if variable can be projected
-        - error_message: Description of why variable is not projectable, else None
+        Error message describing why variable is not projectable, or None
+        if the variable can be projected.
     """
     variable = dataset[full_variable]
     variable_cf = var_info.get_variable(full_variable)
@@ -75,15 +73,15 @@ def check_variable_projectability(
     # Check 1: Missing coordinates
     coordinates_key = create_coordinates_key(variable_cf)
     if not coordinates_key or len(coordinates_key) == 0:
-        return (False, 'No coordinate variables found for this variable')
+        return str(f'No coordinate variables found for this variable')
 
     # Check 2: Validate dimension compatibility with coordinates
     try:
         get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
     except NonProjectableVariableError as error:
-        return (False, error.message)
+        return error.message
 
-    return (True, None)
+    return None
 
 
 def resample_all_variables(
@@ -106,7 +104,7 @@ def resample_all_variables(
     output_extension = os.path.splitext(message_parameters['input_file'])[-1]
     reprojection_cache = get_reprojection_cache(message_parameters)
     output_variables = []
-    non_projectable_variables = {}
+    non_projectable_variables = []
 
     check_for_valid_interpolation(message_parameters, logger)
 
@@ -115,13 +113,13 @@ def resample_all_variables(
 
     for variable in science_variables:
         # Pre-validate variable projectability
-        is_projectable, error_message = check_variable_projectability(
+        error_message = check_variable_projectability(
             dataset, variable, var_info
         )
 
-        if not is_projectable:
+        if error_message:
             logger.warning(f'Variable "{variable}" is non-projectable: {error_message}')
-            non_projectable_variables[variable] = error_message
+            non_projectable_variables.append(variable)
             continue
 
         try:
@@ -143,18 +141,12 @@ def resample_all_variables(
 
             output_variables.append(variable)
 
-        except NonProjectableVariableError as error:
-            # Known non-projectable condition detected during reprojection
-            logger.warning(
-                f'Variable "{variable}" determined non-projectable during '
-                f'processing: {error.message}'
-            )
-            non_projectable_variables[variable] = error.message
         except Exception as error:
-            # Assume for now variable cannot be reprojected. TBD add checks for
-            # other error conditions.
+            # Assume for now variable cannot be reprojected.
+            # Reraise exception as application failures
             logger.error(f'Cannot reproject {variable}')
             logger.exception(error)
+            raise Exception(error) from error
 
     dataset.close()
 
@@ -231,14 +223,6 @@ def resample_variable(
     )
 
     s_var = get_variable_values(variable, fill_value, all_ordered_dims)
-
-    # Validate source variable shape against target area expectations
-    if len(s_var.shape) < 2:
-        dataset.close()
-        raise NonProjectableVariableError(
-            full_variable,
-            f"Variable has fewer than 2 dimensions (shape: {s_var.shape})",
-        )
 
     t_var = allocate_target_array(
         ordered_non_track_dim_objs,
