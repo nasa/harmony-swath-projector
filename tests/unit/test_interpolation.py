@@ -8,6 +8,7 @@ from pyproj import Proj
 from pyresample.geometry import AreaDefinition
 from varinfo import VarInfoFromNetCDF4
 
+from swath_projector.exceptions import CannotReprojectVariable
 from swath_projector.interpolation import (
     EPSILON,
     RADIUS_OF_INFLUENCE,
@@ -23,7 +24,6 @@ from swath_projector.interpolation import (
 )
 from swath_projector.nc_single_band import HARMONY_TARGET
 from swath_projector.reproject import CF_CONFIG_FILE
-from swath_projector.exceptions import CannotReprojectVariable
 
 
 class TestInterpolation(TestCase):

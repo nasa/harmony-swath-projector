@@ -11,19 +11,18 @@ from pyproj import Proj
 from varinfo import VarInfoFromNetCDF4
 
 from swath_projector import nc_merge
-from swath_projector.exceptions import InvalidTargetGrid
-from swath_projector.interpolation import resample_all_variables
 from swath_projector.exceptions import (
-    UnableToParseInputFileVariables,
-    NoScienceVariablesFound,
-    NoReprojectedVariables,
     InputFileNotFound,
-    MissingXExtent,
-    MissingYExtent,
+    InvalidTargetGrid,
     MissingCellHeight,
     MissingCellWidth,
+    MissingXExtent,
+    MissingYExtent,
+    NoReprojectedVariables,
+    NoScienceVariablesFound,
+    UnableToParseInputFileVariables,
 )
-
+from swath_projector.interpolation import resample_all_variables
 
 RADIUS_EARTH_METRES = (
     6_378_137  # http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html

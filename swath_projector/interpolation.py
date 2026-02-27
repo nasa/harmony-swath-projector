@@ -18,8 +18,8 @@ from pyresample.utils import check_and_wrap
 from varinfo import VarInfoFromNetCDF4
 
 from swath_projector.exceptions import (
-    NonProjectableVariableError,
     CannotReprojectVariable,
+    NonProjectableVariableError,
 )
 from swath_projector.nc_single_band import HARMONY_TARGET, write_single_band_output
 from swath_projector.swath_geometry import (

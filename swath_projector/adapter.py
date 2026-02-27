@@ -15,8 +15,8 @@ from harmony_service_lib.util import (
 )
 from pystac import Asset, Item
 
-from swath_projector.reproject import reproject
 from swath_projector.exceptions import InvalidGranuleList
+from swath_projector.reproject import reproject
 
 
 class SwathProjectorAdapter(BaseHarmonyAdapter):
@@ -119,9 +119,7 @@ class SwathProjectorAdapter(BaseHarmonyAdapter):
 
         except Exception as err:
             logger.error('Reprojection failed: ' + str(err), exc_info=1)
-            raise HarmonyException(
-                f'Reprojection failed with error: {err}'
-            ) from err
+            raise HarmonyException(f'Reprojection failed with error: {err}') from err
 
         finally:
             # Clean up any intermediate resources
