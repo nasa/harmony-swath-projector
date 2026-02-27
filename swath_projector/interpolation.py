@@ -76,7 +76,7 @@ def check_variable_projectability(
     # Check 1: Missing coordinates
     coordinates_key = create_coordinates_key(variable_cf)
     if not coordinates_key:
-        return str(f'No coordinate variables found for this variable')
+        return 'No coordinate variables found for this variable'
 
     # Check 2: Validate dimension compatibility with coordinates
     try:
@@ -147,7 +147,7 @@ def resample_all_variables(
             # Reraise exception as application failures
             logger.error(f'Cannot reproject {variable}')
             logger.exception(error)
-            raise CannotReprojectVariable(error)
+            raise CannotReprojectVariable(error) from error
 
     dataset.close()
 

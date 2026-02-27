@@ -120,7 +120,7 @@ class SwathProjectorAdapter(BaseHarmonyAdapter):
         except Exception as err:
             logger.error('Reprojection failed: ' + str(err), exc_info=1)
             raise HarmonyException(
-                'Reprojection failed with error: ' + str(err)
+                f'Reprojection failed with error: {err}'
             ) from err
 
         finally:

@@ -68,7 +68,7 @@ def reproject(
         )
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
-        raise UnableToParseInputFileVariables(err)
+        raise UnableToParseInputFileVariables(err) from err
 
     science_variables = var_info.get_science_variables()
 
