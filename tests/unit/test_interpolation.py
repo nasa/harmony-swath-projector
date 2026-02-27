@@ -23,6 +23,7 @@ from swath_projector.interpolation import (
 )
 from swath_projector.nc_single_band import HARMONY_TARGET
 from swath_projector.reproject import CF_CONFIG_FILE
+from swath_projector.exceptions import CannotReprojectVariable
 
 
 class TestInterpolation(TestCase):
@@ -120,7 +121,7 @@ class TestInterpolation(TestCase):
         parameters = {'interpolation': 'ewa-nn'}
         parameters.update(self.message_parameters)
 
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(CannotReprojectVariable) as context:
             resample_all_variables(
                 parameters,
                 self.science_variables,
@@ -129,7 +130,7 @@ class TestInterpolation(TestCase):
                 self.var_info,
             )
 
-        self.assertIn('unexpected_error', str(context.exception))
+        self.assertIn('Cannot reproject', str(context.exception))
 
     @patch('swath_projector.interpolation.allocate_target_array')
     @patch('swath_projector.interpolation.get_preferred_ordered_dimensions_info')

@@ -16,6 +16,7 @@ from harmony_service_lib.util import (
 from pystac import Asset, Item
 
 from swath_projector.reproject import reproject
+from swath_projector.exceptions import InvalidGranuleList
 
 
 class SwathProjectorAdapter(BaseHarmonyAdapter):
@@ -144,4 +145,4 @@ class SwathProjectorAdapter(BaseHarmonyAdapter):
             raise HarmonyException('No granules specified for reprojection')
 
         if not isinstance(self.message.granules, list):
-            raise Exception('Invalid granule list')
+            raise InvalidGranuleList()

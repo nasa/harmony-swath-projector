@@ -10,6 +10,7 @@ from varinfo import VariableFromNetCDF4
 from swath_projector.exceptions import (
     MissingCoordinatesError,
     NonProjectableVariableError,
+    UnsupportedCoordinateShape,
 )
 
 FillValueType = Optional[Union[float, int]]
@@ -313,7 +314,7 @@ def get_ordered_track_dims(coordinate_var: Variable) -> Tuple[str]:
     Return track dimensions in order of descending size.
     """
     if not coordinate_var.ndim == 2:
-        raise Exception('Unsupported coordinate variable shape')
+        raise UnsupportedCoordinateShape()
     if coordinate_requires_transpose(coordinate_var):
         return coordinate_var.dimensions[::-1]
 

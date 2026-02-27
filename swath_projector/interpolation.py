@@ -17,7 +17,10 @@ from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_inf
 from pyresample.utils import check_and_wrap
 from varinfo import VarInfoFromNetCDF4
 
-from swath_projector.exceptions import NonProjectableVariableError
+from swath_projector.exceptions import (
+    NonProjectableVariableError,
+    CannotReprojectVariable,
+)
 from swath_projector.nc_single_band import HARMONY_TARGET, write_single_band_output
 from swath_projector.swath_geometry import (
     get_extents_from_perimeter,
@@ -54,7 +57,7 @@ def check_variable_projectability(
     dataset: Dataset,
     full_variable: str,
     var_info: VarInfoFromNetCDF4,
-) -> Optional[str]:
+) -> str | None:
     """Pre-validate whether a variable can be projected.
 
     Checks for known non-projectable conditions before attempting projection:
@@ -72,7 +75,7 @@ def check_variable_projectability(
 
     # Check 1: Missing coordinates
     coordinates_key = create_coordinates_key(variable_cf)
-    if not coordinates_key or len(coordinates_key) == 0:
+    if not coordinates_key:
         return str(f'No coordinate variables found for this variable')
 
     # Check 2: Validate dimension compatibility with coordinates
@@ -144,7 +147,7 @@ def resample_all_variables(
             # Reraise exception as application failures
             logger.error(f'Cannot reproject {variable}')
             logger.exception(error)
-            raise Exception(error) from error
+            raise CannotReprojectVariable(error)
 
     dataset.close()
 

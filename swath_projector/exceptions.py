@@ -65,3 +65,113 @@ class NonProjectableVariableError(CustomError):
             'NonProjectableVariableError',
             f'Variable {variable_name} is non-projectable: {message}',
         )
+
+
+class InvalidGranuleList(CustomError):
+    """Raised when the granule list is invalid or empty."""
+
+    def __init__(self):
+        super().__init__(
+            'InvalidGranuleList',
+            'Invalid granule list.',
+        )
+
+
+class UnableToParseInputFileVariables(CustomError):
+    """Raised when the input file variables cannot be parsed."""
+
+    def __init__(self, message):
+        super().__init__(
+            'UnableToParseInputFileVariables',
+            'Unable to parse input file variables: {message}',
+        )
+
+
+class NoScienceVariablesFound(CustomError):
+    """Raised when no science variables are found in the input file."""
+
+    def __init__(self):
+        super().__init__(
+            'NoScienceVariablesFound',
+            'No science variables found in input file.',
+        )
+
+
+class NoReprojectedVariables(CustomError):
+    """Raised when no variables could be reprojected."""
+
+    def __init__(self):
+        super().__init__(
+            'NoReprojectedVariables',
+            'No variables could be reprojected.',
+        )
+
+
+class InputFileNotFound(CustomError):
+    """Raised when the input file does not exist."""
+
+    def __init__(self):
+        super().__init__(
+            'InputFileNotFound',
+            'Input file does not exist.',
+        )
+
+
+class MissingXExtent(CustomError):
+    """Raised when the x extent parameter is missing."""
+
+    def __init__(self):
+        super().__init__(
+            'MissingXExtent',
+            'Missing x extent.',
+        )
+
+
+class MissingYExtent(CustomError):
+    """Raised when the y extent parameter is missing."""
+
+    def __init__(self):
+        super().__init__(
+            'MissingYExtent',
+            'Missing y extent.',
+        )
+
+
+class MissingCellHeight(CustomError):
+    """Raised when the cell height parameter is missing."""
+
+    def __init__(self):
+        super().__init__(
+            'MissingCellHeight',
+            'Missing cell height.',
+        )
+
+
+class MissingCellWidth(CustomError):
+    """Raised when the cell width parameter is missing."""
+
+    def __init__(self):
+        super().__init__(
+            'MissingCellWidth',
+            'Missing cell width.',
+        )
+
+
+class UnsupportedCoordinateShape(CustomError):
+    """Raised when coordinate variables have an unsupported shape."""
+
+    def __init__(self):
+        super().__init__(
+            'UnsupportedCoordinateShape',
+            'Unsupported coordinate variable shape.',
+        )
+
+
+class CannotReprojectVariable(CustomError):
+    """Raised when a specific variable cannot be reprojected."""
+
+    def __init__(self, variable):
+        super().__init__(
+            'CannotReprojectVariable',
+            f'Cannot reproject {variable}.',
+        )

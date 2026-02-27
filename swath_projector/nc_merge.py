@@ -269,7 +269,7 @@ def set_metadata_dimensions(
 ) -> None:
     """Iterate through the dimensions of the metadata variable, and ensure
     that all are present in the reprojected output file. This function is
-    necessary if any of the metadata variables, that aren't to be projected
+    necessary to check if any of the metadata variable that aren't projected
     use the swath-based dimensions from the input granule. If the dimension
     exists as a variable in the source file, copy it to the output file.
 
