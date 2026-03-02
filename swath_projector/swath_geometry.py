@@ -8,7 +8,6 @@ import functools
 from typing import List, Tuple
 
 import numpy as np
-from netCDF4 import Variable
 from pyproj import Proj
 
 
@@ -140,10 +139,6 @@ def get_valid_coordinates_mask(
     location. Validity of these elements means that an element must not be
     a fill value, or contain a NaN. Note, a value of 1 means that the pixel
     contains valid data.
-
-    When a `netCDF4.Variable` is loaded, the data will automatically be
-    read as a `numpy.ma.core.MaskedArray`. Values matching the `_FillValue`
-    as stored in the variable metadata will be masked.
 
     """
     valid_longitudes = np.logical_and(

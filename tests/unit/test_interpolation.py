@@ -8,6 +8,7 @@ from pyproj import Proj
 from pyresample.geometry import AreaDefinition
 from varinfo import VarInfoFromNetCDF4
 
+from swath_projector.exceptions import CannotReprojectVariable
 from swath_projector.interpolation import (
     EPSILON,
     RADIUS_OF_INFLUENCE,
@@ -85,7 +86,7 @@ class TestInterpolation(TestCase):
         parameters = {'interpolation': 'ewa-nn'}
         parameters.update(self.message_parameters)
 
-        output_variables = resample_all_variables(
+        resampled_variables, non_projectable_variables = resample_all_variables(
             parameters,
             self.science_variables,
             self.temp_directory,
@@ -94,7 +95,8 @@ class TestInterpolation(TestCase):
         )
 
         expected_output = ['/red_var', '/green_var', '/blue_var', '/alpha_var']
-        self.assertEqual(output_variables, expected_output)
+        self.assertEqual(resampled_variables, expected_output)
+        self.assertEqual(non_projectable_variables, [])
         self.assertEqual(mock_resample_variable.call_count, 4)
 
         for variable in expected_output:
@@ -109,40 +111,26 @@ class TestInterpolation(TestCase):
             )
 
     @patch('swath_projector.interpolation.resample_variable')
-    def test_resample_single_exception(self, mock_resample_variable):
-        """Ensure that if a single variable fails reprojection, the remaining
-        variables will still be reprojected.
+    def test_resample_variable_unexpected_exception(self, mock_resample_variable):
+        """Ensure that unexpected exceptions during variable reprojection
+        propagate as application failures rather than being silently caught.
 
         """
-        mock_resample_variable.side_effect = [KeyError('random'), None, None, None]
+        mock_resample_variable.side_effect = KeyError('unexpected_error')
 
         parameters = {'interpolation': 'ewa-nn'}
         parameters.update(self.message_parameters)
 
-        output_variables = resample_all_variables(
-            parameters,
-            self.science_variables,
-            self.temp_directory,
-            self.logger,
-            self.var_info,
-        )
-
-        expected_output = ['/green_var', '/blue_var', '/alpha_var']
-        self.assertEqual(output_variables, expected_output)
-        self.assertEqual(mock_resample_variable.call_count, 4)
-
-        all_variables = expected_output + ['/red_var']
-
-        for variable in all_variables:
-            variable_output_path = f'/tmp/01234{variable}.nc'
-            mock_resample_variable.assert_any_call(
+        with self.assertRaises(CannotReprojectVariable) as context:
+            resample_all_variables(
                 parameters,
-                variable,
-                {},
-                variable_output_path,
+                self.science_variables,
+                self.temp_directory,
                 self.logger,
                 self.var_info,
             )
+
+        self.assertIn('Cannot reproject', str(context.exception))
 
     @patch('swath_projector.interpolation.allocate_target_array')
     @patch('swath_projector.interpolation.get_preferred_ordered_dimensions_info')

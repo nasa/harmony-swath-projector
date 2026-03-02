@@ -17,6 +17,10 @@ from pyresample.kd_tree import get_neighbour_info, get_sample_from_neighbour_inf
 from pyresample.utils import check_and_wrap
 from varinfo import VarInfoFromNetCDF4
 
+from swath_projector.exceptions import (
+    CannotReprojectVariable,
+    NonProjectableVariableError,
+)
 from swath_projector.nc_single_band import HARMONY_TARGET, write_single_band_output
 from swath_projector.swath_geometry import (
     get_extents_from_perimeter,
@@ -49,27 +53,76 @@ NEIGHBOURS = 16
 RADIUS_OF_INFLUENCE = 50000
 
 
+def check_variable_projectability(
+    dataset: Dataset,
+    full_variable: str,
+    var_info: VarInfoFromNetCDF4,
+) -> str | None:
+    """Pre-validate whether a variable can be projected.
+
+    Checks for known non-projectable conditions before attempting projection:
+    1. Missing coordinate references
+    2. Dimension compatibility with coordinate variables (validates that
+       the variable's dimensions include the required track dimensions
+       from the coordinate variables)
+
+    Returns:
+        Error message describing why variable is not projectable, or None
+        if the variable can be projected.
+    """
+    variable = dataset[full_variable]
+    variable_cf = var_info.get_variable(full_variable)
+
+    # Check 1: Missing coordinates
+    coordinates_key = create_coordinates_key(variable_cf)
+    if not coordinates_key:
+        return 'No coordinate variables found for this variable'
+
+    # Check 2: Validate dimension compatibility with coordinates
+    try:
+        get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
+    except NonProjectableVariableError as error:
+        return error.message
+
+    return None
+
+
 def resample_all_variables(
     message_parameters: Dict,
     science_variables: List[str],
     temp_directory: str,
     logger: Logger,
     var_info: VarInfoFromNetCDF4,
-) -> List[str]:
+) -> Tuple[List[str], Dict[str, str]]:
     """Iterate through all science variables and reproject to the target
     coordinate grid.
 
     Returns:
         output_variables: A list of names of successfully reprojected
             variables.
+        non_projectable_variables: A dictionary mapping variable names to
+            error messages describing why they could not be projected.
+            These variables will be copied as-is to output.
     """
     output_extension = os.path.splitext(message_parameters['input_file'])[-1]
     reprojection_cache = get_reprojection_cache(message_parameters)
     output_variables = []
+    non_projectable_variables = []
 
     check_for_valid_interpolation(message_parameters, logger)
 
+    # Open dataset once for pre-validation
+    dataset = Dataset(message_parameters['input_file'])
+
     for variable in science_variables:
+        # Pre-validate variable projectability
+        error_message = check_variable_projectability(dataset, variable, var_info)
+
+        if error_message:
+            logger.warning(f'Variable "{variable}" is non-projectable: {error_message}')
+            non_projectable_variables.append(variable)
+            continue
+
         try:
             variable_output_path = get_variable_file_path(
                 temp_directory, variable, output_extension
@@ -88,13 +141,17 @@ def resample_all_variables(
             )
 
             output_variables.append(variable)
+
         except Exception as error:
-            # Assume for now variable cannot be reprojected. TBD add checks for
-            # other error conditions.
+            # Assume for now variable cannot be reprojected.
+            # Reraise exception as application failures
             logger.error(f'Cannot reproject {variable}')
             logger.exception(error)
+            raise CannotReprojectVariable(error) from error
 
-    return output_variables
+    dataset.close()
+
+    return output_variables, non_projectable_variables
 
 
 def resample_variable(
@@ -113,6 +170,11 @@ def resample_variable(
     Reprojection information will be stored in a cache, enabling it to be
     recalled, rather than re-derived for subsequent science variables that
     share the same coordinate variables.
+
+    Raises:
+        NonProjectableVariableError: If the variable is determined to be
+            non-projectable during processing (known condition).
+        Exception: For unexpected errors that may indicate programming issues.
 
     """
     interpolation_functions = get_resampling_functions()[
@@ -155,11 +217,14 @@ def resample_variable(
         reprojection_cache[coordinates_key] = reprojection_information
 
     fill_value = get_variable_numeric_fill_value(variable)
+
+    # NonProjectableVariableError will propagate if dimensions are incompatible
     all_ordered_dims, ordered_non_track_dim_objs = (
         get_preferred_ordered_dimensions_info(variable, coordinates_key, dataset)
     )
 
     s_var = get_variable_values(variable, fill_value, all_ordered_dims)
+
     t_var = allocate_target_array(
         ordered_non_track_dim_objs,
         reprojection_information['target_area'].shape,

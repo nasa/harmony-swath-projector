@@ -46,4 +46,4 @@ class TestInputFileDownload(TestCase):
                 reprojector.logger,
             )
 
-        self.assertEqual(str(context.exception), 'Input file does not exist')
+        self.assertEqual(str(context.exception), 'Input file does not exist.')

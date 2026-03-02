@@ -11,7 +11,17 @@ from pyproj import Proj
 from varinfo import VarInfoFromNetCDF4
 
 from swath_projector import nc_merge
-from swath_projector.exceptions import InvalidTargetGrid
+from swath_projector.exceptions import (
+    InputFileNotFound,
+    InvalidTargetGrid,
+    MissingCellHeight,
+    MissingCellWidth,
+    MissingXExtent,
+    MissingYExtent,
+    NoReprojectedVariables,
+    NoScienceVariablesFound,
+    UnableToParseInputFileVariables,
+)
 from swath_projector.interpolation import resample_all_variables
 
 RADIUS_EARTH_METRES = (
@@ -57,31 +67,32 @@ def reproject(
         )
     except Exception as err:
         logger.error(f'Unable to parse input file variables: {str(err)}')
-        raise Exception('Unable to parse input file variables') from err
+        raise UnableToParseInputFileVariables(err) from err
 
     science_variables = var_info.get_science_variables()
 
     if len(science_variables) == 0:
-        raise Exception('No science variables found in input file')
+        raise NoScienceVariablesFound()
 
     logger.info(f'Input file has {len(science_variables)} science variables')
 
     # Loop through each dataset and reproject
     logger.debug('Using pyresample for reprojection.')
-    outputs = resample_all_variables(
+    resampled_variables, non_projectable_variables = resample_all_variables(
         parameters, science_variables, temp_dir, logger, var_info
     )
 
-    if not outputs:
-        raise Exception('No variables could be reprojected')
+    if not resampled_variables:
+        raise NoReprojectedVariables()
 
     # Now merge outputs (unless we only have one)
     metadata_variables = var_info.get_metadata_variables()
+    metadata_variables.update(non_projectable_variables)
     nc_merge.create_output(
         parameters,
         output_file,
         temp_dir,
-        science_variables,
+        resampled_variables,
         metadata_variables,
         logger,
         var_info,
@@ -132,18 +143,18 @@ def get_parameters_from_message(
             raise InvalidTargetGrid()
 
     if not os.path.isfile(parameters['input_file']):
-        raise Exception('Input file does not exist')
+        raise InputFileNotFound()
 
     # Verify message and assign values for minimum and maximum x and y.
 
     if not parameters['x_extent'] and parameters['y_extent']:
-        raise Exception('Missing x extent')
+        raise MissingXExtent()
     if parameters['x_extent'] and not parameters['y_extent']:
-        raise Exception('Missing y extent')
+        raise MissingYExtent()
     if parameters['width'] and not parameters['height']:
-        raise Exception('Missing cell height')
+        raise MissingCellHeight()
     if parameters['height'] and not parameters['width']:
-        raise Exception('Missing cell width')
+        raise MissingCellWidth()
 
     parameters['x_min'] = rgetattr(message, 'format.scaleExtent.x.min', None)
     parameters['x_max'] = rgetattr(message, 'format.scaleExtent.x.max', None)

@@ -9,29 +9,6 @@
     "VNP10": "VIIRS",
     "TEMPO_.*_L2": "TEMPO"
   },
-  "ExcludedScienceVariables": [
-    {
-      "Applicability": {
-        "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_O3TOT_L2"
-      },
-      "VariablePattern": [
-        "/support_data/cal_adjustment",
-        "/support_data/lut_wavelength"
-      ]
-    },
-    {
-      "Applicability": {
-        "Mission": "TEMPO",
-        "ShortNamePath": "TEMPO_O3PROF_L2"
-      },
-      "VariablePattern": [
-        "/support_data/nongas_param_names",
-        "/support_data/nongas_param_units",
-        "/support_data/other_gas_names"
-      ]
-    }
-  ],
   "MetadataOverrides": [
     {
       "Applicability": {

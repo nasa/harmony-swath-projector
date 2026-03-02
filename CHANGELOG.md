@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.5.0] - 2026-02-24
+
+### Changed
+
+- [[DAS-2219](https://bugs.earthdata.nasa.gov/browse/DAS-2219)]
+  The Swath Projector has been updated to copy the science variables that fail reprojection to the output. Additionally, dimension variables that are referenced by output metadata variables are copied to the output. With this handling of failed reprojection of science variables in place, the configuration file has been modified to remove the TEMPO_O3TOT_L2 excluded variables.
+
 ## [v1.4.0] - 2026-01-06
 
 ### Changed
@@ -104,6 +111,8 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
+[v1.5.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.5.0)
+[v1.4.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.4.0)
 [v1.3.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.3.0)
 [v1.2.3]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.3)
 [v1.2.2]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.2)

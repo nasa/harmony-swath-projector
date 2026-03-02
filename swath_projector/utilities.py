@@ -1,3 +1,5 @@
+"""Utility functions to support swath projector processing"""
+
 import os
 from typing import Dict, Optional, Tuple, Union
 
@@ -5,7 +7,11 @@ import numpy as np
 from netCDF4 import Dataset, Dimension, Variable
 from varinfo import VariableFromNetCDF4
 
-from swath_projector.exceptions import MissingCoordinatesError
+from swath_projector.exceptions import (
+    MissingCoordinatesError,
+    NonProjectableVariableError,
+    UnsupportedCoordinateShape,
+)
 
 FillValueType = Optional[Union[float, int]]
 
@@ -93,8 +99,8 @@ def get_coordinate_data(
 
     if coordinate_requires_transpose(coordinate):
         return np.ma.transpose(coordinate[:]).copy()
-    else:
-        return coordinate[:]
+
+    return coordinate[:]
 
 
 def get_variable_numeric_fill_value(variable: Variable) -> FillValueType:
@@ -269,7 +275,11 @@ def get_preferred_ordered_dimensions_info(
 
     Ensure the track dimensions are the last two dimensions in the tuple and in the
     order of descending size. Any additional dimensions are placed at the front of the
-    tuple maintaining the oringinal relative order between themselves.
+    tuple maintaining the original relative order between themselves.
+
+    Raises:
+        NonProjectableVariableError: If the variable dimensions do not contain
+            the required track dimensions from the coordinate variables.
     """
     # Either 'lat' or 'lon' could be used as the substring here
     coordinate_var = get_coordinate_matching_substring(dataset, coordinates, 'lat')
@@ -279,7 +289,12 @@ def get_preferred_ordered_dimensions_info(
 
     # Ensure both required dims are present
     if not all(dim in current_dims for dim in ordered_track_dims):
-        raise Exception(f"Invalid dimensions {current_dims} for reprojection")
+        missing_dims = [dim for dim in ordered_track_dims if dim not in current_dims]
+        raise NonProjectableVariableError(
+            variable.name,
+            f"Dimensions {current_dims} missing required track dimensions "
+            f"{missing_dims} from coordinates {ordered_track_dims}",
+        )
 
     ordered_non_track_dims = [
         dim for dim in current_dims if dim not in ordered_track_dims
@@ -299,11 +314,11 @@ def get_ordered_track_dims(coordinate_var: Variable) -> Tuple[str]:
     Return track dimensions in order of descending size.
     """
     if not coordinate_var.ndim == 2:
-        raise Exception('Unsupported coordinate variable shape')
+        raise UnsupportedCoordinateShape()
     if coordinate_requires_transpose(coordinate_var):
         return coordinate_var.dimensions[::-1]
-    else:
-        return coordinate_var.dimensions
+
+    return coordinate_var.dimensions
 
 
 def get_axes_permutation(old_dims: Tuple[str], new_dims: Tuple[str]) -> Tuple[int]:
