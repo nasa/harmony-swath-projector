@@ -41,7 +41,7 @@ First ensure you are in a conda environment, with the conda and Pip dependencies
 installed, as specified in their requirements files.
 
 ```
-conda create --name=swathprojector python=3.11 -q \
+conda create --name=swathprojector python=3.13 -q \
     --channel conda-forge  --override-channels -y
 conda activate swathprojector
 pip install -r pip_requirements.txt
