@@ -21,7 +21,7 @@ WORKDIR "/home"
 COPY pip_requirements.txt .
 
 # Create Conda environment
-RUN conda create -y --name swathprojector python=3.11 -q --channel conda-forge \
+RUN conda create -y --name swathprojector python=3.13 -q --channel conda-forge \
     --override-channels && conda clean --all --quiet --yes
 
 # Install additional Pip dependencies
