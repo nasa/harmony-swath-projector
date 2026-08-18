@@ -71,11 +71,9 @@ function below can be edited.
 Note on the STAC catalog:
 
 `BaseHarmonyAdapter.invoke` requires a `pystac.Catalog` describing the input
-granules; it raises a `RuntimeError` without one. The catalog is built in
-memory by `create_stac_catalog` below, rather than read from a file. The
-asset for each item must include `'data'` in its `roles`, as
-`SwathProjectorAdapter.process_item` selects the input granule by looking
-for that role.
+granules. The catalog is built in memory by `create_stac_catalog` below,
+so that `SwathProjectorAdapter.process_item` selects the input granule by
+looking for the `data` role.
 
 """
 
@@ -92,12 +90,7 @@ from pystac import Asset, Catalog, Item
 
 from swath_projector.adapter import SwathProjectorAdapter
 
-BOUNDING_BOX = [-180, -90, 180, 90]
-GRANULE_MEDIA_TYPE = 'application/x-netcdf'
-TEMPORAL_RANGE = {
-    'start': '1979-01-03T23:45:00.000Z',
-    'end': '2037-01-04T00:00:00.000Z',
-}
+GLOBAL_BOUNDING_BOX = [-180, -90, 180, 90]
 
 
 def set_environment_variables():
@@ -143,8 +136,8 @@ def create_stac_catalog(granule_url: str) -> Catalog:
 
     item = Item(
         id='input granule',
-        bbox=BOUNDING_BOX,
-        geometry=bbox_to_geometry(BOUNDING_BOX),
+        bbox=GLOBAL_BOUNDING_BOX,
+        geometry=bbox_to_geometry(GLOBAL_BOUNDING_BOX),
         datetime=datetime(2020, 1, 1),
         properties=None,
     )
@@ -153,7 +146,7 @@ def create_stac_catalog(granule_url: str) -> Catalog:
     # granule to reproject.
     item.add_asset(
         'input data',
-        Asset(granule_url, media_type=GRANULE_MEDIA_TYPE, roles=['data']),
+        Asset(granule_url, media_type='application/x-netcdf', roles=['data']),
     )
     catalog.add_item(item)
 
@@ -163,15 +156,10 @@ def create_stac_catalog(granule_url: str) -> Catalog:
 def stage_side_effect(
     local_filename: str, remote_filename: str, *args, **kwargs
 ) -> str:
-    """A side effect for the `harmony_service_lib.util.stage` mock that moves
-    the reprojected output out of the temporary directory created by
-    `swath_projector.reproject.reproject` and into the current working
-    directory, so it is easy to find and inspect.
+    """A side effect that moves the reprojected output out of the temporary
+    directory created by `reproject` and into the current working directory
 
-    Returns the path of the moved file. The real `stage` uploads to S3 and
-    returns an `s3://` URL; here the local path is returned instead, and
-    becomes the `href` of the asset on the output STAC item.
-
+    Returns the path of the moved file.
     """
     output_path = Path.cwd() / remote_filename
     move(local_filename, output_path)
@@ -195,12 +183,6 @@ def project_granule(
     allow for a test that overrides the default message parameters of a
     geographically projected output using nearest neighbour interpolation.
 
-    `collection_short_name` is passed through to `earthdata-varinfo` as the
-    source `shortName`. Supply it when testing a collection that has
-    `MetadataOverrides` rules in `swath_projector/earthdata_varinfo_config.json`
-    (e.g. 'VNP10' or a 'TEMPO_*_L2' collection), otherwise the short name is
-    derived from the granule metadata.
-
     Returns the `(message, output_catalog)` tuple produced by
     `BaseHarmonyAdapter.invoke`.
 
@@ -217,8 +199,11 @@ def project_granule(
                     'granules': [
                         {
                             'url': granule_url,
-                            'temporal': TEMPORAL_RANGE,
-                            'bbox': BOUNDING_BOX,
+                            'temporal': {
+                                'start': '1979-01-03T23:45:00.000Z',
+                                'end': '2037-01-04T00:00:00.000Z',
+                            },
+                            'bbox': GLOBAL_BOUNDING_BOX,
                         }
                     ],
                 }
