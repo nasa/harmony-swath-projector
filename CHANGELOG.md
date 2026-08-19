@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.5.1] - 2026-08-18
+
+### Changed
+
+- [[DAS-2522](https://bugs.earthdata.nasa.gov/browse/DAS-2522)]
+  - Updates python to 3.13 and updates service libraries.
+  - Removes conda from the service images.
+  - Fixes documentation example notebook.
+
 ## [v1.5.0] - 2026-02-24
 
 ### Changed
