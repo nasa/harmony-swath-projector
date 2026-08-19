@@ -7,6 +7,7 @@
 # 2021-06-24: Updated
 # 2023-11-16: Updated to use new open-source service image and new conda
 #             environment name.
+# 2026-08-18: swaps conda for python docker image. (via parent image in FROM command.)
 #
 FROM ghcr.io/nasa/harmony-swath-projector
 

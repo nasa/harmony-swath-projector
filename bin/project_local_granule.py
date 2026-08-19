@@ -8,8 +8,8 @@ to the terminal in green.
 Prerequisites:
 
 * The `harmony-service-lib-py` package must be installed, via Pip, in the
-  current Python environment (e.g., conda environment or virtualenv).
-* Python v3.11 or higher.
+  current Python environment (e.g., virtualenv).
+* Python v3.13 or higher.
 
 Usage:
 
@@ -96,7 +96,7 @@ GLOBAL_BOUNDING_BOX = [-180, -90, 180, 90]
 def set_environment_variables():
     """If the following environment variables are absent, the
     `SwathProjectorAdapter` class will not allow the projector to run. Make
-    sure to run this script in a different environment (e.g. conda
+    sure to run this script in a different environment (e.g. virtual
     environment) than any local instance of Harmony.
 
     """
