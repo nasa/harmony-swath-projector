@@ -42,7 +42,7 @@ installed.
 
 ```
 ❯ uv venv --python 3.13
-❯ uv pip install -r pip_requirements.txt -r test/pip_test_requirements.txt
+❯ uv pip install -r pip_requirements.txt -r tests/pip_test_requirements.txt
 ```
 
 For simple invocations, you can then use the `bin.project_local_granule` Python
