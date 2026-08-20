@@ -35,16 +35,14 @@ The Swath Projector can be run and tested as part of a local installation of
 Harmony. See <https://github.com/nasa/harmony/blob/main/README.md> for more
 details.
 
-### To run the service locally, by invoking the Python module directly.
+### To run the service locally, invoke the Python module directly.
 
-First ensure you are in a conda environment, with the conda and Pip dependencies
-installed, as specified in their requirements files.
+First ensure you are in an isolated python environment, with the Pip dependencies
+installed.
 
 ```
-conda create --name=swathprojector python=3.11 -q \
-    --channel conda-forge  --override-channels -y
-conda activate swathprojector
-pip install -r pip_requirements.txt
+❯ uv venv --python 3.13
+❯ uv pip install -r pip_requirements.txt -r tests/pip_test_requirements.txt
 ```
 
 For simple invocations, you can then use the `bin.project_local_granule` Python
@@ -52,9 +50,9 @@ module:
 
 ```
 $ cd harmony-swath-projector
-$ python
+$ uv run python
 >>> from bin.project_local_granule import project_granule
->>> project_granule('<full path to local granule, including: file:///>')
+>>> project_granule('<full path to local granule>')
 ```
 
 The `project_granule` function allows a user to specify the target
@@ -126,7 +124,7 @@ used within the Swath Projector (or remove a third party package), the change
 in dependencies will need to be recorded in the relevant requirements file:
 
 * `harmony-swath-projector/pip_requirements.txt`: Additional requirements
-	installed within the container's conda environment via Pip. These are also
+	installed within the container's environment via pip. These are also
 	required for the source code of the Swath Projector to run.
 * `harmony-swath-projector/tests/pip_test_requirements.txt`: Requirements only
 	used while running tests, such as `pylint` or `coverage`. These are kept
@@ -148,8 +146,8 @@ Coverage reports are being generate for each build in GitHub, and saved as
 artifacts.
 
 The tests can also be run outside of the Docker container, for faster checks
-during development. To do so, first activate the requisite conda environment,
-which will need requirements (including the test Pip requirements). Then run:
+during development. To do so, first activate your virtual environment,
+with the pip requirements installed. Then run:
 
 ```
 export ENV=test

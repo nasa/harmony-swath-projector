@@ -272,7 +272,7 @@ def clockwise_point_sort(origin: List[float], point: List[float]) -> Tuple[float
         normalised_vector = np.divide(vector, vector_length)
         dot_product = np.dot(normalised_vector, reference_vector)
         determinant = np.linalg.det([normalised_vector, reference_vector])
-        vector_angle = np.math.atan2(determinant, dot_product)
+        vector_angle = np.atan2(determinant, dot_product)
 
     return vector_angle, vector_length
 
