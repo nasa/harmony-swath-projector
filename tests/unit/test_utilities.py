@@ -11,6 +11,7 @@ from swath_projector.utilities import (
     construct_absolute_path,
     coordinate_requires_transpose,
     create_coordinates_key,
+    find_dimension_variable,
     get_axes_permutation,
     get_coordinate_data,
     get_coordinate_matching_substring,
@@ -620,6 +621,70 @@ class TestUtilities(TestCase):
                     [time_dim, layer_dim],
                 )
                 self.assertEqual(result, expected)
+
+
+class TestFindDimensionVariable(TestCase):
+    """Ensure a dimension's coordinate variable is resolved using the
+    netCDF-4 scoping rules, rather than being looked for only in the root
+    group of the dataset.
+
+    """
+
+    def test_variable_in_same_group_as_dimension(self):
+        """A coordinate variable stored alongside its dimension, inside a
+        group, should be found. Subsetted granules store dimensions this
+        way.
+
+        """
+        with Dataset('test.nc', 'w', diskless=True) as dataset:
+            group = dataset.createGroup('/support_data')
+            group.createDimension('layer_3', size=4)
+            variable = group.createVariable('layer_3', 'i4', dimensions=('layer_3',))
+            variable[:] = np.arange(4)
+
+            dimension = group.dimensions['layer_3']
+            result = find_dimension_variable(dimension)
+
+            self.assertIsNotNone(result)
+            self.assertEqual(result.group().path, '/support_data')
+            np.testing.assert_array_equal(result[:], np.arange(4))
+
+    def test_variable_in_ancestor_group(self):
+        """A dimension re-declared in a group, with its coordinate variable
+        only in the root group, should resolve to the root variable. This
+        is the behaviour relied upon for swath dimensions such as
+        `mirror_step`.
+
+        """
+        with Dataset('test.nc', 'w', diskless=True) as dataset:
+            dataset.createDimension('mirror_step', size=3)
+            root_variable = dataset.createVariable(
+                'mirror_step', 'i4', dimensions=('mirror_step',)
+            )
+            root_variable[:] = np.arange(3)
+
+            group = dataset.createGroup('/geolocation')
+            group.createDimension('mirror_step', size=3)
+
+            dimension = group.dimensions['mirror_step']
+            result = find_dimension_variable(dimension)
+
+            self.assertIsNotNone(result)
+            self.assertEqual(result.group().path, '/')
+            np.testing.assert_array_equal(result[:], np.arange(3))
+
+    def test_no_matching_variable(self):
+        """A dimension with no coordinate variable in any ancestor group
+        should return None, rather than raising.
+
+        """
+        with Dataset('test.nc', 'w', diskless=True) as dataset:
+            group = dataset.createGroup('/support_data')
+            group.createDimension('non_gas_variables', size=9)
+
+            dimension = group.dimensions['non_gas_variables']
+
+            self.assertIsNone(find_dimension_variable(dimension))
 
 
 class TestGetRowsPerScan(TestCase):

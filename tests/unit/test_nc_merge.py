@@ -2,20 +2,27 @@ import json
 import logging
 import os
 from datetime import datetime
+from shutil import rmtree
+from tempfile import mkdtemp
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import numpy as np
 from netCDF4 import Dataset
 from varinfo import VarInfoFromNetCDF4
 
 from swath_projector.exceptions import MissingReprojectedDataError
 from swath_projector.nc_merge import (
     check_coor_valid,
+    copy_dimension_variables,
+    copy_metadata_variable,
     create_history_record,
     create_output,
     get_fill_value_from_attributes,
     get_science_variable_attributes,
     read_attrs,
+    set_dimensions,
+    set_metadata_dimensions,
 )
 from swath_projector.reproject import CF_CONFIG_FILE
 
@@ -372,4 +379,219 @@ class TestNCMerge(TestCase):
             self.assertDictEqual(
                 create_history_record(list_history, request_parameters),
                 expected_output_with_history,
+            )
+
+
+class TestGroupScopedDimensions(TestCase):
+    """Dimensions are not always declared in the root group. Subsetted
+    granules, such as TEMPO O3PROF, re-declare them inside each group, and
+    may store a coordinate variable alongside them. Both must be resolved
+    when merging the reprojected output.
+
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.logger = logging.getLogger('group scoped dimension test')
+
+    def setUp(self):
+        """Write an input granule that declares dimensions inside a group."""
+        self.tmp_dir = mkdtemp()
+        self.input_file = os.path.join(self.tmp_dir, 'grouped_input.nc')
+
+        with Dataset(self.input_file, 'w', format='NETCDF4') as dataset:
+            dataset.createDimension('mirror_step', size=3)
+            root_mirror_step = dataset.createVariable(
+                'mirror_step', 'i4', dimensions=('mirror_step',)
+            )
+            root_mirror_step[:] = np.arange(3)
+
+            group = dataset.createGroup('support_data')
+            group.createDimension('mirror_step', size=3)
+            group.createDimension('xtrack', size=2)
+            group.createDimension('layer_3', size=4)
+
+            layer_3 = group.createVariable('layer_3', 'i4', dimensions=('layer_3',))
+            layer_3[:] = np.arange(4)
+            layer_3.units = 'layer index'
+
+            for variable_name in ['science', 'science_two']:
+                science = group.createVariable(
+                    variable_name, 'f4', dimensions=('mirror_step', 'xtrack', 'layer_3')
+                )
+                science[:] = np.ones((3, 2, 4))
+
+    def tearDown(self):
+        rmtree(self.tmp_dir)
+
+    def test_set_metadata_dimensions_resolves_group_scoped_dimensions(self):
+        """A dimension declared only inside a group must not raise a
+        `KeyError`, and must be created in the group that declared it. Its
+        coordinate variable is written to the group it came from, which may
+        be an ancestor of the group declaring the dimension.
+
+        """
+        with (
+            Dataset(self.input_file) as source_dataset,
+            Dataset('output.nc', 'w', diskless=True) as output_dataset,
+        ):
+            set_metadata_dimensions(
+                '/support_data/science', source_dataset, output_dataset
+            )
+
+            group = output_dataset['/support_data']
+
+            with self.subTest('Group-scoped dimension is created in its group'):
+                self.assertEqual(group.dimensions['layer_3'].size, 4)
+                self.assertNotIn('layer_3', output_dataset.dimensions)
+
+            with self.subTest('Coordinate variable within the group is copied'):
+                np.testing.assert_array_equal(
+                    output_dataset['/support_data/layer_3'][:],
+                    source_dataset['/support_data/layer_3'][:],
+                )
+
+            with self.subTest('Coordinate variable in an ancestor group is copied'):
+                np.testing.assert_array_equal(
+                    output_dataset['/mirror_step'][:],
+                    source_dataset['/mirror_step'][:],
+                )
+
+            with self.subTest('Ancestor dimension is declared in both groups'):
+                self.assertEqual(output_dataset.dimensions['mirror_step'].size, 3)
+                self.assertEqual(group.dimensions['mirror_step'].size, 3)
+
+    def test_set_dimensions_places_dimensions_in_input_groups(self):
+        """Each dimension of the single band file is created in the group that
+        declared it in the input granule. The reprojected horizontal
+        dimensions have no counterpart in the input and stay in the root
+        group, shared by every group in the output.
+
+        """
+        with (
+            Dataset(self.input_file) as source_dataset,
+            Dataset('single_band.nc', 'w', diskless=True) as single_band_dataset,
+            Dataset('output.nc', 'w', diskless=True) as output_dataset,
+        ):
+            single_band_dataset.createDimension('lat', size=5)
+            single_band_dataset.createDimension('lon', size=6)
+            single_band_dataset.createDimension('layer_3', size=4)
+
+            set_dimensions(
+                single_band_dataset,
+                output_dataset,
+                source_dataset['/support_data/science'],
+            )
+
+            with self.subTest('Horizontal dimensions are in the root group'):
+                self.assertEqual(output_dataset.dimensions['lat'].size, 5)
+                self.assertEqual(output_dataset.dimensions['lon'].size, 6)
+
+            with self.subTest('Input dimension is in the group that declared it'):
+                self.assertEqual(
+                    output_dataset['/support_data'].dimensions['layer_3'].size, 4
+                )
+                self.assertNotIn('layer_3', output_dataset.dimensions)
+
+    def test_copy_metadata_variable_of_a_coordinate_variable(self):
+        """A variable that is the coordinate variable of its own dimension is
+        written exactly once. in the `copy_metadata_variable function`,
+        `set_metadata_dimensions` has already copied it by the time the
+        variable itself is created, so successful calling of the function
+        verifies we're not writing twice and we just check the log to see we
+        did skip out.
+
+        """
+        with (
+            Dataset(self.input_file) as source_dataset,
+            Dataset('output.nc', 'w', diskless=True) as output_dataset,
+        ):
+            with self.assertLogs(self.logger, level='INFO') as captured_logs:
+                copy_metadata_variable(
+                    source_dataset, output_dataset, '/mirror_step', self.logger
+                )
+
+            with self.subTest('The variable is not created twice.'):
+                self.assertIn(
+                    'Metadata variable "/mirror_step" was already written.',
+                    [record.getMessage() for record in captured_logs.records],
+                )
+
+            with self.subTest('The variable retains the input values'):
+                np.testing.assert_array_equal(
+                    output_dataset['/mirror_step'][:],
+                    source_dataset['/mirror_step'][:],
+                )
+
+    def test_copy_dimension_variables_finds_grouped_variable(self):
+        """The dimension variable lookup must use the absolute group path,
+        as `earthdata-varinfo` keys variables by absolute path.
+
+        """
+        var_info = VarInfoFromNetCDF4(self.input_file, config_file=CF_CONFIG_FILE)
+
+        with (
+            Dataset(self.input_file) as source_dataset,
+            Dataset('single_band.nc', 'w', diskless=True) as single_band_dataset,
+            Dataset('output.nc', 'w', diskless=True) as output_dataset,
+        ):
+            # Emulate a single band output: reprojected horizontal dimensions
+            # alongside the variable's remaining dimension.
+            single_band_dataset.createDimension('lat', size=5)
+            single_band_dataset.createDimension('lon', size=6)
+            single_band_dataset.createDimension('layer_3', size=4)
+            single_band_group = single_band_dataset.createGroup('support_data')
+            single_band_group.createVariable(
+                'science', 'f4', dimensions=('layer_3', 'lat', 'lon')
+            )
+
+            copy_dimension_variables(
+                source_dataset,
+                output_dataset,
+                single_band_dataset,
+                '/support_data/science',
+                self.logger,
+                var_info,
+            )
+
+            np.testing.assert_array_equal(
+                output_dataset['/support_data/layer_3'][:],
+                source_dataset['/support_data/layer_3'][:],
+            )
+
+    def test_copy_dimension_variables_copies_grouped_variable_once(self):
+        """Two science variables in the same group sharing a group-scoped
+        dimension must not both try to copy its coordinate variable.
+
+        """
+        var_info = VarInfoFromNetCDF4(self.input_file, config_file=CF_CONFIG_FILE)
+
+        with (
+            Dataset(self.input_file) as source_dataset,
+            Dataset('single_band.nc', 'w', diskless=True) as single_band_dataset,
+            Dataset('output.nc', 'w', diskless=True) as output_dataset,
+        ):
+            single_band_dataset.createDimension('lat', size=5)
+            single_band_dataset.createDimension('lon', size=6)
+            single_band_dataset.createDimension('layer_3', size=4)
+            single_band_group = single_band_dataset.createGroup('support_data')
+
+            for variable_name in ['science', 'science_two']:
+                single_band_group.createVariable(
+                    variable_name, 'f4', dimensions=('layer_3', 'lat', 'lon')
+                )
+
+            for variable_name in ['science', 'science_two']:
+                copy_dimension_variables(
+                    source_dataset,
+                    output_dataset,
+                    single_band_dataset,
+                    f'/support_data/{variable_name}',
+                    self.logger,
+                    var_info,
+                )
+
+            np.testing.assert_array_equal(
+                output_dataset['/support_data/layer_3'][:],
+                source_dataset['/support_data/layer_3'][:],
             )

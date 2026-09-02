@@ -9,6 +9,8 @@ from shutil import copy
 from harmony_service_lib.util import bbox_to_geometry
 from pystac import Asset, Catalog, Item
 
+STAGED_OUTPUT_DIR = 'tests/temp'
+
 
 class StringContains:
     """A custom matcher that can be used in `unittest` assertions, ensuring
@@ -35,6 +37,18 @@ def download_side_effect(file_path, working_dir, **kwargs):
 
     copy(file_path, output_file_path)
     return output_file_path
+
+
+def stage_side_effect(local_filename, remote_filename, *args, **kwargs):
+    """A side effect to be used when mocking the `harmony.util.stage`
+    function. The real `stage` reads the output file before it returns, and
+    the adapter removes its working directory as soon as `invoke` completes.
+    Taking a copy here therefore lets a test inspect the reprojected output
+    after that clean up, without relying on the working directory surviving.
+
+    """
+    copy(local_filename, STAGED_OUTPUT_DIR)
+    return 'https://example.com/data'
 
 
 Granule = namedtuple('Granule', ['url', 'media_type', 'roles'])

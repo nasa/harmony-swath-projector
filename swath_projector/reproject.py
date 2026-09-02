@@ -3,7 +3,6 @@
 import functools
 import logging
 import os
-from tempfile import mkdtemp
 
 from harmony_service_lib.message import Message
 from harmony_service_lib.message_utility import has_self_consistent_grid
@@ -48,8 +47,6 @@ def reproject(
     """
     parameters = get_parameters_from_message(message, granule_url, local_filename)
 
-    # Set up source and destination files
-    temp_dir = mkdtemp()
     root_ext = os.path.splitext(os.path.basename(parameters.get('input_file')))
     output_file = temp_dir + os.sep + root_ext[0] + '_repr' + root_ext[1]
 

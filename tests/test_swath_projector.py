@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from os import makedirs
+from os.path import basename, join
 from shutil import copy, rmtree
 from unittest import TestCase
 from unittest.mock import ANY, Mock, patch
@@ -10,11 +11,18 @@ from harmony_service_lib.util import config
 from netCDF4 import Dataset
 
 from swath_projector.adapter import SwathProjectorAdapter
-from tests.test_utils import Granule, StringContains, create_stac, download_side_effect
+from tests.test_utils import (
+    STAGED_OUTPUT_DIR,
+    Granule,
+    StringContains,
+    create_stac,
+    download_side_effect,
+    stage_side_effect,
+)
 
 
 @patch('swath_projector.nc_merge.datetime')
-@patch('swath_projector.adapter.stage', return_value='https://example.com/data')
+@patch('swath_projector.adapter.stage', side_effect=stage_side_effect)
 @patch('swath_projector.adapter.download', side_effect=download_side_effect)
 class TestSwathProjector(TestCase):
     """A test class that will run the full Swath Projector against a variety
@@ -37,7 +45,7 @@ class TestSwathProjector(TestCase):
             'start': '2020-01-01T00:00:00.000Z',
             'end': '2020-01-02T00:00:00.000Z',
         }
-        cls.tmp_dir = 'tests/temp'
+        cls.tmp_dir = STAGED_OUTPUT_DIR
 
     def setUp(self):
         """Set properties of tests that need to be re-created every test."""
@@ -52,8 +60,12 @@ class TestSwathProjector(TestCase):
         """Utility method to retrieve `history`, `History` and `history_json`
         global attributes from a test output file.
 
+        `file_path` is the path `stage` was called with, which lies inside the
+        adapter's working directory and no longer exists. The copy taken by
+        `stage_side_effect` is read instead.
+
         """
-        with Dataset(file_path, 'r') as dataset:
+        with Dataset(join(self.tmp_dir, basename(file_path)), 'r') as dataset:
             history = getattr(dataset, 'history', None)
             history_uppercase = getattr(dataset, 'History', None)
             history_json = getattr(dataset, 'history_json', None)
