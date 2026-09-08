@@ -649,6 +649,23 @@ class TestFindDimensionVariable(TestCase):
             self.assertEqual(result.group().path, '/support_data')
             np.testing.assert_array_equal(result[:], np.arange(4))
 
+    def test_variable_and_dimension_in_root(self):
+        """A coordinate variable and its dimension at the root group, should be
+        found.
+
+        """
+        with Dataset('test.nc', 'w', diskless=True) as dataset:
+            dataset.createDimension('layer', size=4)
+            variable = dataset.createVariable('layer', 'i4', dimensions=('layer',))
+            variable[:] = np.arange(4)
+
+            dimension = dataset.dimensions['layer']
+            result = find_dimension_variable(dimension)
+
+            self.assertIsNotNone(result)
+            self.assertEqual(result.group().path, '/')
+            np.testing.assert_array_equal(result[:], np.arange(4))
+
     def test_variable_in_ancestor_group(self):
         """A dimension re-declared in a group, with its coordinate variable
         only in the root group, should resolve to the root variable. This
