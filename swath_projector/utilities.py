@@ -302,11 +302,34 @@ def get_preferred_ordered_dimensions_info(
 
     all_ordered_dims = (*ordered_non_track_dims, *ordered_track_dims)
 
+    dims_by_name = {dim.name: dim for dim in variable.get_dims()}
     ordered_non_track_dim_objs = [
-        dataset.dimensions[dim] for dim in ordered_non_track_dims
+        dims_by_name[dim_name] for dim_name in ordered_non_track_dims
     ]
 
     return all_ordered_dims, ordered_non_track_dim_objs
+
+
+def find_dimension_variable(dimension: Dimension) -> Variable | None:
+    """Return the variable that describes the given dimension, if one exists.
+
+    The dimension variable (probably correctly called a coordinate variable,
+    but that's overloaded in here already.) shares the name of its
+    dimension. The search begins in the group that declares the dimension, then
+    walk up through ancestor groups to the root. This finds both a dimension
+    variable stored alongside its dimension in a group, and one stored in the
+    root group while the dimension itself is re-declared in a child group.
+
+    """
+    group = dimension.group()
+
+    while group is not None:
+        if dimension.name in group.variables:
+            return group.variables[dimension.name]
+
+        group = group.parent
+
+    return None
 
 
 def get_ordered_track_dims(coordinate_var: Variable) -> Tuple[str]:

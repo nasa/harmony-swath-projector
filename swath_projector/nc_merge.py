@@ -14,7 +14,11 @@ from netCDF4 import Dataset, Variable
 from varinfo import VarInfoFromNetCDF4
 
 from swath_projector.exceptions import MissingReprojectedDataError
-from swath_projector.utilities import get_variable_file_path, variable_in_dataset
+from swath_projector.utilities import (
+    find_dimension_variable,
+    get_variable_file_path,
+    variable_in_dataset,
+)
 
 # Values needed for history_json attribute
 HISTORY_JSON_SCHEMA = (
@@ -68,7 +72,7 @@ def create_output(
 
             if os.path.isfile(dataset_file):
                 with Dataset(dataset_file) as data:
-                    set_dimensions(data, output_dataset)
+                    set_dimensions(data, output_dataset, input_dataset[variable_name])
 
                     copy_science_variable(
                         input_dataset,
@@ -219,14 +223,82 @@ def read_attrs(dataset: Union[Dataset, Variable]) -> Dict:
     return dataset.__dict__
 
 
-def set_dimensions(input_dataset: Dataset, output_dataset: Dataset) -> None:
-    """Read the dimensions in the single band intermediate file. Add each
-    dimension to the output dataset that is not already present.
+def create_dimension(
+    output_dataset: Dataset, group_path: str, name: str, size: int
+) -> bool:
+    """Create a dimension in the output group that declared it in the input
+    granule. Return True if the dimension was created, or False if that group
+    already contained it.
+
+    `Group.dimensions` only lists the dimensions declared by that group, so
+    the membership check is correctly scoped. `createGroup` returns the root
+    group for '/', and creates any intermediate groups that are absent.
 
     """
-    for name, dimension in input_dataset.dimensions.items():
-        if name not in output_dataset.dimensions:
-            output_dataset.createDimension(name, dimension.size)
+    group = output_dataset.createGroup(group_path)
+
+    if name in group.dimensions:
+        return False
+
+    group.createDimension(name, size)
+    return True
+
+
+def set_dimensions(
+    single_band_dataset: Dataset, output_dataset: Dataset, input_variable: Variable
+) -> None:
+    """Read the dimensions in the single band intermediate file, which are all
+    in its root group, and add each to the output dataset in the group that
+    declared it in the input granule.
+
+    The reprojected horizontal dimensions are created by the reprojection
+    itself, so they have no counterpart in the input variable and are placed
+    in the root group, to be shared by every group in the output.
+
+    """
+    input_dimensions = {
+        dimension.name: dimension for dimension in input_variable.get_dims()
+    }
+
+    for name, dimension in single_band_dataset.dimensions.items():
+        input_dimension = input_dimensions.get(name)
+        group_path = '/' if input_dimension is None else input_dimension.group().path
+        create_dimension(output_dataset, group_path, name, dimension.size)
+
+
+def copy_dimension_variable(
+    output_dataset: Dataset, dimension_variable: Variable
+) -> None:
+    """Copy a coordinate variable into the output group it occupied in the
+    input granule. That group must declare the variable's own dimension
+    before the variable can be created against it, which is not guaranteed
+    when the dimension was resolved from a descendant group.
+
+    """
+    for dimension in dimension_variable.get_dims():
+        create_dimension(
+            output_dataset, dimension.group().path, dimension.name, dimension.size
+        )
+
+    output_group = output_dataset.createGroup(dimension_variable.group().path)
+
+    if dimension_variable.name in output_group.variables:
+        return
+
+    attributes = read_attrs(dimension_variable)
+    fill_value = get_fill_value_from_attributes(attributes)
+
+    output_variable = output_group.createVariable(
+        dimension_variable.name,
+        dimension_variable.datatype,
+        dimensions=dimension_variable.dimensions,
+        fill_value=fill_value,
+        zlib=True,
+        complevel=6,
+    )
+
+    output_variable[:] = dimension_variable[:]
+    output_variable.setncatts(attributes)
 
 
 def copy_dimension_variables(
@@ -245,7 +317,10 @@ def copy_dimension_variables(
     corresponding variable is copied into the output dataset.
     """
     all_input_variables = var_info.get_all_variables()
-    group_name = single_band_dataset[variable_name].group().name
+
+    # Need to use .path over .name (to prepend '/') since we're considering
+    # sub-groups outside of the root group.
+    group_path = single_band_dataset[variable_name].group().path
 
     for dim in single_band_dataset.dimensions:
         # Skip dimensions that have already been copied over. This also ensures that
@@ -259,7 +334,7 @@ def copy_dimension_variables(
             copy_metadata_variable(input_dataset, output_dataset, dim, logger)
             continue
 
-        grouped_dim = f"{group_name.rstrip('/')}/{dim}"
+        grouped_dim = f"{group_path.rstrip('/')}/{dim}"
         if grouped_dim in all_input_variables:
             copy_metadata_variable(input_dataset, output_dataset, grouped_dim, logger)
 
@@ -274,26 +349,17 @@ def set_metadata_dimensions(
     exists as a variable in the source file, copy it to the output file.
 
     """
-    for dimension in source_dataset[metadata_variable].dimensions:
-        if dimension not in output_dataset.dimensions:
-            output_dataset.createDimension(
-                dimension, source_dataset.dimensions[dimension].size
-            )
-            if dimension in source_dataset.variables:
-                attributes = read_attrs(source_dataset[dimension])
-                fill_value = get_fill_value_from_attributes(attributes)
+    for dimension in source_dataset[metadata_variable].get_dims():
+        if create_dimension(
+            output_dataset, dimension.group().path, dimension.name, dimension.size
+        ):
+            # The coordinate variable is resolved from the group declaring the
+            # dimension upwards, rather than from the root group alone, so that
+            # a coordinate variable stored inside a group is still copied.
+            dimension_variable = find_dimension_variable(dimension)
 
-                output_dataset.createVariable(
-                    dimension,
-                    source_dataset[dimension].datatype,
-                    dimensions=source_dataset[dimension].dimensions,
-                    fill_value=fill_value,
-                    zlib=True,
-                    complevel=6,
-                )
-
-                output_dataset[dimension][:] = source_dataset[dimension][:]
-                output_dataset[dimension].setncatts(attributes)
+            if dimension_variable is not None:
+                copy_dimension_variable(output_dataset, dimension_variable)
 
 
 def copy_metadata_variable(
@@ -313,6 +379,13 @@ def copy_metadata_variable(
     """
     logger.info(f'Adding metadata variable "{variable_name}" to the output.')
     set_metadata_dimensions(variable_name, source_dataset, output_dataset)
+
+    if variable_in_dataset(variable_name, output_dataset):
+        # prevent coordinate variables from attempting to be copied twice since
+        # `set_metadata_dimensions` copies the coordinate variable belonging to
+        # each dimension it creates.
+        logger.info(f'Metadata variable "{variable_name}" was already written.')
+        return
 
     attributes = read_attrs(source_dataset[variable_name])
     fill_value = get_fill_value_from_attributes(attributes)

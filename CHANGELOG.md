@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.6.0] - 2026-09-01
+
+### Changed
+
+- [[DAS-2523](https://bugs.earthdata.nasa.gov/browse/DAS-2523)] The swath projector has been updated to correctly handle group level dimensions to support TEMPO O3PROF L2 data.
+  + Dimension objects in groups are now correctly identified and used.
+  + When merging the 1-band variables, dimensions and their dimension variables are now created in the group that declared them in the input file, rather than all being flattened into the root group. The reprojected horizontal dimensions remain in the root group, shared by every group.
+  + The intermediate temporary files created are now cleaned up instead of left on disk.
+
 ## [v1.5.1] - 2026-08-18
 
 ### Changed
@@ -120,9 +129,11 @@ Repository structure changes include:
 For more information on internal releases prior to NASA open-source approval,
 see legacy-CHANGELOG.md.
 
+[v1.6.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.6.0)
 [v1.5.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.5.1)
 [v1.5.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.5.0)
 [v1.4.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.4.0)
+[v1.3.1]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.3.1)
 [v1.3.0]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.3.0)
 [v1.2.3]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.3)
 [v1.2.2]: (https://github.com/nasa/harmony-swath-projector/releases/tag/1.2.2)
