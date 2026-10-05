@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Preserve packed metadata and coordinate values when merging output files.
+  Install scale and offset attributes before copying decoded values (#61).
+
 ## [v1.6.0] - 2026-09-01
 
 ### Changed

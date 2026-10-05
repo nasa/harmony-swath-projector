@@ -297,8 +297,9 @@ def copy_dimension_variable(
         complevel=6,
     )
 
-    output_variable[:] = dimension_variable[:]
+    # Install packing metadata before assigning the decoded source values.
     output_variable.setncatts(attributes)
+    output_variable[:] = dimension_variable[:]
 
 
 def copy_dimension_variables(
@@ -399,8 +400,9 @@ def copy_metadata_variable(
         complevel=6,
     )
 
-    output_dataset[variable_name][:] = source_dataset[variable_name][:]
+    # NetCDF packs decoded values on write only after scale/offset are set.
     output_dataset[variable_name].setncatts(attributes)
+    output_dataset[variable_name][:] = source_dataset[variable_name][:]
 
 
 def copy_science_variable(
